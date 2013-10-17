@@ -165,11 +165,11 @@ class Project(object):
       (defaults to the current user)
 
     """
+    url = url.rstrip('/')
     user = user or getuser()
     with temppath() as path:
       self.build(path)
-      if not session_id:
-        # TODO: check if session.id is valid also
+      if not session_id or post('%s/manager' % (url, ), {'session.id': session_id}, verify=False).text:
         req = post(
           url,
           data={'action': 'login', 'username': user, 'password': getpass()},
@@ -186,11 +186,14 @@ class Project(object):
           'ajax': 'upload',
           'session.id': session_id,
           'project': self.name,
-          'file': path
+        },
+        files={
+          'file': ('file.zip', open(path, 'rb')),
         },
         verify=False
       )
-      if 'error' in req.json():
+      res = req.json()
+      if 'error' in res:
         raise AzkabanError(res['error'])
 
   def run(self):
