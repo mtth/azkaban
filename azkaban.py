@@ -24,7 +24,7 @@ from contextlib import contextmanager
 from docopt import docopt
 from getpass import getpass, getuser
 from os import close, remove
-from os.path import basename, exists, expanduser, join, splitext
+from os.path import basename, exists, expanduser, isabs, join, splitext
 from requests import post
 from sys import argv
 from tempfile import mkstemp
@@ -99,10 +99,15 @@ class Project(object):
   def add_file(self, path, archive_path=None):
     """Include a file in the project archive.
 
-    :param path: path to file
+    :param path: absolute path to file
     :param archive_path: path to file in archive (defaults to same as `path`)
 
+    This method requires the path to be absolute to avoid having files in the
+    archive with lower level destinations than the base root directory.
+
     """
+    if not isabs(path):
+      raise AzkabanError('relative path not allowed: %r' % (path, ))
     if path in self._files:
       if self._files[path] != archive_path:
         raise AzkabanError('inconsistent duplicate: %r' % (path, ))

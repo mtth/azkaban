@@ -4,6 +4,7 @@
 """Azkaban test module."""
 
 from nose.tools import eq_, ok_, raises, nottest
+from os.path import relpath
 
 from azkaban import *
 
@@ -42,6 +43,12 @@ class TestProject(object):
     """TODO: test_missing_file docstring."""
     project = Project('foo')
     project.add_file('bar')
+
+  @raises(AzkabanError)
+  def test_relative_file(self):
+    """TODO: test_relative_file docstring."""
+    project = Project('foo')
+    project.add_file(relpath(__file__))
 
   def test_add_duplicate_file(self):
     """TODO: test_add_duplicate_file docstring."""
@@ -93,13 +100,13 @@ class TestProject(object):
 
   def test_build_with_file(self):
     """TODO: test_build_with_file docstring."""
-    project = Project('pf')
-    project.add_file(__file__, 'this.py')
+    project = Project('foo')
+    project.add_file(__file__.rstrip('c'), 'this.py')
     with temppath() as path:
       project.build(path)
       with ZipFile(path) as reader:
         ok_('this.py' in reader.namelist())
-        eq_(reader.read('this.py').split('\n')[7], 'from azkaban import *')
+        eq_(reader.read('this.py').split('\n')[8], 'from azkaban import *')
 
   def test_build_multiple_jobs(self):
     """TODO: test_zip_single_job docstring."""
