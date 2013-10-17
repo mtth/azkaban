@@ -133,7 +133,7 @@ class Project(object):
 
     :param path: destination path
 
-    Triggeres the `on_build` method on each job inside the project (passing
+    Triggers the `on_build` method on each job inside the project (passing
     itself and the job's name as two argument). This method will be called
     right before the job file is generated.
 
