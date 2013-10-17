@@ -144,7 +144,9 @@ class Project(object):
     right before the job file is generated.
 
     """
-    with ZipFile(path, 'w') as writer:
+    # not using a with statement for compatibility with older python versions
+    writer = ZipFile(path, 'w')
+    try:
       for name, job in self._jobs.items():
         job.on_build(self, name)
         with temppath() as fpath:
@@ -152,6 +154,8 @@ class Project(object):
           writer.write(fpath, '%s.job' % (name, ))
       for fpath, apath in self._files.items():
         writer.write(fpath, apath)
+    finally:
+      writer.close()
 
   def upload(self, url, user=None, session_id=None):
     """Build and upload project to Azkaban.

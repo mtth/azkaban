@@ -94,9 +94,12 @@ class TestProject(object):
     with temppath() as path:
       project.build(path)
       eq_(job.test, ('foo', 'bar'))
-      with ZipFile(path) as reader:
+      reader =  ZipFile(path)
+      try:
         ok_('bar.job' in reader.namelist())
         eq_(reader.read('bar.job'), 'a=2\n')
+      finally:
+        reader.close()
 
   def test_build_with_file(self):
     """TODO: test_build_with_file docstring."""
@@ -104,9 +107,12 @@ class TestProject(object):
     project.add_file(__file__.rstrip('c'), 'this.py')
     with temppath() as path:
       project.build(path)
-      with ZipFile(path) as reader:
+      reader = ZipFile(path)
+      try:
         ok_('this.py' in reader.namelist())
         eq_(reader.read('this.py').split('\n')[8], 'from azkaban import *')
+      finally:
+        reader.close()
 
   def test_build_multiple_jobs(self):
     """TODO: test_zip_single_job docstring."""
@@ -116,11 +122,14 @@ class TestProject(object):
     project.add_file(__file__, 'this.py')
     with temppath() as path:
       project.build(path)
-      with ZipFile(path) as reader:
+      reader = ZipFile(path)
+      try:
         ok_('foo.job' in reader.namelist())
         ok_('bar.job' in reader.namelist())
         ok_('this.py' in reader.namelist())
         eq_(reader.read('foo.job'), 'a=2\n')
+      finally:
+        reader.close()
 
 
 class TestJob(object):
