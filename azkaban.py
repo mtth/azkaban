@@ -19,8 +19,6 @@ Options:
 
 """
 
-import re
-
 from ConfigParser import NoOptionError, RawConfigParser
 from contextlib import contextmanager
 from docopt import docopt
@@ -76,29 +74,6 @@ def temppath():
     if exists(path):
       remove(path)
 
-def get_session_id(cluster, user, path=None):
-  """TODO: get_config docstring.
-
-  :param section: TODO
-  :param option: TODO
-
-  """
-  parser = RawConfigParser()
-  path = path or join(expanduser('~'), '.azkabanrc')
-  parser.read(path)
-  if not parser.has_section(section):
-    parser.add_section(section)
-  try:
-    value = parser.get(section, option)
-  except NoOptionError:
-    value = value or raw_input('%s %s' % (message, '[%s] ' % (default, ) if default else ''))
-    parser.set(section, option, value)
-    with open(path, 'w') as writer:
-      parser.write(writer)
-    return value
-  else:
-    return value
-
 
 class AzkabanError(Exception):
 
@@ -132,6 +107,8 @@ class Project(object):
       if self._files[path] != archive_path:
         raise AzkabanError('inconsistent duplicate: %r' % (path, ))
     else:
+      if not exists(path):
+        raise AzkabanError('file missing: %r' % (path, ))
       self._files[path] = archive_path
 
   def add_job(self, name, job):
@@ -141,7 +118,8 @@ class Project(object):
     :param job: `Job` subclass
 
     This method triggers the `on_add` method on the added job (passing the
-    project and name as arguments).
+    project and name as arguments). The handler will be called right after the
+    job is added.
 
     """
     if name in self._jobs:
@@ -170,7 +148,7 @@ class Project(object):
         writer.write(fpath, apath)
 
   def upload(self, url):
-    """Build and upload project to Azkaban.
+    """TODO: Build and upload project to Azkaban.
 
     :param url: http endpoint (including port)
 
@@ -190,7 +168,7 @@ class Project(object):
       )
 
   def run(self):
-    """Command line interface."""
+    """TODO: Command line interface."""
     argv.insert(0, 'FILE')
     args = docopt(__doc__, version=__version__)
     if args['build']:
@@ -200,6 +178,7 @@ class Project(object):
     elif args['view']:
       for name in self._jobs:
         print name
+
 
 class Job(object):
 
@@ -255,20 +234,25 @@ class Job(object):
 
 class PigJob(Job):
 
-  """Job class corresponding to pig jobs (pigLi type).
+  """Job class corresponding to pig jobs.
 
   :param path: path to pig script
   :param *options: cf. `Job`
 
-  Implements helpful handlers.
+  Implements helpful handlers. To use custom pig type jobs, override the `type`
+  class attribute.
 
   TODO: automatic dependency detection using variables.
 
   """
 
+  type = 'pig'
+
   def __init__(self, path, *options):
+    if not exists(path):
+      raise AzkabanError('pig script missing: %r' % (path, ))
     super(PigJob, self).__init__(
-      {'type': 'pigLi', 'pig.script': path},
+      {'type': self.type, 'pig.script': path},
       *options
     )
     self.path = path
