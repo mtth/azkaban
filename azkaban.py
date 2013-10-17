@@ -4,7 +4,7 @@
 """Azkaban CLI.
 
 Usage:
-  python FILE upload (-p PROFILE | [-u USER] URL)
+  python FILE upload (-a ALIAS | [-u USER] URL)
   python FILE build PATH
   python FILE view
   python FILE -h | --help | -v | --version
@@ -15,9 +15,9 @@ Arguments:
   URL                           Azkaban endpoint (with port).
 
 Options:
-  -h --help                     Show this message and exit.
-  -p PROFILE --profile=PROFILE  Saved username, URL. Will also try to reuse
+  -a ALIAS --alias=ALIAS        Saved username, URL. Will also try to reuse
                                 session IDs.
+  -h --help                     Show this message and exit.
   -u USER --user=USER           Username used to log into Azkaban.
   -v --version                  Show version and exit.
 
@@ -92,6 +92,8 @@ class Project(object):
 
   """
 
+  rcpath = expanduser('~/.azkabanrc')
+
   def __init__(self, name):
     self.name = name
     self._jobs = {}
@@ -157,29 +159,15 @@ class Project(object):
     finally:
       writer.close()
 
-  def upload(self, url, user=None, session_id=None):
+  def upload(self, url=None, user=None, password=None, alias=None):
     """Build and upload project to Azkaban.
 
     :param url: http endpoint (including port)
-    :param user: username which will be used to upload the built project
-      (defaults to the current user)
 
     """
-    url = url.rstrip('/')
-    user = user or getuser()
+    (url, session_id) = self._get_credentials(url, user, password, alias)
     with temppath() as path:
       self.build(path)
-      if not session_id or post('%s/manager' % (url, ), {'session.id': session_id}, verify=False).text:
-        req = post(
-          url,
-          data={'action': 'login', 'username': user, 'password': getpass()},
-          verify=False
-        )
-        res = req.json()
-        if 'error' in res:
-          raise AzkabanError(res['error'])
-        else:
-          session_id = res['session.id']
       req = post(
         '%s/manager' % (url, ),
         data={
@@ -195,37 +183,70 @@ class Project(object):
       res = req.json()
       if 'error' in res:
         raise AzkabanError(res['error'])
+      else:
+        res.update({'session_id': session_id})
+        return res
 
   def run(self):
-    """TODO: Command line interface."""
+    """Command line argument parser."""
     argv.insert(0, 'FILE')
     args = docopt(__doc__, version=__version__)
     if args['build']:
       self.build(args['PATH'])
     elif args['upload']:
-      self.upload(args['URL'])
+      res = self.upload(
+        url=args['URL'],
+        user=args['--user'],
+        alias=args['--alias'],
+      )
     elif args['view']:
       for name in sorted(self._jobs):
         print name
 
-  def _get_profile(self, profile):
-    """Get username, URL and session ID corresponding to profile.
+  def _get_credentials(self, url=None, user=None, password=None, alias=None):
+    """Get valid session ID.
 
-    :param profile: name of profile.
+    :param url: http endpoint (including port)
+    :param user: username which will be used to upload the built project
+      (defaults to the current user)
 
     """
-    parser = RawConfigParser()
-    parser.read(expanduser('~/.azkabanrc'))
-    if not parser.has_section(profile):
-      raise AzkabanError('missing profile: %r' % (profile, ))
-    elif not parser.has_option(profile, 'url'):
-      raise AzkabanError('missing URL for profile: %r' % (profile, ))
-    else:
-      return {
-        'user': parser.get(profile, 'user'),
-        'url': parser.get(profile, 'url'),
-        'session_id': parser.get(profile, 'session_id'),
-      }
+    if alias:
+      parser = RawConfigParser({'user': '', 'session_id': ''})
+      parser.read(self.rcpath)
+      if not parser.has_section(alias):
+        raise AzkabanError('missing alias: %r' % (alias, ))
+      elif not parser.has_option(alias, 'url'):
+        raise AzkabanError('missing URL for alias: %r' % (alias, ))
+      else:
+        url = parser.get(alias, 'url')
+        user = parser.get(alias, 'user')
+        session_id = parser.get(alias, 'session_id')
+    elif not url:
+        raise ValueError('Either url or alias must be specified.')
+    url = url.rstrip('/')
+    if not session_id or post(
+      '%s/manager' % (url, ),
+      {'session.id': session_id},
+      verify=False
+    ).text:
+      user = user or getuser()
+      password = password or getpass('Azkaban password for %s: ' % (user, ))
+      req = post(
+        url,
+        data={'action': 'login', 'username': user, 'password': password},
+        verify=False,
+      )
+      res = req.json()
+      if 'error' in res:
+        raise AzkabanError(res['error'])
+      else:
+        session_id = res['session.id']
+        if alias:
+          parser.set(alias, 'session_id', session_id)
+          with open(self.rcpath, 'w') as writer:
+            parser.write(writer)
+    return (url, session_id)
 
 
 class Job(object):
