@@ -16,7 +16,7 @@ Command line interface for Azkaban_.
 
   project.add_file('baz.jar')
 
-  project.build('foo.zip')
+  project.run()
 
 
 Convenience job class for pig jobs:

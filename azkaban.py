@@ -4,18 +4,22 @@
 """Azkaban CLI.
 
 Usage:
+  python FILE upload (-p PROFILE | [-u USER] URL)
   python FILE build PATH
-  python FILE upload URL
   python FILE view
+  python FILE -h | --help | -v | --version
 
 Arguments:
-  FILE            Jobs file.
-  PATH            Output path where zip file will be created.
-  URL             Azkaban endpoint.
+  FILE                          Jobs file.
+  PATH                          Output path where zip file will be created.
+  URL                           Azkaban endpoint (with port).
 
 Options:
-  -h --help       Show this message and exit.
-  -v --version    Show version and exit.
+  -h --help                     Show this message and exit.
+  -p PROFILE --profile=PROFILE  Saved username, URL. Will also try to reuse
+                                session IDs.
+  -u USER --user=USER           Username used to log into Azkaban.
+  -v --version                  Show version and exit.
 
 """
 
@@ -85,14 +89,11 @@ class Project(object):
   """Azkaban project.
 
   :param name: name of the project
-  :param user: username which will be used to upload the built project
-    (defaults to the current user)
 
   """
 
-  def __init__(self, name, user=None):
+  def __init__(self, name):
     self.name = name
-    self.user = user or getuser()
     self._jobs = {}
     self._files = {}
 
@@ -108,7 +109,7 @@ class Project(object):
     """
     if not isabs(path):
       raise AzkabanError('relative path not allowed: %r' % (path, ))
-    if path in self._files:
+    elif path in self._files:
       if self._files[path] != archive_path:
         raise AzkabanError('inconsistent duplicate: %r' % (path, ))
     else:
@@ -152,25 +153,41 @@ class Project(object):
       for fpath, apath in self._files.items():
         writer.write(fpath, apath)
 
-  def upload(self, url):
-    """TODO: Build and upload project to Azkaban.
+  def upload(self, url, user=None, session_id=None):
+    """Build and upload project to Azkaban.
 
     :param url: http endpoint (including port)
+    :param user: username which will be used to upload the built project
+      (defaults to the current user)
 
     """
+    user = user or getuser()
     with temppath() as path:
       self.build(path)
-      url = get_cluster_url(cluster, url)
-      session_id = get_session_id(cluster, self.user)
+      if not session_id:
+        # TODO: check if session.id is valid also
+        req = post(
+          url,
+          data={'action': 'login', 'username': user, 'password': getpass()},
+          verify=False
+        )
+        res = req.json()
+        if 'error' in res:
+          raise AzkabanError(res['error'])
+        else:
+          session_id = res['session.id']
       req = post(
         '%s/manager' % (url, ),
         data={
           'ajax': 'upload',
-          'session-id': session_id,
+          'session.id': session_id,
           'project': self.name,
           'file': path
-        }
+        },
+        verify=False
       )
+      if 'error' in req.json():
+        raise AzkabanError(res['error'])
 
   def run(self):
     """TODO: Command line interface."""
@@ -179,10 +196,29 @@ class Project(object):
     if args['build']:
       self.build(args['PATH'])
     elif args['upload']:
-      pass
+      self.upload(args['URL'])
     elif args['view']:
-      for name in self._jobs:
+      for name in sorted(self._jobs):
         print name
+
+  def _get_profile(self, profile):
+    """Get username, URL and session ID corresponding to profile.
+
+    :param profile: name of profile.
+
+    """
+    parser = RawConfigParser()
+    parser.read(expanduser('~/.azkabanrc'))
+    if not parser.has_section(profile):
+      raise AzkabanError('missing profile: %r' % (profile, ))
+    elif not parser.has_option(profile, 'url'):
+      raise AzkabanError('missing URL for profile: %r' % (profile, ))
+    else:
+      return {
+        'user': parser.get(profile, 'user'),
+        'url': parser.get(profile, 'url'),
+        'session_id': parser.get(profile, 'session_id'),
+      }
 
 
 class Job(object):
