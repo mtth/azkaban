@@ -14,7 +14,7 @@ setup(
     author_email='monsch@alum.mit.edu',
     url='http://github.com/mtth/azkaban/',
     license='MIT',
-    # py_modules=['azkaban'],
+    py_modules=['azkaban'],
     classifiers=[
       'Development Status :: 4 - Beta',
       'Intended Audience :: Developers',

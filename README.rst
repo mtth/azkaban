@@ -82,8 +82,8 @@ The session ID is cached and reused for later connections.
 Job options
 ***********
 
-There often are options which are common across multiple jobs. For this 
-reason, the :code:`Job` constructor takes in multiple options dictionaries. 
+There often are options which are shared across multiple jobs. For this 
+reason, the :code:`Job` constructor can take in multiple options dictionaries. 
 The first definition of an option (i.e. earlier in the arguments) will take 
 precedence over later ones.
 
@@ -102,7 +102,7 @@ We can use this to efficiently share default options among jobs, for example:
 All jobs except the first one will have their :code:`user.to.proxy` property 
 set. Note also that the last job overrides the :code:`retries` property.
 
-Finally, nested dictionaries can be used to group options efficiently:
+Finally, nested dictionaries can be used to group options concisely:
 
 .. code:: python
 
@@ -116,7 +116,7 @@ Finally, nested dictionaries can be used to group options efficiently:
   # is equivalent to this one
   Job({
     'proxy': {'user': 'boo', 'keytab.location': '/path'},
-    'param': {'input': 'foo', 'output': 'bar'}
+    'param': {'input': 'foo', 'output': 'bar'},
   })
 
 

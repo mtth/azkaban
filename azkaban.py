@@ -25,17 +25,20 @@ Options:
 
 from ConfigParser import NoOptionError, RawConfigParser
 from contextlib import contextmanager
-from docopt import docopt
 from getpass import getpass, getuser
 from os import close, remove
 from os.path import basename, exists, expanduser, getsize, isabs, join
-from requests import post, ConnectionError
 from sys import argv, exit, stderr, stdout
 from tempfile import mkstemp
 from zipfile import ZipFile
 
+try:
+  from docopt import docopt
+  from requests import post, ConnectionError
+except ImportError:
+  pass
 
-__version__ = '0.1.1'
+__version__ = '0.1.3'
 
 
 def flatten(dct, sep='.'):
