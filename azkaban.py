@@ -36,7 +36,7 @@ from tempfile import mkstemp
 from zipfile import ZipFile
 
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 
 def flatten(dct, sep='.'):
@@ -148,6 +148,8 @@ class Project(object):
 
     """
     # not using a with statement for compatibility with older python versions
+    if not (len(self._jobs) or len(self._files)):
+      raise AzkabanError('building empty project')
     writer = ZipFile(path, 'w')
     try:
       for name, job in self._jobs.items():
@@ -243,6 +245,8 @@ class Project(object):
         session_id = parser.get(alias, 'session_id')
     elif not url:
         raise ValueError('Either url or alias must be specified.')
+    else:
+      session_id = None
     url = url.rstrip('/')
     if not session_id or post(
       '%s/manager' % (url, ),
