@@ -6,8 +6,10 @@ Lightweight command line interface (CLI) for Azkaban_:
 * Define jobs from a single python file
 * Build projects and upload to Azkaban from the command line
 
-Integration is meant to be as transparent as possible: no additional folders 
-and files and no imposed project structure.
+Integration is meant to be as transparent as possible:
+
+* No additional folders and files
+* No imposed project structure
 
 
 Installation
@@ -41,9 +43,9 @@ In this example, we add a single job and file:
     project.main()
 
 From the command line we can now run :code:`python jobs.py --help` to view the 
-list of all available options. E.g. the following command will create the 
-archive :code:`foo.zip` containing all the project's jobs and dependency 
-files:
+list of all available options (:code:`build`, :code:`upload`, etc.). E.g. the 
+following command will create the archive :code:`foo.zip` containing all the 
+project's jobs and dependency files:
 
 .. code:: bash
 
@@ -57,15 +59,17 @@ Aliases
 *******
 
 To avoid having to enter the server's URL on every upload (or hard-coding it 
-into our project configuration file, ugh), we can define an alias in 
+into our project's configuration file, ugh), we can define aliases in 
 :code:`~/.azkabanrc`:
 
 .. code:: cfg
 
   [foo]
-  url = http://url.to.server:port
+  url = http://url.to.foo.server:port
+  [bar]
+  url = http://url.to.bar.server:port
 
-We can now upload directly to this URL with the command:
+We can now upload directly to each of these URLs with the shorthand:
 
 .. code:: bash
 
@@ -86,6 +90,14 @@ adds the corresponding script file to the project.
   from azkaban import PigJob
 
   project.add_job('baz', PigJob('/.../baz.pig', {'dependencies': 'bar'}))
+
+
+Customization
+*************
+
+Any valid python code can go inside the jobs configuration file. This includes 
+using loops to add jobs, subclassing the base :code:`Job` class to better suit 
+a project's needs...
 
 
 .. _Azkaban: http://data.linkedin.com/opensource/azkaban
