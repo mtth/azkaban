@@ -4,9 +4,9 @@
 """Azkaban CLI.
 
 Usage:
-  python FILE upload (-a ALIAS | [-u USER] URL)
-  python FILE build PATH
-  python FILE view
+  python FILE upload [-d] (-a ALIAS | [-u USER] URL)
+  python FILE build [-d] PATH
+  python FILE view [-d]
   python FILE -h | --help | -v | --version
 
 Arguments:
@@ -17,6 +17,7 @@ Arguments:
 Options:
   -a ALIAS --alias=ALIAS        Saved username, URL. Will also try to reuse
                                 session IDs.
+  -d --debug                    Enable full exception tracebock.
   -h --help                     Show this message and exit.
   -u USER --user=USER           Username used to log into Azkaban.
   -v --version                  Show version and exit.
@@ -29,13 +30,13 @@ from docopt import docopt
 from getpass import getpass, getuser
 from os import close, remove
 from os.path import basename, exists, expanduser, isabs, join, splitext
-from requests import post
-from sys import argv
+from requests import post, ConnectionError
+from sys import argv, exit, stderr, stdout
 from tempfile import mkstemp
 from zipfile import ZipFile
 
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 
 def flatten(dct, sep='.'):
@@ -110,13 +111,13 @@ class Project(object):
 
     """
     if not isabs(path):
-      raise AzkabanError('relative path not allowed: %r' % (path, ))
+      raise AzkabanError('relative path not allowed %r' % (path, ))
     elif path in self._files:
       if self._files[path] != archive_path:
-        raise AzkabanError('inconsistent duplicate: %r' % (path, ))
+        raise AzkabanError('inconsistent duplicate %r' % (path, ))
     else:
       if not exists(path):
-        raise AzkabanError('file missing: %r' % (path, ))
+        raise AzkabanError('missing file %r' % (path, ))
       self._files[path] = archive_path
 
   def add_job(self, name, job):
@@ -131,7 +132,7 @@ class Project(object):
 
     """
     if name in self._jobs:
-      raise AzkabanError('duplicate job name: %r' % (name, ))
+      raise AzkabanError('duplicate job name %r' % (name, ))
     else:
       self._jobs[name] = job
       job.on_add(self, name)
@@ -163,45 +164,63 @@ class Project(object):
     """Build and upload project to Azkaban.
 
     :param url: http endpoint (including port)
+    :param user: Azkaban username (must have the appropriate permissions)
+    :param password: Azkaban login password
+    :param alias: section of rc file used to cache urls (will enable session
+      ID caching)
+
+    Note that in order to upload to Azkaban, the project must have already been
+    created and the corresponding user must have permissions to upload.
 
     """
     (url, session_id) = self._get_credentials(url, user, password, alias)
     with temppath() as path:
       self.build(path)
-      req = post(
-        '%s/manager' % (url, ),
-        data={
-          'ajax': 'upload',
-          'session.id': session_id,
-          'project': self.name,
-        },
-        files={
-          'file': ('file.zip', open(path, 'rb')),
-        },
-        verify=False
-      )
-      res = req.json()
-      if 'error' in res:
-        raise AzkabanError(res['error'])
+      try:
+        req = post(
+          '%s/manager' % (url, ),
+          data={
+            'ajax': 'upload',
+            'session.id': session_id,
+            'project': self.name,
+          },
+          files={
+            'file': ('file.zip', open(path, 'rb')),
+          },
+          verify=False
+        )
+      except ConnectionError as err:
+        raise AzkabanError('unable to connect to azkaban server')
       else:
-        res.update({'session_id': session_id})
-        return res
+        res = req.json()
+        if 'error' in res:
+          raise AzkabanError(res['error'])
+        else:
+          return res
 
-  def run(self):
+  def main(self):
     """Command line argument parser."""
     argv.insert(0, 'FILE')
     args = docopt(__doc__, version=__version__)
-    if args['build']:
-      self.build(args['PATH'])
-    elif args['upload']:
-      res = self.upload(
-        url=args['URL'],
-        user=args['--user'],
-        alias=args['--alias'],
-      )
-    elif args['view']:
-      for name in sorted(self._jobs):
-        print name
+    try:
+      if args['build']:
+        self.build(args['PATH'])
+      elif args['upload']:
+        res = self.upload(
+          url=args['URL'],
+          user=args['--user'],
+          alias=args['--alias'],
+        )
+        stdout.write(
+          'project %s successfully uploaded (id: %s, version:%s)\n' %
+          (self.name, res['projectId'], res['version'])
+        )
+      elif args['view']:
+        for name, job in sorted(self._jobs.items()):
+          stdout.write('%s [%s]\n' % (name, job.options['type']))
+    except AzkabanError as err:
+      stderr.write('error: %s\n' % (err, ))
+      exit(1)
 
   def _get_credentials(self, url=None, user=None, password=None, alias=None):
     """Get valid session ID.
@@ -215,9 +234,9 @@ class Project(object):
       parser = RawConfigParser({'user': '', 'session_id': ''})
       parser.read(self.rcpath)
       if not parser.has_section(alias):
-        raise AzkabanError('missing alias: %r' % (alias, ))
+        raise AzkabanError('missing alias %r' % (alias, ))
       elif not parser.has_option(alias, 'url'):
-        raise AzkabanError('missing URL for alias: %r' % (alias, ))
+        raise AzkabanError('missing url for alias %r' % (alias, ))
       else:
         url = parser.get(alias, 'url')
         user = parser.get(alias, 'user')
@@ -231,21 +250,25 @@ class Project(object):
       verify=False
     ).text:
       user = user or getuser()
-      password = password or getpass('Azkaban password for %s: ' % (user, ))
-      req = post(
-        url,
-        data={'action': 'login', 'username': user, 'password': password},
-        verify=False,
-      )
-      res = req.json()
-      if 'error' in res:
-        raise AzkabanError(res['error'])
+      password = password or getpass('azkaban password for %s: ' % (user, ))
+      try:
+        req = post(
+          url,
+          data={'action': 'login', 'username': user, 'password': password},
+          verify=False,
+        )
+      except ConnectionError as err:
+        raise AzkabanError('unable to connect to azkaban server')
       else:
-        session_id = res['session.id']
-        if alias:
-          parser.set(alias, 'session_id', session_id)
-          with open(self.rcpath, 'w') as writer:
-            parser.write(writer)
+        res = req.json()
+        if 'error' in res:
+          raise AzkabanError(res['error'])
+        else:
+          session_id = res['session.id']
+          if alias:
+            parser.set(alias, 'session_id', session_id)
+            with open(self.rcpath, 'w') as writer:
+              parser.write(writer)
     return (url, session_id)
 
 
@@ -319,7 +342,7 @@ class PigJob(Job):
 
   def __init__(self, path, *options):
     if not exists(path):
-      raise AzkabanError('pig script missing: %r' % (path, ))
+      raise AzkabanError('missing pig script %r' % (path, ))
     super(PigJob, self).__init__(
       {'type': self.type, 'pig.script': path},
       *options
