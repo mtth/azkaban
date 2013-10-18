@@ -328,7 +328,7 @@ class PigJob(Job):
 
   """Job class corresponding to pig jobs.
 
-  :param path: path to pig script
+  :param path: absolute path to pig script
   :param *options: cf. `Job`
 
   Implements helpful handlers. To use custom pig type jobs, override the `type`
@@ -344,7 +344,7 @@ class PigJob(Job):
     if not exists(path):
       raise AzkabanError('missing pig script %r' % (path, ))
     super(PigJob, self).__init__(
-      {'type': self.type, 'pig.script': path},
+      {'type': self.type, 'pig.script': path.lstrip('/')},
       *options
     )
     self.path = path
