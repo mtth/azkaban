@@ -4,9 +4,9 @@
 """Azkaban CLI.
 
 Usage:
-  python FILE upload [-d] (-a ALIAS | [-u USER] URL)
-  python FILE build [-d] PATH
-  python FILE view [-d]
+  python FILE upload (-a ALIAS | [-u USER] URL)
+  python FILE build PATH
+  python FILE view
   python FILE -h | --help | -v | --version
 
 Arguments:
@@ -17,7 +17,6 @@ Arguments:
 Options:
   -a ALIAS --alias=ALIAS        Saved username, URL. Will also try to reuse
                                 session IDs.
-  -d --debug                    Enable full exception tracebock.
   -h --help                     Show this message and exit.
   -u USER --user=USER           Username used to log into Azkaban.
   -v --version                  Show version and exit.
@@ -29,7 +28,7 @@ from contextlib import contextmanager
 from docopt import docopt
 from getpass import getpass, getuser
 from os import close, remove
-from os.path import basename, exists, expanduser, isabs, join, splitext
+from os.path import basename, exists, expanduser, getsize, isabs, join
 from requests import post, ConnectionError
 from sys import argv, exit, stderr, stdout
 from tempfile import mkstemp
@@ -57,6 +56,17 @@ def flatten(dct, sep='.'):
         items.append((new_prefix, value))
     return dict(items)
   return _flatten(dct)
+
+def human_readable(size):
+  """Transform size from bytes to human readable format (kB, MB, ...).
+
+  :param size: size in bytes
+
+  """
+  for suffix in ['bytes','kB','MB','GB','TB']:
+    if size < 1024.0:
+        return "%3.1f%s" % (size, suffix)
+    size /= 1024.0
 
 @contextmanager
 def temppath():
@@ -155,7 +165,7 @@ class Project(object):
       for name, job in self._jobs.items():
         job.on_build(self, name)
         with temppath() as fpath:
-          job.generate(fpath)
+          job.build(fpath)
           writer.write(fpath, '%s.job' % (name, ))
       for fpath, apath in self._files.items():
         writer.write(fpath, apath)
@@ -206,7 +216,10 @@ class Project(object):
     args = docopt(__doc__, version=__version__)
     try:
       if args['build']:
-        self.build(args['PATH'])
+        path = args['PATH']
+        self.build(path)
+        size = human_readable(getsize(path))
+        stdout.write('project successfully built (size: %s)\n' % (size, ))
       elif args['upload']:
         res = self.upload(
           url=args['URL'],
@@ -230,6 +243,9 @@ class Project(object):
     :param url: http endpoint (including port)
     :param user: username which will be used to upload the built project
       (defaults to the current user)
+    :param password: password used to log into Azkaban
+    :param alias: alias name used to find the URL, and an existing
+      session ID if possible (will override the URL parameter)
 
     """
     if alias:
@@ -243,10 +259,10 @@ class Project(object):
         url = parser.get(alias, 'url')
         user = parser.get(alias, 'user')
         session_id = parser.get(alias, 'session_id')
-    elif not url:
-        raise ValueError('Either url or alias must be specified.')
-    else:
+    elif url:
       session_id = None
+    else:
+      raise ValueError('Either url or alias must be specified.')
     url = url.rstrip('/')
     if not session_id or post(
       '%s/manager' % (url, ),
@@ -298,7 +314,7 @@ class Job(object):
       options.update(flatten(option))
     return options
 
-  def generate(self, path):
+  def build(self, path):
     """Create job file.
 
     :param path: path where job file will be created. Any existing file will

@@ -100,7 +100,7 @@ class TestProject(object):
       reader = ZipFile(path)
       try:
         ok_('this.py' in reader.namelist())
-        eq_(reader.read('this.py').split('\n')[9], 'from azkaban import *')
+        eq_(reader.read('this.py').split('\n')[8], 'from azkaban import *')
       finally:
         reader.close()
 
@@ -131,7 +131,7 @@ class TestJob(object):
   def test_generate_simple(self):
     job = Job({'a': 1, 'b': {'c': 2, 'd': 3}})
     with temppath() as path:
-      job.generate(path)
+      job.build(path)
       with open(path) as reader:
         eq_(reader.read(), 'a=1\nb.c=2\nb.d=3\n')
 
@@ -139,7 +139,7 @@ class TestJob(object):
     defaults = {'b': {'d': 4}, 'e': 5}
     job = Job({'a': 1, 'b': {'c': 2, 'd': 3}}, defaults)
     with temppath() as path:
-      job.generate(path)
+      job.build(path)
       with open(path) as reader:
         eq_(reader.read(), 'a=1\nb.c=2\nb.d=3\ne=5\n')
 
@@ -148,7 +148,7 @@ class TestJob(object):
     bar = Job({'a': 3})
     job = Job({'a': 2, 'dependencies': 'bar,foo'})
     with temppath() as path:
-      job.generate(path)
+      job.build(path)
       with open(path) as reader:
         eq_(reader.read(), 'a=2\ndependencies=bar,foo\n')
 
@@ -161,7 +161,7 @@ class TestPigJob(object):
         writer.write('-- pig script')
       job = PigJob(path, {'a': 2}, {'a': 3, 'b': 4}, {'type': 'noop'})
       with temppath() as tpath:
-        job.generate(tpath)
+        job.build(tpath)
         with open(tpath) as reader:
           eq_(
             reader.read(),
@@ -176,7 +176,7 @@ class TestPigJob(object):
         writer.write('-- pig script')
       job = OtherPigJob(path, {'type': 'bar'})
       with temppath() as tpath:
-        job.generate(tpath)
+        job.build(tpath)
         with open(tpath) as reader:
           eq_(
             reader.read(),
@@ -196,17 +196,17 @@ class TestPigJob(object):
       eq_(project._files, {path: None})
 
 
-# class TestUpload(object):
-# 
-#   def setup(self):
-#     if not PASSWORD:
-#       raise SkipTest
-#     self.project = Project('foo')
-# 
-#   @raises(ValueError)
-#   def test_bad_parameters(self):
-#     self.project.upload()
-# 
-#   @raises(AzkabanError)
-#   def test_bad_url(self):
-#     self.project._get_credentials('http://foo')
+class TestUpload(object):
+
+  def setup(self):
+    # if not PASSWORD:
+    #   raise SkipTest
+    self.project = Project('foo')
+
+  @raises(ValueError)
+  def test_bad_parameters(self):
+    self.project.upload(user='bar')
+
+  @raises(AzkabanError)
+  def test_bad_url(self):
+    self.project._get_credentials('http://foo', password='bar')
