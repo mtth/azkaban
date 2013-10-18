@@ -177,20 +177,26 @@ class TestPigJob(object):
       with temppath() as tpath:
         job.generate(tpath)
         with open(tpath) as reader:
-          eq_(reader.read(), 'a=2\nb=4\npig.script=%s\ntype=pig\n' % (path, ))
+          eq_(
+            reader.read(),
+            'a=2\nb=4\npig.script=%s\ntype=pig\n' % (path.lstrip('/'), )
+          )
 
   def test_type(self):
     """TODO: test_type docstring."""
     class OtherPigJob(PigJob):
-      type = 'pigfoo'
+      type = 'foo'
     with temppath() as path:
       with open(path, 'w') as writer:
         writer.write('-- pig script')
-      job = OtherPigJob(path, {'type': 'pigbar'})
+      job = OtherPigJob(path, {'type': 'bar'})
       with temppath() as tpath:
         job.generate(tpath)
         with open(tpath) as reader:
-          eq_(reader.read(), 'pig.script=%s\ntype=pigfoo\n' % (path, ))
+          eq_(
+            reader.read(),
+            'pig.script=%s\ntype=foo\n' % (path.lstrip('/'), )
+          )
 
   @raises(AzkabanError)
   def test_missing(self):

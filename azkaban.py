@@ -36,7 +36,7 @@ from tempfile import mkstemp
 from zipfile import ZipFile
 
 
-__version__ = '0.0.2'
+__version__ = '0.1.0'
 
 
 def flatten(dct, sep='.'):
@@ -311,6 +311,8 @@ class Job(object):
     :param project: project instance
     :param name: name corresponding to this job in the project.
 
+    The default implementation does nothing.
+
     """
     pass
 
@@ -320,6 +322,8 @@ class Job(object):
     :param project: project instance
     :param name: name corresponding to this job in the project.
 
+    The default implementation does nothing.
+
     """
     pass
 
@@ -328,16 +332,13 @@ class PigJob(Job):
 
   """Job class corresponding to pig jobs.
 
-  :param path: absolute path to pig script
-  :param *options: cf. `Job`
-
-  Implements helpful handlers. To use custom pig type jobs, override the `type`
-  class attribute.
-
-  TODO: automatic dependency detection using variables.
+  :param path: absolute path to pig script (this script will automatically be
+    added to the project archive)
+  :param options: cf. `Job`
 
   """
 
+  #: Job type used (change this to use a custom pig type).
   type = 'pig'
 
   def __init__(self, path, *options):
@@ -350,5 +351,5 @@ class PigJob(Job):
     self.path = path
 
   def on_add(self, project, name):
-    """Adds script file to project."""
+    """This handler adds the corresponding script file to the project."""
     project.add_file(self.path)
