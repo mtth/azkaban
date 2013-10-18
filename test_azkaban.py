@@ -5,7 +5,6 @@
 
 from nose.tools import eq_, ok_, raises, nottest
 from os.path import relpath
-from unittest.case import SkipTest
 
 from azkaban import *
 

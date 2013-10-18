@@ -92,12 +92,38 @@ adds the corresponding script file to the project.
   project.add_job('baz', PigJob('/.../baz.pig', {'dependencies': 'bar'}))
 
 
-Customization
-*************
+Job options
+***********
+
+There often are options which are common across multiple jobs. For this 
+reason, the :code:`Job` constructor takes in multiple options dictionaries. 
+The first definition of an option (i.e. earlier in the arguments) will take 
+precedence over later ones.
+
+We can use this to efficiently share default options among jobs, for example:
+
+.. code:: python
+
+  defaults = {'user.to.proxy': 'boo', 'retries': 0}
+  jobs = [
+    Job({'type': 'noop'}),
+    Job({'type': 'noop'}, defaults),
+    Job({'type': 'command', 'command': 'ls'}, defaults),
+    Job({'type': 'command', 'command': 'ls -l', 'retries': 1}, defaults),
+  ]
+
+All jobs except the first one will have their :code:`user.to.proxy` property 
+set to :code:`boo`. Note also that the last job overrides the :code:`retries` 
+property.
+
+
+Next steps
+**********
 
 Any valid python code can go inside the jobs configuration file. This includes 
 using loops to add jobs, subclassing the base :code:`Job` class to better suit 
-a project's needs...
+a project's needs (e.g. by implementing the :code:`on_add` and 
+:code:`on_build` handlers), ...
 
 
 .. _Azkaban: http://data.linkedin.com/opensource/azkaban

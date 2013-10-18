@@ -214,8 +214,8 @@ class Project(object):
           alias=args['--alias'],
         )
         stdout.write(
-          'project %s successfully uploaded (id: %s, version:%s)\n' %
-          (self.name, res['projectId'], res['version'])
+          'project successfully uploaded (id: %s, version: %s)\n' %
+          (res['projectId'], res['version'])
         )
       elif args['view']:
         for name, job in sorted(self._jobs.items()):
