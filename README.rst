@@ -36,8 +36,8 @@ In this example, we add a single job and file:
 
   project = Project('foo')
 
-  project.add_job('bar', Job({'type': 'command', 'command': 'echo "Hello!"'}))
-  project.add_file('bax.jar')
+  project.add_file('/path/to/bar.txt', 'bar.txt')
+  project.add_job('bar', Job({'type': 'command', 'command': 'cat bar.txt'}))
 
   if __name__ == '__main__':
     project.main()
@@ -79,19 +79,6 @@ This has the added benefit that we won't have to authenticate on every upload.
 The session ID is cached and reused for later connections.
 
 
-Pig jobs
-********
-
-A :code:`PigJob` class is provided, which automatically sets the job type and 
-adds the corresponding script file to the project.
-
-.. code:: python
-
-  from azkaban import PigJob
-
-  project.add_job('baz', PigJob('/.../baz.pig', {'dependencies': 'bar'}))
-
-
 Job options
 ***********
 
@@ -113,8 +100,39 @@ We can use this to efficiently share default options among jobs, for example:
   ]
 
 All jobs except the first one will have their :code:`user.to.proxy` property 
-set to :code:`boo`. Note also that the last job overrides the :code:`retries` 
-property.
+set. Note also that the last job overrides the :code:`retries` property.
+
+Finally, nested dictionaries can be used to group options efficiently:
+
+.. code:: python
+
+  # e.g. this job
+  Job({
+    'proxy.user': 'boo',
+    'proxy.keytab.location': '/path',
+    'param.input': 'foo',
+    'param.output': 'bar',
+  })
+  # is equivalent to this one
+  Job({
+    'proxy': {'user': 'boo', 'keytab.location': '/path'},
+    'param': {'input': 'foo', 'output': 'bar'}
+  })
+
+
+Pig jobs
+********
+
+Because pig jobs are so common, a :code:`PigJob` class is provided which 
+accepts a file path (to the pig script) as first constructor argument, 
+optionally followed by job options. It then automatically sets the job type 
+and adds the corresponding script file to the project.
+
+.. code:: python
+
+  from azkaban import PigJob
+
+  project.add_job('baz', PigJob('/.../baz.pig', {'dependencies': 'bar'}))
 
 
 Next steps
