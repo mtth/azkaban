@@ -137,7 +137,7 @@ class TestJob(object):
 
   def test_generate_with_defaults(self):
     defaults = {'b': {'d': 4}, 'e': 5}
-    job = Job({'a': 1, 'b': {'c': 2, 'd': 3}}, defaults)
+    job = Job(defaults, {'a': 1, 'b': {'c': 2, 'd': 3}})
     with temppath() as path:
       job.build(path)
       with open(path) as reader:
@@ -165,7 +165,7 @@ class TestPigJob(object):
         with open(tpath) as reader:
           eq_(
             reader.read(),
-            'a=2\nb=4\npig.script=%s\ntype=pig\n' % (path.lstrip('/'), )
+            'a=3\nb=4\npig.script=%s\ntype=noop\n' % (path.lstrip('/'), )
           )
 
   def test_type(self):
@@ -180,7 +180,7 @@ class TestPigJob(object):
         with open(tpath) as reader:
           eq_(
             reader.read(),
-            'pig.script=%s\ntype=foo\n' % (path.lstrip('/'), )
+            'pig.script=%s\ntype=bar\n' % (path.lstrip('/'), )
           )
 
   @raises(AzkabanError)

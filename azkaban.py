@@ -299,7 +299,7 @@ class Job(object):
 
   """Base Azkaban job.
 
-  :param options: list of dictionaries (earlier values take precedence).
+  :param options: list of dictionaries (later values take precedence).
 
   To enable more functionality, subclass and override the `on_add` and
   `on_build` methods.
@@ -307,13 +307,13 @@ class Job(object):
   """
 
   def __init__(self, *options):
-    self._options = options
+    self.options = options
 
   @property
-  def options(self):
+  def build_options(self):
     """Combined job options."""
     options = {}
-    for option in reversed(self._options):
+    for option in self.options:
       options.update(flatten(option))
     return options
 
@@ -325,7 +325,7 @@ class Job(object):
 
     """
     with open(path, 'w') as writer:
-      for key, value in sorted(self.options.items()):
+      for key, value in sorted(self.build_options.items()):
         writer.write('%s=%s\n' % (key, value))
 
   def on_add(self, project, name):

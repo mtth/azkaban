@@ -52,6 +52,58 @@ project's jobs and dependency files:
   $ python jobs.py build foo.zip
 
 
+Job options
+-----------
+
+There often are options which are shared across multiple jobs. For this 
+reason, the :code:`Job` constructor can take in multiple options dictionaries. 
+The last definition of an option (i.e. later in the arguments) will take 
+precedence over earlier ones.
+
+We can use this to efficiently share default options among jobs, for example:
+
+.. code:: python
+
+  defaults = {'user.to.proxy': 'boo', 'retries': 0}
+
+  jobs = [
+    Job({'type': 'noop'}),
+    Job(defaults, {'type': 'noop'}),
+    Job(defaults, {'type': 'command', 'command': 'ls'}),
+    Job(defaults, {'type': 'command', 'command': 'ls -l', 'retries': 1}),
+  ]
+
+All jobs except the first one will have their :code:`user.to.proxy` property 
+set. Note also that the last job overrides the :code:`retries` property.
+
+Alternatively, if we really don't want to pass the defaults dictionary around, 
+we can create a new :code:`Job` subclass to do it for us:
+
+.. code:: python
+
+  class BooJob(Job):
+
+    def __init__(self, *options):
+      super(BooJob, self).__init__(defaults, *options)
+
+Finally, nested dictionaries can be used to group options concisely:
+
+.. code:: python
+
+  # e.g. this job
+  Job({
+    'proxy.user': 'boo',
+    'proxy.keytab.location': '/path',
+    'param.input': 'foo',
+    'param.output': 'bar',
+  })
+  # is equivalent to this one
+  Job({
+    'proxy': {'user': 'boo', 'keytab.location': '/path'},
+    'param': {'input': 'foo', 'output': 'bar'},
+  })
+
+
 More
 ----
 
@@ -77,47 +129,6 @@ We can now upload directly to each of these URLs with the shorthand:
 
 This has the added benefit that we won't have to authenticate on every upload. 
 The session ID is cached and reused for later connections.
-
-
-Job options
-***********
-
-There often are options which are shared across multiple jobs. For this 
-reason, the :code:`Job` constructor can take in multiple options dictionaries. 
-The first definition of an option (i.e. earlier in the arguments) will take 
-precedence over later ones.
-
-We can use this to efficiently share default options among jobs, for example:
-
-.. code:: python
-
-  defaults = {'user.to.proxy': 'boo', 'retries': 0}
-  jobs = [
-    Job({'type': 'noop'}),
-    Job({'type': 'noop'}, defaults),
-    Job({'type': 'command', 'command': 'ls'}, defaults),
-    Job({'type': 'command', 'command': 'ls -l', 'retries': 1}, defaults),
-  ]
-
-All jobs except the first one will have their :code:`user.to.proxy` property 
-set. Note also that the last job overrides the :code:`retries` property.
-
-Finally, nested dictionaries can be used to group options concisely:
-
-.. code:: python
-
-  # e.g. this job
-  Job({
-    'proxy.user': 'boo',
-    'proxy.keytab.location': '/path',
-    'param.input': 'foo',
-    'param.output': 'bar',
-  })
-  # is equivalent to this one
-  Job({
-    'proxy': {'user': 'boo', 'keytab.location': '/path'},
-    'param': {'input': 'foo', 'output': 'bar'},
-  })
 
 
 Pig jobs
