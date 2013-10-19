@@ -80,23 +80,6 @@ we can create a new :code:`Job` subclass to do it for us:
     def __init__(self, *options):
       super(BooJob, self).__init__(defaults, *options)
 
-Finally, nested dictionaries can be used to group options concisely:
-
-.. code:: python
-
-  # e.g. this job
-  Job({
-    'proxy.user': 'boo',
-    'proxy.keytab.location': '/path',
-    'param.input': 'foo',
-    'param.output': 'bar',
-  })
-  # is equivalent to this one
-  Job({
-    'proxy': {'user': 'boo', 'keytab.location': '/path'},
-    'param': {'input': 'foo', 'output': 'bar'},
-  })
-
 
 More
 ----
@@ -123,6 +106,27 @@ We can now upload directly to each of these URLs with the shorthand:
 
 This has the added benefit that we won't have to authenticate on every upload. 
 The session ID is cached and reused for later connections.
+
+
+Nested options
+**************
+
+Nested dictionaries can be used to group options concisely:
+
+.. code:: python
+
+  # e.g. this job
+  Job({
+    'proxy.user': 'boo',
+    'proxy.keytab.location': '/path',
+    'param.input': 'foo',
+    'param.output': 'bar',
+  })
+  # is equivalent to this one
+  Job({
+    'proxy': {'user': 'boo', 'keytab.location': '/path'},
+    'param': {'input': 'foo', 'output': 'bar'},
+  })
 
 
 Pig jobs

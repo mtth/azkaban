@@ -23,11 +23,11 @@ Options:
 
 """
 
-from ConfigParser import NoOptionError, RawConfigParser
+from ConfigParser import RawConfigParser
 from contextlib import contextmanager
 from getpass import getpass, getuser
 from os import close, remove
-from os.path import basename, exists, expanduser, getsize, isabs, join
+from os.path import exists, expanduser, getsize, isabs
 from sys import argv, exit, stderr, stdout
 from tempfile import mkstemp
 from zipfile import ZipFile
@@ -39,7 +39,7 @@ try:
 except ImportError:
   pass
 
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
 
 def flatten(dct, sep='.'):
@@ -67,9 +67,9 @@ def human_readable(size):
   :param size: size in bytes
 
   """
-  for suffix in ['bytes','kB','MB','GB','TB']:
+  for suffix in ['bytes', 'kB', 'MB', 'GB', 'TB']:
     if size < 1024.0:
-        return "%3.1f%s" % (size, suffix)
+      return '%3.1f%s' % (size, suffix)
     size /= 1024.0
 
 @contextmanager
@@ -205,9 +205,9 @@ class Project(object):
           },
           verify=False
         )
-      except ConnectionError as err:
+      except ConnectionError:
         raise AzkabanError('unable to connect to azkaban server')
-      except MissingSchema as err:
+      except MissingSchema:
         raise AzkabanError('invalid azkaban server url')
       else:
         res = req.json()
@@ -283,9 +283,9 @@ class Project(object):
           data={'action': 'login', 'username': user, 'password': password},
           verify=False,
         )
-      except ConnectionError as err:
+      except ConnectionError:
         raise AzkabanError('unable to connect to azkaban server')
-      except MissingSchema as err:
+      except MissingSchema:
         raise AzkabanError('invalid azkaban server url')
       else:
         res = req.json()
