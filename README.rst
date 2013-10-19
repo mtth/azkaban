@@ -20,10 +20,9 @@ Using pip_:
 Quickstart
 ----------
 
-We first create a file to define our project. Let's call it :code:`jobs.py`, 
-although any name would work.
-
-In this example, we add a single job and file:
+We first create a configuration file for our project. Let's call it 
+:code:`jobs.py`, although any name would work. Here's a simple example of how 
+we could define a project with a single job and a static file:
 
 .. code:: python
 
@@ -35,6 +34,14 @@ In this example, we add a single job and file:
 
   if __name__ == '__main__':
     project.main()
+
+The :code:`add_file` method adds a file to the project archive (the second 
+optional argument specifies the destination path inside the zip file).
+
+The :code:`add_job` method will trigger the creation of a :code:`.job` file. 
+The first method argument will be the file's name, the second is a :code:`Job` 
+instance. :code:`Job` instances accept a dictionary as constructor argument 
+which is then used to generate the contents of their job file.
 
 From the command line we can now run :code:`python jobs.py --help` to view the 
 list of all available options (:code:`build`, :code:`upload`, etc.). E.g. the 
