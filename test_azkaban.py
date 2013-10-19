@@ -3,8 +3,11 @@
 
 """Azkaban test module."""
 
+from ConfigParser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
+from nose.plugins.skip import SkipTest
 from os.path import relpath
+from time import sleep, time
 
 from azkaban import *
 
@@ -100,7 +103,7 @@ class TestProject(object):
       reader = ZipFile(path)
       try:
         ok_('this.py' in reader.namelist())
-        eq_(reader.read('this.py').split('\n')[8], 'from azkaban import *')
+        eq_(reader.read('this.py').split('\n')[11], 'from azkaban import *')
       finally:
         reader.close()
 
@@ -198,15 +201,77 @@ class TestPigJob(object):
 
 class TestUpload(object):
 
+  # requires valid credentials and an 'azkabancli' project on the server
+
+  last_request = time()
+  url = None
+  valid_alias = None
+
+  @classmethod
+  def setup_class(cls):
+    # skip tests if no valid credentials found
+    parser = RawConfigParser()
+    parser.read(Project.rcpath)
+    for section in parser.sections():
+      url = parser.get(section, 'url').rstrip('/')
+      if parser.has_option(section, 'session_id'):
+        session_id = parser.get(section, 'session_id')
+        if not post(
+          '%s/manager' % (url, ),
+          {'session.id': session_id},
+          verify=False
+        ).text:
+          cls.url = url
+          cls.valid_alias = section
+          return
+
+  def wait(self, ms=2000):
+    # wait before making a request
+    delay = time() - self.last_request
+    sleep(max(0, ms * 1e-3 - delay))
+    self.last_request = time()
+
   def setup(self):
-    # if not PASSWORD:
-    #   raise SkipTest
-    self.project = Project('foo')
+    if not self.valid_alias:
+      raise SkipTest
+    self.wait()
+    self.project = Project('azkabancli')
 
   @raises(ValueError)
   def test_bad_parameters(self):
     self.project.upload(user='bar')
 
   @raises(AzkabanError)
+  def test_invalid_project(self):
+    project = Project('foobarzz')
+    project.upload(alias=self.valid_alias)
+
+  @raises(AzkabanError)
   def test_bad_url(self):
     self.project._get_credentials('http://foo', password='bar')
+
+  @raises(AzkabanError)
+  def test_missing_protocol(self):
+    self.project._get_credentials('foo', password='bar')
+
+  @raises(AzkabanError)
+  def test_bad_password(self):
+    self.project._get_credentials(self.url, password='bar')
+
+  def test_upload_simple(self):
+    self.project.add_job('test', Job({'type': 'noop'}))
+    res = self.project.upload(alias=self.valid_alias)
+    eq_(['projectId', 'version'], res.keys())
+
+  @raises(AzkabanError)
+  def test_upload_missing_type(self):
+    self.project.add_job('test', Job())
+    self.project.upload(alias=self.valid_alias)
+
+  def test_upload_pig_job(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
+        writer.write('-- pig script')
+      self.project.add_job('foo', PigJob(path))
+      res = self.project.upload(alias=self.valid_alias)
+      eq_(['projectId', 'version'], res.keys())

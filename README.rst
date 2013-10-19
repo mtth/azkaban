@@ -6,11 +6,6 @@ Lightweight command line interface (CLI) for Azkaban_:
 * Define jobs from a single python file
 * Build projects and upload to Azkaban from the command line
 
-Integration is meant to be as transparent as possible:
-
-* No additional folders and files
-* No imposed project structure
-
 
 Installation
 ------------
@@ -35,7 +30,6 @@ In this example, we add a single job and file:
   from azkaban import Job, Project
 
   project = Project('foo')
-
   project.add_file('/path/to/bar.txt', 'bar.txt')
   project.add_job('bar', Job({'type': 'command', 'command': 'cat bar.txt'}))
 

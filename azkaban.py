@@ -12,7 +12,7 @@ Usage:
 Arguments:
   FILE                          Jobs file.
   PATH                          Output path where zip file will be created.
-  URL                           Azkaban endpoint (with port).
+  URL                           Azkaban endpoint (with protocol).
 
 Options:
   -a ALIAS --alias=ALIAS        Saved username, URL. Will also try to reuse
@@ -35,6 +35,7 @@ from zipfile import ZipFile
 try:
   from docopt import docopt
   from requests import post, ConnectionError
+  from requests.exceptions import MissingSchema
 except ImportError:
   pass
 
@@ -178,10 +179,10 @@ class Project(object):
   def upload(self, url=None, user=None, password=None, alias=None):
     """Build and upload project to Azkaban.
 
-    :param url: http endpoint (including port)
+    :param url: http endpoint URL (including protocol)
     :param user: Azkaban username (must have the appropriate permissions)
     :param password: Azkaban login password
-    :param alias: section of rc file used to cache urls (will enable session
+    :param alias: section of rc file used to cache URLs (will enable session
       ID caching)
 
     Note that in order to upload to Azkaban, the project must have already been
@@ -206,6 +207,8 @@ class Project(object):
         )
       except ConnectionError as err:
         raise AzkabanError('unable to connect to azkaban server')
+      except MissingSchema as err:
+        raise AzkabanError('invalid azkaban server url')
       else:
         res = req.json()
         if 'error' in res:
@@ -282,6 +285,8 @@ class Project(object):
         )
       except ConnectionError as err:
         raise AzkabanError('unable to connect to azkaban server')
+      except MissingSchema as err:
+        raise AzkabanError('invalid azkaban server url')
       else:
         res = req.json()
         if 'error' in res:
