@@ -38,8 +38,8 @@ we could define a project with a single job and a static file:
 The :code:`add_file` method adds a file to the project archive (the second 
 optional argument specifies the destination path inside the zip file). The 
 :code:`add_job` method will trigger the creation of a :code:`.job` file. The 
-first method argument will be the file's name, the second is a :code:`Job` 
-instance.
+first argument will be the file's name, the second is a :code:`Job` instance 
+(cf. `Job options`_).
 
 From the command line we can now run :code:`python jobs.py --help` to view the 
 list of all available options (:code:`build`, :code:`upload`, etc.). E.g. the 
@@ -54,13 +54,13 @@ project's jobs and dependency files:
 Job options
 -----------
 
-The :code:`Job` is a light wrapper which allows the creation of :code:`.job` 
-files using python dictionaries.
+The :code:`Job` class is a light wrapper which allows the creation of 
+:code:`.job` files using python dictionaries.
 
 It also provides a convenient way to handle options shared across multiple 
-jobs: the :code:`Job` constructor can take in multiple options dictionaries. 
-The last definition of an option (i.e. later in the arguments) will take 
-precedence over earlier ones.
+jobs: the constructor can take in multiple options dictionaries and the last 
+definition of an option (i.e. later in the arguments) will take precedence 
+over earlier ones.
 
 We can use this to efficiently share default options among jobs, for example:
 
