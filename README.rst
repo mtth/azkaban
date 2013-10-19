@@ -151,6 +151,9 @@ and adds the corresponding script file to the project.
 
   project.add_job('baz', PigJob('/.../baz.pig', {'dependencies': 'bar'}))
 
+Using a custom pig type, is as simple as changing the :code:`PigJob.type` 
+class variable.
+
 
 Next steps
 **********

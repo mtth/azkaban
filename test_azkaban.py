@@ -28,65 +28,59 @@ class TestFlatten(object):
 
 class TestProject(object):
 
+  def setup(self):
+    self.project = Project('foo')
+
   def test_add_file(self):
-    project = Project('foo')
-    project.add_file(__file__, 'bar')
-    eq_(project._files, {__file__: 'bar'})
+    self.project.add_file(__file__, 'bar')
+    eq_(self.project._files, {__file__: 'bar'})
 
   @raises(AzkabanError)
   def test_missing_file(self):
-    project = Project('foo')
-    project.add_file('bar')
+    self.project.add_file('bar')
 
   @raises(AzkabanError)
   def test_relative_file(self):
-    project = Project('foo')
-    project.add_file(relpath(__file__))
+    self.project.add_file(relpath(__file__))
 
   def test_add_duplicate_file(self):
-    project = Project('foo')
-    project.add_file(__file__)
-    project.add_file(__file__)
-    eq_(project._files, {__file__: None})
+    self.project.add_file(__file__)
+    self.project.add_file(__file__)
+    eq_(self.project._files, {__file__: None})
 
   @raises(AzkabanError)
   def test_add_inconsistent_duplicate_file(self):
-    project = Project('foo')
-    project.add_file(__file__)
-    project.add_file(__file__, 'this.py')
+    self.project.add_file(__file__)
+    self.project.add_file(__file__, 'this.py')
 
   def test_add_job(self):
-    project = Project('foo')
     class OtherJob(Job):
       test = None
       def on_add(self, project, name):
         self.test = (project.name, name)
     job = OtherJob()
-    project.add_job('bar', job)
+    self.project.add_job('bar', job)
     eq_(job.test, ('foo', 'bar'))
 
   @raises(AzkabanError)
   def test_add_duplicate_job(self):
-    project = Project('foo')
-    project.add_job('bar', Job())
-    project.add_job('bar', Job())
+    self.project.add_job('bar', Job())
+    self.project.add_job('bar', Job())
 
   @raises(AzkabanError)
   def test_build_empty(self):
-    project = Project('foo')
     with temppath() as path:
-      project.build(path)
+      self.project.build(path)
 
   def test_build_single_job(self):
-    project = Project('foo')
     class OtherJob(Job):
       test = None
       def on_build(self, project, name):
         self.test = (project.name, name)
     job = OtherJob({'a': 2})
-    project.add_job('bar', job)
+    self.project.add_job('bar', job)
     with temppath() as path:
-      project.build(path)
+      self.project.build(path)
       eq_(job.test, ('foo', 'bar'))
       reader =  ZipFile(path)
       try:
@@ -96,10 +90,9 @@ class TestProject(object):
         reader.close()
 
   def test_build_with_file(self):
-    project = Project('foo')
-    project.add_file(__file__.rstrip('c'), 'this.py')
+    self.project.add_file(__file__.rstrip('c'), 'this.py')
     with temppath() as path:
-      project.build(path)
+      self.project.build(path)
       reader = ZipFile(path)
       try:
         ok_('this.py' in reader.namelist())
@@ -108,12 +101,11 @@ class TestProject(object):
         reader.close()
 
   def test_build_multiple_jobs(self):
-    project = Project('pj')
-    project.add_job('foo', Job({'a': 2}))
-    project.add_job('bar', Job({'b': 3}))
-    project.add_file(__file__, 'this.py')
+    self.project.add_job('foo', Job({'a': 2}))
+    self.project.add_job('bar', Job({'b': 3}))
+    self.project.add_file(__file__, 'this.py')
     with temppath() as path:
-      project.build(path)
+      self.project.build(path)
       reader = ZipFile(path)
       try:
         ok_('foo.job' in reader.namelist())
@@ -125,11 +117,20 @@ class TestProject(object):
 
   @raises(AzkabanError)
   def test_missing_alias(self):
-    project = Project('foo')
-    project.upload(alias='bar')
+    self.project.upload(alias='bar')
 
 
 class TestJob(object):
+
+  def test_options(self):
+    eq_(Job().options, ())
+    eq_(Job({'foo': 1}).options, ({'foo': 1}, ))
+    eq_(Job({'foo': 1}, {}).options, ({'foo': 1}, {}))
+
+  def test_build_options(self):
+    eq_(Job().build_options, {})
+    eq_(Job({'foo': 1}, {}).build_options, {'foo': 1})
+    eq_(Job({'foo': 1}, {'foo': 2}).build_options, {'foo': 2})
 
   def test_generate_simple(self):
     job = Job({'a': 1, 'b': {'c': 2, 'd': 3}})

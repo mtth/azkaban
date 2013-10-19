@@ -6,23 +6,33 @@
 Usage:
   python FILE upload (-a ALIAS | [-u USER] URL)
   python FILE build PATH
-  python FILE view
+  python FILE view JOB
+  python FILE list
   python FILE -h | --help | -v | --version
 
+Commmands:
+  upload                        Upload project to Azkaban server.
+  build                         Build zip archive.
+  view                          View job options.
+  list                          View list of jobs.
+
 Arguments:
-  FILE                          Jobs file.
+  FILE                          Project configuration file.
+  JOB                           Job name.
   PATH                          Output path where zip file will be created.
   URL                           Azkaban endpoint (with protocol).
 
 Options:
-  -a ALIAS --alias=ALIAS        Saved username, URL. Will also try to reuse
-                                session IDs.
+  -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
+                                to reuse session IDs for later connections.
   -h --help                     Show this message and exit.
-  -u USER --user=USER           Username used to log into Azkaban.
+  -u USER --user=USER           Username used to log into Azkaban (defaults to
+                                the current user, as determined by `whoami`).
   -v --version                  Show version and exit.
 
 """
 
+from collections import defaultdict
 from ConfigParser import RawConfigParser
 from contextlib import contextmanager
 from getpass import getpass, getuser
@@ -39,7 +49,7 @@ try:
 except ImportError:
   pass
 
-__version__ = '0.1.4'
+__version__ = '0.1.5'
 
 
 def flatten(dct, sep='.'):
@@ -71,6 +81,26 @@ def human_readable(size):
     if size < 1024.0:
       return '%3.1f%s' % (size, suffix)
     size /= 1024.0
+
+def pretty_print(info):
+  """Prints pretty representation of dictionary to stdout.
+
+  :param info: dictionary
+
+  """
+  keys = sorted(info.keys())
+  padding = max(len(key) for key in keys)
+  header_format = '%%%ss: %%s\n' % (padding + 1, )
+  content_format = ' ' * (padding + 3) + '%s\n'
+  for key in keys:
+    value = info[key]
+    if isinstance(value, list):
+      options = sorted(value)
+      stdout.write(header_format % (key, options[0]))
+      for option in options[1:]:
+        stdout.write(content_format % (option, ))
+    else:
+      stdout.write(header_format % (key, value))
 
 @contextmanager
 def temppath():
@@ -237,8 +267,23 @@ class Project(object):
           (res['projectId'], res['version'])
         )
       elif args['view']:
-        for name, job in sorted(self._jobs.items()):
-          stdout.write('%s [%s]\n' % (name, job.options['type']))
+        job_name = args['JOB']
+        if job_name in self._jobs:
+          job = self._jobs[job_name]
+          pretty_print(job.build_options)
+        else:
+          raise AzkabanError('missing job %r' % (job_name, ))
+      elif args['list']:
+        jobs = defaultdict(list)
+        for name, job in self._jobs.items():
+          job_type = job.build_options.get('type', '--')
+          job_deps = job.build_options.get('dependencies', '')
+          if job_deps:
+            info = '%s [%s]' % (name, job_deps)
+          else:
+            info = name
+          jobs[job_type].append(info)
+        pretty_print(jobs)
     except AzkabanError as err:
       stderr.write('error: %s\n' % (err, ))
       exit(1)
