@@ -22,7 +22,7 @@ Quickstart
 
 We first create a configuration file for our project. Let's call it 
 :code:`jobs.py`, although any name would work. Here's a simple example of how 
-we could define a project with a single job and a static file:
+we could define a project with a single job and static file:
 
 .. code:: python
 
@@ -41,14 +41,15 @@ optional argument specifies the destination path inside the zip file). The
 first argument will be the file's name, the second is a :code:`Job` instance 
 (cf. `Job options`_).
 
-From the command line we can now run :code:`python jobs.py --help` to view the 
-list of all available options (:code:`build`, :code:`upload`, etc.). E.g. the 
-following command will create the archive :code:`foo.zip` containing all the 
-project's jobs and dependency files:
+Once we've saved our jobs file, the following commands are available to us:
 
-.. code:: bash
+* :code:`list`, see the list of all jobs in the current project
+* :code:`view`, view the contents of the :code:`.job` file for a given job
+* :code:`build`, build the project archive and store it locally
+* :code:`upload`, build and upload the project to an Azkaban server
 
-  $ python jobs.py build foo.zip
+We can also run :code:`python jobs.py --help` to view the list of options for 
+each of the previous commands.
 
 
 Job options
@@ -151,8 +152,8 @@ and adds the corresponding script file to the project.
 
   project.add_job('baz', PigJob('/.../baz.pig', {'dependencies': 'bar'}))
 
-Using a custom pig type, is as simple as changing the :code:`PigJob.type` 
-class variable.
+Using a custom pig type is as simple as changing the :code:`PigJob.type` class 
+variable.
 
 
 Next steps
