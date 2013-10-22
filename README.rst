@@ -3,8 +3,8 @@ Azkaban
 
 Lightweight command line interface (CLI) for Azkaban_:
 
-* Define jobs from a single python file
-* Build projects and upload to Azkaban from the command line
+* Define jobs from a single python file.
+* Build projects and upload to Azkaban from the command line.
 
 
 Installation
@@ -43,13 +43,17 @@ first argument will be the file's name, the second is a :code:`Job` instance
 
 Once we've saved our jobs file, the following commands are available to us:
 
-* :code:`list`, see the list of all jobs in the current project
-* :code:`view`, view the contents of the :code:`.job` file for a given job
-* :code:`build`, build the project archive and store it locally
-* :code:`upload`, build and upload the project to an Azkaban server
+* :code:`python jobs.py list`, see the list of all jobs in the current 
+  project.
+* :code:`python jobs.py view`, view the contents of the :code:`.job` file for 
+  a given job.
+* :code:`python jobs.py build`, build the project archive and store it 
+  locally.
+* :code:`python jobs.py upload`, build and upload the project to an Azkaban 
+  server.
 
-We can also run :code:`python jobs.py --help` to view the list of options for 
-each of the previous commands.
+Running :code:`python jobs.py --help` shows the list of options for each of 
+the previous commands.
 
 
 Job options
@@ -105,7 +109,7 @@ into our project's configuration file, ugh), we can define aliases in
   [foo]
   url = http://url.to.foo.server:port
   [bar]
-  url = http://url.to.bar.server:port
+  url = http://url.to.bar.server
 
 We can now upload directly to each of these URLs with the shorthand:
 
