@@ -23,7 +23,7 @@ setup(
     ],
     install_requires=[
       'docopt',
-      'requests',
+      'requests>=2.0.1',
     ],
     # entry_points={'console_scripts': []},
 )

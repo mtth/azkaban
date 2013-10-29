@@ -231,7 +231,7 @@ class Project(object):
             'project': self.name,
           },
           files={
-            'file': ('file.zip', open(path, 'rb')),
+            'file': ('file.zip', open(path, 'rb'), 'application/zip'),
           },
           verify=False
         )
