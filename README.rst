@@ -100,9 +100,9 @@ More
 Aliases
 *******
 
-To avoid having to enter the server's URL on every upload (or hard-coding it 
-into our project's configuration file, ugh), we can define aliases in 
-:code:`~/.azkabanrc`:
+To avoid having to enter the server's URL and our username on every upload (or 
+hard-coding it into our project's configuration file, ugh), we can define 
+aliases in :code:`~/.azkabanrc`:
 
 .. code:: cfg
 
@@ -110,6 +110,7 @@ into our project's configuration file, ugh), we can define aliases in
   url = http://url.to.foo.server:port
   [bar]
   url = http://url.to.bar.server
+  user = baruser
 
 We can now upload directly to each of these URLs with the shorthand:
 
