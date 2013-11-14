@@ -3,13 +3,12 @@
 
 """Azkaban test module."""
 
+from azkaban import *
 from ConfigParser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
 from os.path import relpath
 from time import sleep, time
-
-from azkaban import *
 
 
 class TestFlatten(object):
@@ -96,7 +95,7 @@ class TestProject(object):
       reader = ZipFile(path)
       try:
         ok_('this.py' in reader.namelist())
-        eq_(reader.read('this.py').split('\n')[11], 'from azkaban import *')
+        eq_(reader.read('this.py').split('\n')[5], 'from azkaban import *')
       finally:
         reader.close()
 

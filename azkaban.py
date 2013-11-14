@@ -26,6 +26,7 @@ Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
                                 to reuse session IDs for later connections.
   -h --help                     Show this message and exit.
+  -q --quiet                    Suppress output.
   -u USER --user=USER           Username used to log into Azkaban (defaults to
                                 the current user, as determined by `whoami`).
   -v --version                  Show version and exit.
@@ -38,7 +39,7 @@ from contextlib import contextmanager
 from getpass import getpass, getuser
 from os import close, remove
 from os.path import exists, expanduser, getsize, isabs
-from sys import argv, exit, stderr, stdout
+from sys import argv, exit, stderr, stdout, version
 from tempfile import mkstemp
 from zipfile import ZipFile
 
@@ -49,7 +50,18 @@ try:
 except ImportError:
   pass
 
-__version__ = '0.1.6'
+import logging
+
+__version__ = '0.1.7'
+
+
+# for python <2.7
+class NullHandler(logging.Handler):
+  def emit(self, record):
+    pass
+
+logger = logging.getLogger(__name__)
+logger.addHandler(NullHandler())
 
 
 def flatten(dct, sep='.'):
@@ -154,6 +166,7 @@ class Project(object):
     archive with lower level destinations than the base root directory.
 
     """
+    logger.debug('adding file %r as %r', path, archive_path or path)
     if not isabs(path):
       raise AzkabanError('relative path not allowed %r' % (path, ))
     elif path in self._files:
@@ -175,6 +188,7 @@ class Project(object):
     job is added.
 
     """
+    logger.debug('adding job %r', name)
     if name in self._jobs:
       raise AzkabanError('duplicate job name %r' % (name, ))
     else:
@@ -191,6 +205,7 @@ class Project(object):
     right before the job file is generated.
 
     """
+    logger.debug('building project')
     # not using a with statement for compatibility with older python versions
     if not (len(self._jobs) or len(self._files)):
       raise AzkabanError('building empty project')
@@ -205,6 +220,8 @@ class Project(object):
         writer.write(fpath, apath)
     finally:
       writer.close()
+    size = human_readable(getsize(path))
+    logger.info('project successfully built (size: %s)\n' % (size, ))
 
   def upload(self, url=None, user=None, password=None, alias=None):
     """Build and upload project to Azkaban.
@@ -220,6 +237,7 @@ class Project(object):
 
     """
     (url, session_id) = self._get_credentials(url, user, password, alias)
+    logger.debug('uploading project to %r', url)
     with temppath() as path:
       self.build(path)
       try:
@@ -244,27 +262,26 @@ class Project(object):
         if 'error' in res:
           raise AzkabanError(res['error'])
         else:
+          logger.info(
+            'project successfully uploaded (id: %s, version: %s)\n' %
+            (res['projectId'], res['version'])
+          )
           return res
 
   def main(self):
     """Command line argument parser."""
     argv.insert(0, 'FILE')
     args = docopt(__doc__, version=__version__)
+    if not args['--quiet']:
+      logger.addHandler(self._get_stream_handler())
     try:
       if args['build']:
-        path = args['PATH']
-        self.build(path)
-        size = human_readable(getsize(path))
-        stdout.write('project successfully built (size: %s)\n' % (size, ))
+        self.build(args['PATH'])
       elif args['upload']:
         res = self.upload(
           url=args['URL'],
           user=args['--user'],
           alias=args['--alias'],
-        )
-        stdout.write(
-          'project successfully uploaded (id: %s, version: %s)\n' %
-          (res['projectId'], res['version'])
         )
       elif args['view']:
         job_name = args['JOB']
@@ -285,7 +302,7 @@ class Project(object):
           jobs[job_type].append(info)
         pretty_print(jobs)
     except AzkabanError as err:
-      stderr.write('error: %s\n' % (err, ))
+      logger.error(err)
       exit(1)
 
   def _get_credentials(self, url=None, user=None, password=None, alias=None):
@@ -344,6 +361,13 @@ class Project(object):
               parser.write(writer)
     return (url, session_id)
 
+  def _get_stream_handler(self):
+    """Get formatted stream handler."""
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s')
+    handler.setFormatter(formatter)
+    return handler
+
 
 class Job(object):
 
@@ -365,6 +389,9 @@ class Job(object):
     options = {}
     for option in self.options:
       options.update(flatten(option))
+    for key, value in options.items():
+      if not isinstance(value, (str, int, float)):
+        logger.warn('non-standard value %r for option %r', value, key)
     return options
 
   def build(self, path):
