@@ -4,8 +4,8 @@
 """Azkaban CLI.
 
 Usage:
-  python FILE upload (-a ALIAS | [-u USER] URL)
-  python FILE build PATH
+  python FILE upload [-q] (-a ALIAS | [-u USER] URL)
+  python FILE build [-fq] PATH
   python FILE view JOB
   python FILE list
   python FILE -h | --help | -v | --version
@@ -25,6 +25,7 @@ Arguments:
 Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
                                 to reuse session IDs for later connections.
+  -f --force                    Overwrite any existing file.
   -h --help                     Show this message and exit.
   -q --quiet                    Suppress output.
   -u USER --user=USER           Username used to log into Azkaban (defaults to
@@ -39,7 +40,7 @@ from contextlib import contextmanager
 from getpass import getpass, getuser
 from os import close, remove
 from os.path import exists, expanduser, getsize, isabs
-from sys import argv, exit, stderr, stdout, version
+from sys import argv, exit, stdout
 from tempfile import mkstemp
 from zipfile import ZipFile
 
@@ -55,8 +56,10 @@ import logging
 __version__ = '0.1.7'
 
 
-# for python <2.7
 class NullHandler(logging.Handler):
+
+  """For python <2.7."""
+
   def emit(self, record):
     pass
 
@@ -113,6 +116,13 @@ def pretty_print(info):
         stdout.write(content_format % (option, ))
     else:
       stdout.write(header_format % (key, value))
+
+def get_formatted_stream_handler():
+  """Returns a formatted stream handler used for the command line parser."""
+  handler = logging.StreamHandler()
+  formatter = logging.Formatter('%(levelname)s: %(message)s')
+  handler.setFormatter(formatter)
+  return handler
 
 @contextmanager
 def temppath():
@@ -195,7 +205,7 @@ class Project(object):
       self._jobs[name] = job
       job.on_add(self, name)
 
-  def build(self, path):
+  def build(self, path, force=False):
     """Create the project archive.
 
     :param path: destination path
@@ -207,6 +217,8 @@ class Project(object):
     """
     logger.debug('building project')
     # not using a with statement for compatibility with older python versions
+    if exists(path) and not force:
+      raise AzkabanError('path %r already exists' % (path, ))
     if not (len(self._jobs) or len(self._files)):
       raise AzkabanError('building empty project')
     writer = ZipFile(path, 'w')
@@ -221,7 +233,7 @@ class Project(object):
     finally:
       writer.close()
     size = human_readable(getsize(path))
-    logger.info('project successfully built (size: %s)\n' % (size, ))
+    logger.info('project successfully built (size: %s)' % (size, ))
 
   def upload(self, url=None, user=None, password=None, alias=None):
     """Build and upload project to Azkaban.
@@ -263,7 +275,7 @@ class Project(object):
           raise AzkabanError(res['error'])
         else:
           logger.info(
-            'project successfully uploaded (id: %s, version: %s)\n' %
+            'project successfully uploaded (id: %s, version: %s)' %
             (res['projectId'], res['version'])
           )
           return res
@@ -273,12 +285,13 @@ class Project(object):
     argv.insert(0, 'FILE')
     args = docopt(__doc__, version=__version__)
     if not args['--quiet']:
-      logger.addHandler(self._get_stream_handler())
+      logger.setLevel(logging.INFO)
+      logger.addHandler(get_formatted_stream_handler())
     try:
       if args['build']:
-        self.build(args['PATH'])
+        self.build(args['PATH'], force=args['--force'])
       elif args['upload']:
-        res = self.upload(
+        self.upload(
           url=args['URL'],
           user=args['--user'],
           alias=args['--alias'],
@@ -361,13 +374,6 @@ class Project(object):
               parser.write(writer)
     return (url, session_id)
 
-  def _get_stream_handler(self):
-    """Get formatted stream handler."""
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s')
-    handler.setFormatter(formatter)
-    return handler
-
 
 class Job(object):
 
@@ -390,8 +396,9 @@ class Job(object):
     for option in self.options:
       options.update(flatten(option))
     for key, value in options.items():
-      if not isinstance(value, (str, int, float)):
+      if isinstance(value, bool) or not isinstance(value, (str, int, float)):
         logger.warn('non-standard value %r for option %r', value, key)
+      options[key] = str(value)
     return options
 
   def build(self, path):
