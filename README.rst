@@ -160,7 +160,7 @@ and adds the corresponding script file to the project.
 Using a custom pig type is as simple as changing the :code:`PigJob.type` class 
 variable.
 
-Merging Projects
+Merging projects
 ****************
 
 If you have multiple projects, you can merge them together to create a single project.
