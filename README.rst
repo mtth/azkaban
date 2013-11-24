@@ -160,6 +160,30 @@ and adds the corresponding script file to the project.
 Using a custom pig type is as simple as changing the :code:`PigJob.type` class 
 variable.
 
+Merging Projects
+****************
+
+If you have multiple projects, you can merge them together to create a single project.
+The merge is done in place on the project the method is called on. The first project will
+retain its original name.
+
+.. code:: python
+
+  from azkaban import Job, Project
+
+  project1 = Project('foo')
+  project1.add_file('/path/to/bar.txt', 'bar.txt')
+  project1.add_job('bar', Job({'type': 'command', 'command': 'cat bar.txt'}))
+
+  project2 = Project('qux')
+  project2.add_file('/path/to/baz.txt', 'baz.txt')
+  project2.add_job('baz', Job({'type': 'command', 'command': 'cat baz.txt'}))
+
+  # project1 will now contain baz.txt and the baz job from project2
+  project1.merge(project2)
+
+  if __name__ == '__main__':
+    project1.main()
 
 Next steps
 **********
