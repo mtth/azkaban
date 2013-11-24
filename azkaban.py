@@ -53,7 +53,7 @@ except ImportError:
 
 import logging
 
-__version__ = '0.1.7'
+__version__ = '0.1.8'
 
 
 class NullHandler(logging.Handler):
@@ -204,6 +204,21 @@ class Project(object):
     else:
       self._jobs[name] = job
       job.on_add(self, name)
+
+  def merge(self, project):
+    """Merge one project with another.
+
+    :param project: project to merge with this project
+
+    This method does an in place merge of the current project with another.
+    The merged project will maintain the current project's name.
+    """
+    logger.debug('merging project %r with %r', self.name, project.name)
+    for name, job in project._jobs.items():
+      self.add_job(name, job)
+
+    for path, archive_path in project._files.items():
+      self.add_file(path, archive_path)
 
   def build(self, path, force=False):
     """Create the project archive.

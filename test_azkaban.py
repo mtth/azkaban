@@ -7,7 +7,7 @@ from azkaban import *
 from ConfigParser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
-from os.path import relpath
+from os.path import relpath, abspath
 from time import sleep, time
 
 
@@ -65,6 +65,23 @@ class TestProject(object):
   def test_add_duplicate_job(self):
     self.project.add_job('bar', Job())
     self.project.add_job('bar', Job())
+
+  def test_merge_project(self):
+    job_bar = Job()
+    self.project.add_job('bar', job_bar)
+    file_bar = __file__
+    self.project.add_file(file_bar, 'bar')
+
+    project2 = Project('qux')
+    job_baz = Job()
+    project2.add_job('baz', job_baz) 
+    file_baz = abspath('azkaban.py')
+    project2.add_file(file_baz, 'baz')
+
+    self.project.merge(project2)
+    eq_(self.project.name, 'foo')
+    eq_(self.project._jobs, {'bar': job_bar, 'baz': job_baz})
+    eq_(self.project._files, {file_bar: 'bar', file_baz: 'baz'})
 
   @raises(AzkabanError)
   def test_build_empty(self):
@@ -128,8 +145,8 @@ class TestJob(object):
 
   def test_build_options(self):
     eq_(Job().build_options, {})
-    eq_(Job({'foo': 1}, {}).build_options, {'foo': 1})
-    eq_(Job({'foo': 1}, {'foo': 2}).build_options, {'foo': 2})
+    eq_(Job({'foo': 1}, {}).build_options, {'foo': '1'})
+    eq_(Job({'foo': 1}, {'foo': 2}).build_options, {'foo': '2'})
 
   def test_generate_simple(self):
     job = Job({'a': 1, 'b': {'c': 2, 'd': 3}})
