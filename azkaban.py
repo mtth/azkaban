@@ -5,6 +5,7 @@
 
 Usage:
   python FILE upload [-q] (-a ALIAS | [-u USER] URL)
+  python FILE run [-q] (-a ALIAS | [-u USER] URL) FLOW
   python FILE build [-fq] PATH
   python FILE view JOB
   python FILE list
@@ -12,12 +13,14 @@ Usage:
 
 Commmands:
   upload                        Upload project to Azkaban server.
+  run                           Run workflow.
   build                         Build zip archive.
   view                          View job options.
   list                          View list of jobs.
 
 Arguments:
   FILE                          Project configuration file.
+  FLOW                          Workflow (job without children) name.
   JOB                           Job name.
   PATH                          Output path where zip file will be created.
   URL                           Azkaban endpoint (with protocol).
@@ -27,7 +30,8 @@ Options:
                                 to reuse session IDs for later connections.
   -f --force                    Overwrite any existing file.
   -h --help                     Show this message and exit.
-  -q --quiet                    Suppress output.
+  -q --quiet                    Suppress output. The return status of the
+                                command will still signal errors.
   -u USER --user=USER           Username used to log into Azkaban (defaults to
                                 the current user, as determined by `whoami`).
   -v --version                  Show version and exit.
@@ -46,14 +50,14 @@ from zipfile import ZipFile
 
 try:
   from docopt import docopt
-  from requests import post, ConnectionError
+  from requests import get, post, ConnectionError
   from requests.exceptions import MissingSchema
 except ImportError:
   pass
 
 import logging
 
-__version__ = '0.1.8'
+__version__ = '0.1.9'
 
 
 class NullHandler(logging.Handler):
@@ -295,6 +299,51 @@ class Project(object):
           )
           return res
 
+  def run(self, flow, url=None, user=None, password=None, alias=None):
+    """Run a workflow on Azkaban.
+
+    :param flow: name of the workflow
+    :param url: http endpoint URL (including protocol)
+    :param user: Azkaban username (must have the appropriate permissions)
+    :param password: Azkaban login password
+    :param alias: section of rc file used to cache URLs (will enable session
+      ID caching)
+
+    Note that in order to run a workflow on Azkaban, it must already have been
+    uploaded and the corresponding user must have permissions to run.
+
+    """
+    (url, session_id) = self._get_credentials(url, user, password, alias)
+    logger.debug('running flow %s on %r', flow, url)
+    try:
+      req = post(
+        '%s/executor' % (url, ),
+        data={
+          'ajax': 'executeFlow',
+          'session.id': session_id,
+          'project': self.name,
+          'flow': flow,
+        },
+        verify=False,
+      )
+    except ConnectionError:
+      raise AzkabanError('unable to connect to azkaban server')
+    except MissingSchema:
+      raise AzkabanError('invalid azkaban server url')
+    else:
+      res = req.json()
+      if 'error' in res:
+        raise AzkabanError(res['error'])
+      else:
+        logger.info(
+          'successfully started flow %s (execution id: %s)' %
+          (flow, res['execid'])
+        )
+        logger.info(
+          'details at %s/executor?execid=%s' % (url, res['execid'])
+        )
+        return res
+
   def main(self):
     """Command line argument parser."""
     argv.insert(0, 'FILE')
@@ -307,6 +356,13 @@ class Project(object):
         self.build(args['PATH'], force=args['--force'])
       elif args['upload']:
         self.upload(
+          url=args['URL'],
+          user=args['--user'],
+          alias=args['--alias'],
+        )
+      elif args['run']:
+        self.run(
+          flow=args['FLOW'],
           url=args['URL'],
           user=args['--user'],
           alias=args['--alias'],

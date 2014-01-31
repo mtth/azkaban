@@ -291,4 +291,33 @@ class TestUpload(object):
         writer.write('-- pig script')
       self.project.add_job('foo', PigJob(path))
       res = self.project.upload(alias=self.valid_alias)
-      eq_(['projectId', 'version'], res.keys())
+      eq_(['projectId', 'version'], sorted(res.keys()))
+
+  def test_run_simple_workflow(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    self.project.upload(alias=self.valid_alias)
+    res = self.project.run('foo', alias=self.valid_alias)
+    eq_(['execid', 'flow', 'message', 'project'], sorted(res.keys()))
+    eq_(res['message'][:32], 'Execution submitted successfully')
+
+  def test_run_workflow_with_dependencies(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    self.project.add_job('bar', Job(options, {'dependencies': 'foo'}))
+    self.project.upload(alias=self.valid_alias)
+    res = self.project.run('bar', alias=self.valid_alias)
+    eq_(['execid', 'flow', 'message', 'project'], sorted(res.keys()))
+    eq_(res['message'][:32], 'Execution submitted successfully')
+
+  @raises(AzkabanError)
+  def test_run_missing_workflow(self):
+    self.project.run('foo', alias=self.valid_alias)
+
+  @raises(AzkabanError)
+  def test_run_non_workflow_job(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    self.project.add_job('bar', Job(options, {'dependencies': 'foo'}))
+    self.project.upload(alias=self.valid_alias)
+    self.project.run('foo', alias=self.valid_alias)
