@@ -4,7 +4,7 @@ Azkaban
 Lightweight command line interface (CLI) for Azkaban_:
 
 * Define jobs from a single python file.
-* Build projects and upload to Azkaban from the command line.
+* Build projects, upload to Azkaban, and run workflows from the command line.
 
 
 Installation
@@ -51,6 +51,7 @@ Once we've saved our jobs file, the following commands are available to us:
   locally.
 * :code:`python jobs.py upload`, build and upload the project to an Azkaban 
   server.
+* :code:`python jobs.py run`, trigger a workflow run on the Azkaban server.
 
 Running :code:`python jobs.py --help` shows the list of options for each of 
 the previous commands.

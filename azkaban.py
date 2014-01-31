@@ -50,7 +50,7 @@ from zipfile import ZipFile
 
 try:
   from docopt import docopt
-  from requests import get, post, ConnectionError
+  from requests import post, ConnectionError
   from requests.exceptions import MissingSchema
 except ImportError:
   pass
