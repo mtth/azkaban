@@ -133,7 +133,7 @@ class TestProject(object):
 
   @raises(AzkabanError)
   def test_missing_alias(self):
-    self.project.upload(alias='bar')
+    self.project.upload('foo', alias='bar')
 
 
 class TestJob(object):
@@ -256,12 +256,12 @@ class TestUpload(object):
 
   @raises(ValueError)
   def test_bad_parameters(self):
-    self.project.upload(user='bar')
+    self.project.upload('foo', user='bar')
 
   @raises(AzkabanError)
   def test_invalid_project(self):
     project = Project('foobarzz')
-    project.upload(alias=self.valid_alias)
+    project.upload('foo', alias=self.valid_alias)
 
   @raises(AzkabanError)
   def test_bad_url(self):
@@ -275,28 +275,40 @@ class TestUpload(object):
   def test_bad_password(self):
     self.project._get_credentials(self.url, password='bar')
 
+  @raises(AzkabanError)
+  def test_missing_archive(self):
+    self.project.upload('foo', alias=self.valid_alias)
+
   def test_upload_simple(self):
-    self.project.add_job('test', Job({'type': 'noop'}))
-    res = self.project.upload(alias=self.valid_alias)
-    eq_(['projectId', 'version'], res.keys())
+    with temppath() as archive:
+      self.project.add_job('test', Job({'type': 'noop'}))
+      self.project.build(archive)
+      res = self.project.upload(archive, alias=self.valid_alias)
+      eq_(['projectId', 'version'], res.keys())
 
   @raises(AzkabanError)
   def test_upload_missing_type(self):
-    self.project.add_job('test', Job())
-    self.project.upload(alias=self.valid_alias)
+    with temppath() as archive:
+      self.project.add_job('test', Job())
+      self.project.build(archive)
+      self.project.upload(archive, alias=self.valid_alias)
 
   def test_upload_pig_job(self):
     with temppath() as path:
       with open(path, 'w') as writer:
         writer.write('-- pig script')
       self.project.add_job('foo', PigJob(path))
-      res = self.project.upload(alias=self.valid_alias)
-      eq_(['projectId', 'version'], sorted(res.keys()))
+      with temppath() as archive:
+        self.project.build(archive)
+        res = self.project.upload(archive, alias=self.valid_alias)
+        eq_(['projectId', 'version'], sorted(res.keys()))
 
   def test_run_simple_workflow(self):
     options = {'type': 'command', 'command': 'ls'}
     self.project.add_job('foo', Job(options))
-    self.project.upload(alias=self.valid_alias)
+    with temppath() as archive:
+      self.project.build(archive)
+      self.project.upload(archive, alias=self.valid_alias)
     res = self.project.run('foo', alias=self.valid_alias)
     eq_(['execid', 'flow', 'message', 'project'], sorted(res.keys()))
     eq_(res['message'][:32], 'Execution submitted successfully')
@@ -305,7 +317,9 @@ class TestUpload(object):
     options = {'type': 'command', 'command': 'ls'}
     self.project.add_job('foo', Job(options))
     self.project.add_job('bar', Job(options, {'dependencies': 'foo'}))
-    self.project.upload(alias=self.valid_alias)
+    with temppath() as archive:
+      self.project.build(archive)
+      self.project.upload(archive, alias=self.valid_alias)
     res = self.project.run('bar', alias=self.valid_alias)
     eq_(['execid', 'flow', 'message', 'project'], sorted(res.keys()))
     eq_(res['message'][:32], 'Execution submitted successfully')
@@ -319,5 +333,7 @@ class TestUpload(object):
     options = {'type': 'command', 'command': 'ls'}
     self.project.add_job('foo', Job(options))
     self.project.add_job('bar', Job(options, {'dependencies': 'foo'}))
-    self.project.upload(alias=self.valid_alias)
+    with temppath() as archive:
+      self.project.build(archive)
+      self.project.upload(archive, alias=self.valid_alias)
     self.project.run('foo', alias=self.valid_alias)

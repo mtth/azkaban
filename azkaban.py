@@ -4,7 +4,7 @@
 """Azkaban CLI.
 
 Usage:
-  python FILE upload [-q] (-a ALIAS | [-u USER] URL)
+  python FILE upload [-qz ZIP] (-a ALIAS | [-u USER] URL)
   python FILE run [-q] (-a ALIAS | [-u USER] URL) FLOW
   python FILE build [-fq] PATH
   python FILE view JOB
@@ -35,6 +35,9 @@ Options:
   -u USER --user=USER           Username used to log into Azkaban (defaults to
                                 the current user, as determined by `whoami`).
   -v --version                  Show version and exit.
+  -z ZIP --zip=ZIP              Path to existing zip archive. If specified,
+                                this file will be directly uploaded to
+                                Azkaban (skipping the project build).
 
 """
 
@@ -57,7 +60,7 @@ except ImportError:
 
 import logging
 
-__version__ = '0.1.9'
+__version__ = '0.1.10'
 
 
 class NullHandler(logging.Handler):
@@ -254,9 +257,10 @@ class Project(object):
     size = human_readable(getsize(path))
     logger.info('project successfully built (size: %s)' % (size, ))
 
-  def upload(self, url=None, user=None, password=None, alias=None):
+  def upload(self, archive, url=None, user=None, password=None, alias=None):
     """Build and upload project to Azkaban.
 
+    :param archive: path to zip file (typically the output of `build`)
     :param url: http endpoint URL (including protocol)
     :param user: Azkaban username (must have the appropriate permissions)
     :param password: Azkaban login password
@@ -269,35 +273,35 @@ class Project(object):
     """
     (url, session_id) = self._get_credentials(url, user, password, alias)
     logger.debug('uploading project to %r', url)
-    with temppath() as path:
-      self.build(path)
-      try:
-        req = post(
-          '%s/manager' % (url, ),
-          data={
-            'ajax': 'upload',
-            'session.id': session_id,
-            'project': self.name,
-          },
-          files={
-            'file': ('file.zip', open(path, 'rb'), 'application/zip'),
-          },
-          verify=False
-        )
-      except ConnectionError:
-        raise AzkabanError('unable to connect to azkaban server')
-      except MissingSchema:
-        raise AzkabanError('invalid azkaban server url')
+    try:
+      req = post(
+        '%s/manager' % (url, ),
+        data={
+          'ajax': 'upload',
+          'session.id': session_id,
+          'project': self.name,
+        },
+        files={
+          'file': ('file.zip', open(archive, 'rb'), 'application/zip'),
+        },
+        verify=False
+      )
+    except ConnectionError:
+      raise AzkabanError('unable to connect to azkaban server')
+    except MissingSchema:
+      raise AzkabanError('invalid azkaban server url')
+    except IOError:
+      raise AzkabanError('unable to find archive at %r' % (archive, ))
+    else:
+      res = req.json()
+      if 'error' in res:
+        raise AzkabanError(res['error'])
       else:
-        res = req.json()
-        if 'error' in res:
-          raise AzkabanError(res['error'])
-        else:
-          logger.info(
-            'project successfully uploaded (id: %s, version: %s)' %
-            (res['projectId'], res['version'])
-          )
-          return res
+        logger.info(
+          'project successfully uploaded (id: %s, version: %s)' %
+          (res['projectId'], res['version'])
+        )
+        return res
 
   def run(self, flow, url=None, user=None, password=None, alias=None):
     """Run a workflow on Azkaban.
@@ -355,11 +359,22 @@ class Project(object):
       if args['build']:
         self.build(args['PATH'], force=args['--force'])
       elif args['upload']:
-        self.upload(
-          url=args['URL'],
-          user=args['--user'],
-          alias=args['--alias'],
-        )
+        if args['--zip']:
+          self.upload(
+            args['--zip'],
+            url=args['URL'],
+            user=args['--user'],
+            alias=args['--alias'],
+          )
+        else:
+          with temppath() as path:
+            self.build(path)
+            self.upload(
+              path,
+              url=args['URL'],
+              user=args['--user'],
+              alias=args['--alias'],
+            )
       elif args['run']:
         self.run(
           flow=args['FLOW'],
