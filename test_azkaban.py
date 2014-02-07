@@ -8,6 +8,7 @@ from ConfigParser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
 from os.path import relpath, abspath
+from requests import ConnectionError
 from time import sleep, time
 
 
@@ -71,14 +72,12 @@ class TestProject(object):
     self.project.add_job('bar', job_bar)
     file_bar = __file__
     self.project.add_file(file_bar, 'bar')
-
     project2 = Project('qux')
     job_baz = Job()
     project2.add_job('baz', job_baz) 
     file_baz = abspath('azkaban.py')
     project2.add_file(file_baz, 'baz')
-
-    self.project.merge(project2)
+    project2.merge_into(self.project)
     eq_(self.project.name, 'foo')
     eq_(self.project._jobs, {'bar': job_bar, 'baz': job_baz})
     eq_(self.project._files, {file_bar: 'bar', file_baz: 'baz'})
@@ -162,8 +161,8 @@ class TestJob(object):
     eq_(Job({}).get_option_list('foo'), [])
     eq_(Job({'foo': 1}, {}).get_option_list('bar'), [])
     eq_(Job({'foo': 1}, {}).get_option_list('foo'), [1])
-    eq_(Job({'foo': 1}, {'foo': 2}).get_option_list('foo'), [2, 1])
-    eq_(Job({'foo': 1}, {'foo': 2, 'bar': 3}).get_option_list('foo'), [2, 1])
+    eq_(Job({'foo': 1}, {'foo': 2}).get_option_list('foo'), [1, 2])
+    eq_(Job({'foo': 1}, {'foo': 2, 'bar': 3}).get_option_list('foo'), [1, 2])
 
   def test_generate_simple(self):
     job = Job({'a': 1, 'b': {'c': 2, 'd': 3}})
@@ -250,14 +249,17 @@ class TestUpload(object):
       url = parser.get(section, 'url').rstrip('/')
       if parser.has_option(section, 'session_id'):
         session_id = parser.get(section, 'session_id')
-        if not post(
-          '%s/manager' % (url, ),
-          {'session.id': session_id},
-          verify=False
-        ).text:
-          cls.url = url
-          cls.valid_alias = section
-          return
+        try:
+          if not post(
+            '%s/manager' % (url, ),
+            {'session.id': session_id},
+            verify=False
+          ).text:
+            cls.url = url
+            cls.valid_alias = section
+            return
+        except ConnectionError:
+          pass
 
   def wait(self, ms=2000):
     # wait before making a request
