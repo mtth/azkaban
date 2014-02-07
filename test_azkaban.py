@@ -4,12 +4,14 @@
 """Azkaban test module."""
 
 from azkaban import *
+from azkaban.util import AzkabanError, flatten, temppath
 from ConfigParser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
 from os.path import relpath, abspath
-from requests import ConnectionError
+from requests import ConnectionError, post
 from time import sleep, time
+from zipfile import ZipFile
 
 
 class TestFlatten(object):
@@ -75,7 +77,7 @@ class TestProject(object):
     project2 = Project('qux')
     job_baz = Job()
     project2.add_job('baz', job_baz) 
-    file_baz = abspath('azkaban.py')
+    file_baz = abspath('README.rst')
     project2.add_file(file_baz, 'baz')
     project2.merge_into(self.project)
     eq_(self.project.name, 'foo')
@@ -218,10 +220,6 @@ class TestPigJob(object):
             reader.read(),
             'pig.script=%s\ntype=bar\n' % (path.lstrip('/'), )
           )
-
-  @raises(AzkabanError)
-  def test_missing(self):
-    PigJob('foo.pig')
 
   def test_on_add(self):
     project = Project('pj')
