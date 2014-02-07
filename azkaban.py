@@ -64,7 +64,7 @@ except ImportError:
 
 import logging
 
-__version__ = '0.1.11'
+__version__ = '0.2.0'
 
 
 class NullHandler(logging.Handler):
@@ -216,7 +216,7 @@ class Project(object):
       self._jobs[name] = job
       job.on_add(self, name)
 
-  def merge(self, project):
+  def merge_into(self, project):
     """Merge one project with another.
 
     :param project: project to merge with this project
@@ -224,17 +224,17 @@ class Project(object):
     This method does an in place merge of the current project with another.
     The merged project will maintain the current project's name.
     """
-    logger.debug('merging project %r with %r', self.name, project.name)
-    for name, job in project._jobs.items():
-      self.add_job(name, job)
+    logger.debug('merging into project %r', project.name)
+    for name, job in self._jobs.items():
+      project.add_job(name, job)
+    for path, archive_path in self._files.items():
+      project.add_file(path, archive_path)
 
-    for path, archive_path in project._files.items():
-      self.add_file(path, archive_path)
-
-  def build(self, path, force=False):
+  def build(self, path, overwrite=False):
     """Create the project archive.
 
     :param path: destination path
+    :param overwrite: don't throw an error if a file already exists at `path`
 
     Triggers the `on_build` method on each job inside the project (passing
     itself and the job's name as two argument). This method will be called
@@ -243,7 +243,7 @@ class Project(object):
     """
     logger.debug('building project')
     # not using a with statement for compatibility with older python versions
-    if exists(path) and not force:
+    if exists(path) and not overwrite:
       raise AzkabanError('path %r already exists' % (path, ))
     if not (len(self._jobs) or len(self._files)):
       raise AzkabanError('building empty project')
@@ -361,7 +361,7 @@ class Project(object):
       logger.addHandler(get_formatted_stream_handler())
     try:
       if args['build']:
-        self.build(args['PATH'], force=args['--force'])
+        self.build(args['PATH'], overwrite=args['--overwrite'])
       elif args['upload']:
         if args['--zip']:
           self.upload(
@@ -492,19 +492,60 @@ class Job(object):
   """
 
   def __init__(self, *options):
-    self.options = options
+    self.options_tuple = options
 
   @property
-  def build_options(self):
-    """Combined job options."""
-    options = {}
-    for option in self.options:
-      options.update(flatten(option))
-    for key, value in options.items():
-      if isinstance(value, bool) or not isinstance(value, (str, int, float)):
-        logger.warn('non-standard value %r for option %r', value, key)
-      options[key] = str(value)
-    return options
+  def option_names(self):
+    """Set of all option keys."""
+    if self.options_tuple:
+      names = set.union(*[set(flatten(opts)) for opts in self.options_tuple])
+    else:
+      names = set()
+    return names
+
+  def get_option(self, name):
+    """Get latest definition of an option.
+
+    :param name: name of an option
+
+    Raises an error if the option isn't present.
+
+    """
+    options_index = 0
+    flattened_opts = [flatten(opts) for opts in self.options_tuple][::-1]
+    try:
+      while name not in flattened_opts[options_index]:
+        options_index += 1
+    except IndexError:
+      raise AzkabanError('option %r not found' % (name, ))
+    else:
+      return flatten(flattened_opts[options_index])[name]
+
+  def get_option_list(self, name):
+    """Get list of all definitions of an option (from latest to earliest).
+
+    :param name: name of an option
+
+    Returns an empty list if the option isn't defined anywhere.
+
+    """
+    option_list = []
+    for options in self.options_tuple[::-1]:
+      flattened_options = flatten(options)
+      if name in flattened_options:
+        option_list.append(flattened_options[name])
+    return option_list
+
+  @property
+  def options(self):
+    """Combined job options.
+
+    The default implementation takes the latest definition of each option.
+    Override this to implement custom logic for special option names. E.g. to
+    join lists of options.
+
+    """
+    return {name: self.get_option(name) for name in self.option_names}
 
   def build(self, path):
     """Create job file.
@@ -514,7 +555,7 @@ class Job(object):
 
     """
     with open(path, 'w') as writer:
-      for key, value in sorted(self.build_options.items()):
+      for key, value in sorted(self.options.items()):
         writer.write('%s=%s\n' % (key, value))
 
   def on_add(self, project, name):

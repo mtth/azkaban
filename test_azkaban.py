@@ -138,15 +138,32 @@ class TestProject(object):
 
 class TestJob(object):
 
-  def test_options(self):
-    eq_(Job().options, ())
-    eq_(Job({'foo': 1}).options, ({'foo': 1}, ))
-    eq_(Job({'foo': 1}, {}).options, ({'foo': 1}, {}))
+  def test_options_tuple(self):
+    eq_(Job().options_tuple, ())
+    eq_(Job({'foo': 1}).options_tuple, ({'foo': 1}, ))
+    eq_(Job({'foo': 1}, {}).options_tuple, ({'foo': 1}, {}))
 
-  def test_build_options(self):
-    eq_(Job().build_options, {})
-    eq_(Job({'foo': 1}, {}).build_options, {'foo': '1'})
-    eq_(Job({'foo': 1}, {'foo': 2}).build_options, {'foo': '2'})
+  def test_option_names(self):
+    eq_(Job().option_names, set())
+    eq_(Job({'foo': 1}, {}).option_names, set(['foo']))
+    eq_(Job({'foo': 1}, {'foo': 2}).option_names, set(['foo']))
+    eq_(Job({'foo': 1}, {'bar': 2}).option_names, set(['foo', 'bar']))
+
+  @raises(AzkabanError)
+  def test_get_missing_option(self):
+    Job({'foo': 1}).get_option('bar')
+
+  def test_get_option(self):
+    eq_(Job({'foo': 1}, {}).get_option('foo'), 1)
+    eq_(Job({'foo': 1}, {'foo': 2}).get_option('foo'), 2)
+    eq_(Job({'foo': 1}, {'bar': 2}).get_option('foo'), 1)
+
+  def test_get_option_list(self):
+    eq_(Job({}).get_option_list('foo'), [])
+    eq_(Job({'foo': 1}, {}).get_option_list('bar'), [])
+    eq_(Job({'foo': 1}, {}).get_option_list('foo'), [1])
+    eq_(Job({'foo': 1}, {'foo': 2}).get_option_list('foo'), [2, 1])
+    eq_(Job({'foo': 1}, {'foo': 2, 'bar': 3}).get_option_list('foo'), [2, 1])
 
   def test_generate_simple(self):
     job = Job({'a': 1, 'b': {'c': 2, 'd': 3}})
