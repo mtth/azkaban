@@ -6,9 +6,9 @@
 Usage:
   python FILE upload [-qz ZIP] (-a ALIAS | [-u USER] URL)
   python FILE run [-q] (-a ALIAS | [-u USER] URL) FLOW
-  python FILE build [-fq] PATH
+  python FILE build [-oq] PATH
   python FILE view JOB
-  python FILE list
+  python FILE list [-fp]
   python FILE -h | --help | -v | --version
 
 Commmands:
@@ -28,8 +28,12 @@ Arguments:
 Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
                                 to reuse session IDs for later connections.
-  -f --force                    Overwrite any existing file.
+  -f --files                    List project files instead of jobs.
   -h --help                     Show this message and exit.
+  -p --pretty                   Organize jobs by type and show dependencies. If
+                                used with the `--files` option, will show the
+                                size of each and its path in the archive.
+  -o --overwrite                Overwrite any existing file.
   -q --quiet                    Suppress output. The return status of the
                                 command will still signal errors.
   -u USER --user=USER           Username used to log into Azkaban (defaults to
@@ -45,8 +49,8 @@ from collections import defaultdict
 from ConfigParser import RawConfigParser
 from contextlib import contextmanager
 from getpass import getpass, getuser
-from os import close, remove
-from os.path import exists, expanduser, getsize, isabs
+from os import close, remove, sep
+from os.path import abspath, exists, expanduser, getsize, isabs, relpath
 from sys import argv, exit, stdout
 from tempfile import mkstemp
 from zipfile import ZipFile
@@ -60,7 +64,7 @@ except ImportError:
 
 import logging
 
-__version__ = '0.1.10'
+__version__ = '0.1.11'
 
 
 class NullHandler(logging.Handler):
@@ -391,15 +395,30 @@ class Project(object):
           raise AzkabanError('missing job %r' % (job_name, ))
       elif args['list']:
         jobs = defaultdict(list)
-        for name, job in self._jobs.items():
-          job_type = job.build_options.get('type', '--')
-          job_deps = job.build_options.get('dependencies', '')
-          if job_deps:
-            info = '%s [%s]' % (name, job_deps)
+        if args['--pretty']:
+          if args['--files']:
+            for path, apath in self._files.items():
+              rpath = relpath(path)
+              size = human_readable(getsize(path))
+              apath = apath or abspath(path).lstrip(sep)
+              stdout.write('%s: %s [%s]\n' % (rpath, size, apath))
           else:
-            info = name
-          jobs[job_type].append(info)
-        pretty_print(jobs)
+            for name, job in self._jobs.items():
+              job_type = job.build_options.get('type', '--')
+              job_deps = job.build_options.get('dependencies', '')
+            if job_deps:
+              info = '%s [%s]' % (name, job_deps)
+            else:
+              info = name
+            jobs[job_type].append(info)
+            pretty_print(jobs)
+        else:
+          if args['--files']:
+            for path in self._files:
+              stdout.write('%s\n' % (relpath(path), ))
+          else:
+            for name in self._jobs:
+              stdout.write('%s\n' % (name, ))
     except AzkabanError as err:
       logger.error(err)
       exit(1)
