@@ -45,16 +45,25 @@ Options:
 
 """
 
+__version__ = '0.2.0'
+
+
 import logging
 
 try:
   from .project import Project
   from .job import Job, PigJob
-  from .util import NullHandler
 except ImportError:
   pass # in setup.py
 
+
+class NullHandler(logging.Handler):
+
+  """For python <2.7."""
+
+  def emit(self, record):
+    pass
+
+
 logger = logging.getLogger(__name__)
 logger.addHandler(NullHandler())
-
-__version__ = '0.2.0'

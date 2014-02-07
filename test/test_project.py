@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-"""Azkaban test module."""
+"""Test Azkaban project module."""
 
-from azkaban import *
+from azkaban.project import *
+from azkaban.job import Job, PigJob
 from azkaban.util import AzkabanError, flatten, temppath
 from ConfigParser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
@@ -12,20 +13,6 @@ from os.path import relpath, abspath
 from requests import ConnectionError, post
 from time import sleep, time
 from zipfile import ZipFile
-
-
-class TestFlatten(object):
-
-  def test_empty(self):
-    eq_(flatten({}), {})
-
-  def test_simple(self):
-    dct = {'a': 1, 'B': 2}
-    eq_(flatten(dct), dct)
-
-  def test_nested(self):
-    dct = {'a': 1, 'b': {'c': 3}}
-    eq_(flatten(dct), {'a': 1, 'b.c': 3})
 
 
 class TestProject(object):
@@ -113,7 +100,7 @@ class TestProject(object):
       reader = ZipFile(path)
       try:
         ok_('this.py' in reader.namelist())
-        eq_(reader.read('this.py').split('\n')[5], 'from azkaban import *')
+        eq_(reader.read('this.py').split('\n')[0], '#!/usr/bin/env python')
       finally:
         reader.close()
 
@@ -135,99 +122,6 @@ class TestProject(object):
   @raises(AzkabanError)
   def test_missing_alias(self):
     self.project.upload('foo', alias='bar')
-
-
-class TestJob(object):
-
-  def test_options_tuple(self):
-    eq_(Job().options_tuple, ())
-    eq_(Job({'foo': 1}).options_tuple, ({'foo': 1}, ))
-    eq_(Job({'foo': 1}, {}).options_tuple, ({'foo': 1}, {}))
-
-  def test_option_names(self):
-    eq_(Job().option_names, set())
-    eq_(Job({'foo': 1}, {}).option_names, set(['foo']))
-    eq_(Job({'foo': 1}, {'foo': 2}).option_names, set(['foo']))
-    eq_(Job({'foo': 1}, {'bar': 2}).option_names, set(['foo', 'bar']))
-
-  @raises(AzkabanError)
-  def test_get_missing_option(self):
-    Job({'foo': 1}).get_option('bar')
-
-  def test_get_option(self):
-    eq_(Job({'foo': 1}, {}).get_option('foo'), 1)
-    eq_(Job({'foo': 1}, {'foo': 2}).get_option('foo'), 2)
-    eq_(Job({'foo': 1}, {'bar': 2}).get_option('foo'), 1)
-
-  def test_get_option_list(self):
-    eq_(Job({}).get_option_list('foo'), [])
-    eq_(Job({'foo': 1}, {}).get_option_list('bar'), [])
-    eq_(Job({'foo': 1}, {}).get_option_list('foo'), [1])
-    eq_(Job({'foo': 1}, {'foo': 2}).get_option_list('foo'), [1, 2])
-    eq_(Job({'foo': 1}, {'foo': 2, 'bar': 3}).get_option_list('foo'), [1, 2])
-
-  def test_generate_simple(self):
-    job = Job({'a': 1, 'b': {'c': 2, 'd': 3}})
-    with temppath() as path:
-      job.build(path)
-      with open(path) as reader:
-        eq_(reader.read(), 'a=1\nb.c=2\nb.d=3\n')
-
-  def test_generate_with_defaults(self):
-    defaults = {'b': {'d': 4}, 'e': 5}
-    job = Job(defaults, {'a': 1, 'b': {'c': 2, 'd': 3}})
-    with temppath() as path:
-      job.build(path)
-      with open(path) as reader:
-        eq_(reader.read(), 'a=1\nb.c=2\nb.d=3\ne=5\n')
-
-  def test_generate_with_dependencies(self):
-    foo = Job()
-    bar = Job({'a': 3})
-    job = Job({'a': 2, 'dependencies': 'bar,foo'})
-    with temppath() as path:
-      job.build(path)
-      with open(path) as reader:
-        eq_(reader.read(), 'a=2\ndependencies=bar,foo\n')
-
-
-class TestPigJob(object):
-
-  def test_init(self):
-    with temppath() as path:
-      with open(path, 'w') as writer:
-        writer.write('-- pig script')
-      job = PigJob(path, {'a': 2}, {'a': 3, 'b': 4}, {'type': 'noop'})
-      with temppath() as tpath:
-        job.build(tpath)
-        with open(tpath) as reader:
-          eq_(
-            reader.read(),
-            'a=3\nb=4\npig.script=%s\ntype=noop\n' % (path.lstrip('/'), )
-          )
-
-  def test_type(self):
-    class OtherPigJob(PigJob):
-      type = 'foo'
-    with temppath() as path:
-      with open(path, 'w') as writer:
-        writer.write('-- pig script')
-      job = OtherPigJob(path, {'type': 'bar'})
-      with temppath() as tpath:
-        job.build(tpath)
-        with open(tpath) as reader:
-          eq_(
-            reader.read(),
-            'pig.script=%s\ntype=bar\n' % (path.lstrip('/'), )
-          )
-
-  def test_on_add(self):
-    project = Project('pj')
-    with temppath() as path:
-      with open(path, 'w') as writer:
-        writer.write('-- pig script')
-      project.add_job('foo', PigJob(path))
-      eq_(project._files, {path: None})
 
 
 class TestUpload(object):

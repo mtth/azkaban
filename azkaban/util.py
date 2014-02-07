@@ -9,15 +9,6 @@ from os import close, remove
 from os.path import exists
 from sys import stdout
 from tempfile import mkstemp
-import logging
-
-
-class NullHandler(logging.Handler):
-
-  """For python <2.7."""
-
-  def emit(self, record):
-    pass
 
 
 def flatten(dct, sep='.'):
@@ -69,13 +60,6 @@ def pretty_print(info):
         stdout.write(content_format % (option, ))
     else:
       stdout.write(header_format % (key, value))
-
-def get_formatted_stream_handler():
-  """Returns a formatted stream handler used for the command line parser."""
-  handler = logging.StreamHandler()
-  formatter = logging.Formatter('%(levelname)s: %(message)s')
-  handler.setFormatter(formatter)
-  return handler
 
 @contextmanager
 def temppath():

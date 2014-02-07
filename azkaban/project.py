@@ -31,8 +31,7 @@ from sys import argv, exit, stdout
 from zipfile import ZipFile
 
 from . import __doc__ as azkaban_doc, __version__
-from .util import (AzkabanError, get_formatted_stream_handler, human_readable,
-  pretty_print, temppath)
+from .util import AzkabanError, human_readable, pretty_print, temppath
 
 import logging
 

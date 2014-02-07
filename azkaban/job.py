@@ -87,7 +87,7 @@ class Job(object):
     join lists of options.
 
     """
-    return {name: self.get_option(name) for name in self.option_names}
+    return dict((name, self.get_option(name)) for name in self.option_names)
 
   def build(self, path):
     """Create job file.
