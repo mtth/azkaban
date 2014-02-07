@@ -231,7 +231,7 @@ class Project(object):
     for path, archive_path in project._files.items():
       self.add_file(path, archive_path)
 
-  def build(self, path, force=False):
+  def build(self, path, overwrite=False):
     """Create the project archive.
 
     :param path: destination path
@@ -243,7 +243,7 @@ class Project(object):
     """
     logger.debug('building project')
     # not using a with statement for compatibility with older python versions
-    if exists(path) and not force:
+    if exists(path) and not overwrite:
       raise AzkabanError('path %r already exists' % (path, ))
     if not (len(self._jobs) or len(self._files)):
       raise AzkabanError('building empty project')
@@ -361,7 +361,7 @@ class Project(object):
       logger.addHandler(get_formatted_stream_handler())
     try:
       if args['build']:
-        self.build(args['PATH'], force=args['--force'])
+        self.build(args['PATH'], overwrite=args['--overwrite'])
       elif args['upload']:
         if args['--zip']:
           self.upload(
