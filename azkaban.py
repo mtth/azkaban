@@ -406,11 +406,11 @@ class Project(object):
             for name, job in self._jobs.items():
               job_type = job.build_options.get('type', '--')
               job_deps = job.build_options.get('dependencies', '')
-            if job_deps:
-              info = '%s [%s]' % (name, job_deps)
-            else:
-              info = name
-            jobs[job_type].append(info)
+              if job_deps:
+                info = '%s [%s]' % (name, job_deps)
+              else:
+                info = name
+              jobs[job_type].append(info)
             pretty_print(jobs)
         else:
           if args['--files']:
