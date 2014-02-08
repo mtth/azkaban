@@ -4,14 +4,23 @@ Azkaban
 Version 0.2.0 (02/07/2014)
 --------------------------
 
-* Simpler job options handling. `Job.get_option` and `Job.get_option_list`
+Features:
+
+* Separate `azkaban` CLI utility. This allows running workflows on Azkaban,
+  and uploading prebuilt archives without having to create an empty project.
+* Simpler job options. `Job.get_option` and `Job.get_option_list`
   should allow for easier handling of special job option names.
 * Logging is now separate from the output of `Project.main`. It is now
   exclusively meant to be used for debugging.
+
+Breaking changes:
+
+* The `Project.main` method is now deprecated in favor of the `azkaban`
+  executable.
+* The `--user` and `URL` command line options have been combined into a single
+  `--url` option. The new format is '[user@]protocol:endpoint'.
 * `Project.merge` is renamed to `Project.merge_into` to be more explicit. Note
   that the direction of the merge has also been reversed.
-* `Project.add_job` and `Project.add_file` do not raise errors anymore when
-  they used to. These same errors are delayed until the project is built.
 
 
 Version 0.1.0 (10/17/2013)

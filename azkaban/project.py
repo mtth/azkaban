@@ -283,3 +283,28 @@ class Project(EmptyProject):
       writer.close()
     size = human_readable(getsize(path))
     logger.info('project successfully built (size: %s)' % (size, ))
+
+  def main(self):
+    """Command line argument parser.
+
+    This method will be removed in a future version (using the `azkaban`
+    executable is now the preferred way of running the CLI).
+
+    """
+    from sys import argv
+    from __main__ import main
+    import warnings
+    script = argv[0]
+    argv.insert(1, self.name)
+    msg = """
+
+      Use azkaban CLI instead of running module directly:
+
+        $ azkaban %s%s
+
+      This current method leads to inconsistent error handling and will be
+      disabled in a future release.
+    """ % (' '.join(argv[1:]), '' if argv[2] == 'run' else ' %s' % (script, ))
+    warnings.simplefilter('default')
+    warnings.warn(msg, DeprecationWarning)
+    main(self)
