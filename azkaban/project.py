@@ -284,7 +284,19 @@ class Project(EmptyProject):
     size = human_readable(getsize(path))
     logger.info('project successfully built (size: %s)' % (size, ))
 
-  def main(self):
+  @property
+  def jobs(self):
+    """Returns a dictionary with each job.
+
+    This property should not be used to add jobs. Use `add_job` instead.
+
+    """
+    return dict(
+      (name, job.options)
+      for name, job in self._jobs.items()
+    )
+
+  def main(self, suppress_warning=False):
     """Command line argument parser.
 
     This method will be removed in a future version (using the `azkaban`
@@ -298,13 +310,17 @@ class Project(EmptyProject):
     argv.insert(1, self.name)
     msg = """
 
-      Use azkaban CLI instead of running module directly:
+      Use azkaban executable instead of running module directly:
 
         $ azkaban %s%s
 
       This current method leads to inconsistent error handling and will be
       disabled in a future release.
-    """ % (' '.join(argv[1:]), '' if argv[2] == 'run' else ' %s' % (script, ))
-    warnings.simplefilter('default')
+    """ % (
+      ' '.join(argv[1:]),
+      '' if argv[2] == 'run' or script == 'jobs.py' else ' -s %s' % (script, ),
+    )
+    if not suppress_warning:
+      warnings.simplefilter('default')
     warnings.warn(msg, DeprecationWarning)
     main(self)
