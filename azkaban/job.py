@@ -3,6 +3,7 @@
 
 """Job definition module."""
 
+
 from os import sep
 from .util import AzkabanError, flatten
 
