@@ -12,7 +12,8 @@ from requests.exceptions import MissingSchema
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
 
-from .util import AzkabanError, human_readable, pretty_print, temppath
+from .util import (AzkabanError, human_readable, temppath, azkaban_request,
+  extract_json)
 
 import logging
 
@@ -26,7 +27,7 @@ class EmptyProject(object):
 
   """Azkaban project.
 
-  :param name: TODO
+  :param name: project name
 
   Doesn't contain any information about jobs.
 
@@ -52,37 +53,30 @@ class EmptyProject(object):
     created and the corresponding user must have permissions to upload.
 
     """
-    (url, session_id) = self._get_credentials(url, user, password, alias)
     logger.debug('uploading project to %r', url)
-    try:
-      req = post(
-        '%s/manager' % (url, ),
-        data={
-          'ajax': 'upload',
-          'session.id': session_id,
-          'project': self.name,
-        },
-        files={
-          'file': ('file.zip', open(archive, 'rb'), 'application/zip'),
-        },
-        verify=False
-      )
-    except ConnectionError:
-      raise AzkabanError('unable to connect to azkaban server')
-    except MissingSchema:
-      raise AzkabanError('invalid azkaban server url')
-    except IOError:
+    if not exists(archive):
       raise AzkabanError('unable to find archive at %r' % (archive, ))
+    (url, session_id) = self._get_credentials(url, user, password, alias)
+    res = azkaban_request(
+      'POST',
+      '%s/manager' % (url, ),
+      data={
+        'ajax': 'upload',
+        'session.id': session_id,
+        'project': self.name,
+      },
+      files={
+        'file': ('file.zip', open(archive, 'rb'), 'application/zip'),
+      },
+    ).json()
+    if 'error' in res:
+      raise AzkabanError(res['error'])
     else:
-      res = req.json()
-      if 'error' in res:
-        raise AzkabanError(res['error'])
-      else:
-        logger.info(
-          'project successfully uploaded (id: %s, version: %s)' %
-          (res['projectId'], res['version'])
-        )
-        return res
+      logger.info(
+        'project successfully uploaded (id: %s, version: %s)' %
+        (res['projectId'], res['version'])
+      )
+      return res
 
   def run(self, flow, url=None, user=None, password=None, alias=None):
     """Run a workflow on Azkaban.
@@ -100,34 +94,24 @@ class EmptyProject(object):
     """
     (url, session_id) = self._get_credentials(url, user, password, alias)
     logger.debug('running flow %s on %r', flow, url)
-    try:
-      req = post(
-        '%s/executor' % (url, ),
-        data={
-          'ajax': 'executeFlow',
-          'session.id': session_id,
-          'project': self.name,
-          'flow': flow,
-        },
-        verify=False,
-      )
-    except ConnectionError:
-      raise AzkabanError('unable to connect to azkaban server')
-    except MissingSchema:
-      raise AzkabanError('invalid azkaban server url')
-    else:
-      res = req.json()
-      if 'error' in res:
-        raise AzkabanError(res['error'])
-      else:
-        logger.info(
-          'successfully started flow %s (execution id: %s)' %
-          (flow, res['execid'])
-        )
-        logger.info(
-          'details at %s/executor?execid=%s' % (url, res['execid'])
-        )
-        return res
+    res = extract_json(azkaban_request(
+      'POST',
+      '%s/executor' % (url, ),
+      data={
+        'ajax': 'executeFlow',
+        'session.id': session_id,
+        'project': self.name,
+        'flow': flow,
+      },
+    ))
+    logger.info(
+      'successfully started flow %s (execution id: %s)' %
+      (flow, res['execid'])
+    )
+    #   logger.info(
+    #     'details at %s/executor?execid=%s' % (url, res['execid'])
+    #   )
+    return res
 
   def _get_credentials(self, url=None, user=None, password=None, alias=None):
     """Get valid session ID.
@@ -156,33 +140,23 @@ class EmptyProject(object):
     else:
       raise ValueError('Either url or alias must be specified.')
     url = url.rstrip('/')
-    if not session_id or post(
+    if not session_id or azkaban_request(
+      'POST',
       '%s/manager' % (url, ),
-      {'session.id': session_id},
-      verify=False
+      data={'session.id': session_id},
     ).text:
       user = user or getuser()
       password = password or getpass('azkaban password for %s: ' % (user, ))
-      try:
-        req = post(
-          url,
-          data={'action': 'login', 'username': user, 'password': password},
-          verify=False,
-        )
-      except ConnectionError:
-        raise AzkabanError('unable to connect to azkaban server')
-      except MissingSchema:
-        raise AzkabanError('invalid azkaban server url')
-      else:
-        res = req.json()
-        if 'error' in res:
-          raise AzkabanError(res['error'])
-        else:
-          session_id = res['session.id']
-          if alias:
-            parser.set(alias, 'session_id', session_id)
-            with open(self.rcpath, 'w') as writer:
-              parser.write(writer)
+      res = extract_json(azkaban_request(
+        'POST',
+        url,
+        data={'action': 'login', 'username': user, 'password': password},
+      ))
+      session_id = res['session.id']
+      if alias:
+        parser.set(alias, 'session_id', session_id)
+        with open(self.rcpath, 'w') as writer:
+          parser.write(writer)
     return (url, session_id)
 
 

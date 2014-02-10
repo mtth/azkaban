@@ -10,6 +10,13 @@ from os.path import exists
 from sys import stdout
 from tempfile import mkstemp
 
+import requests as rq
+
+
+class AzkabanError(Exception):
+
+  """Base error class."""
+
 
 def flatten(dct, sep='.'):
   """Flatten a nested dictionary.
@@ -61,6 +68,27 @@ def pretty_print(info):
     else:
       stdout.write(header_format % (key, value))
 
+def tabularize(items, fields, header=True, writer=stdout):
+  """Formatted list of dictionaries.
+
+  :param items: list of dictionaries
+  :param fields: list of keys
+  :param writer: output writer
+
+  Will raise `ValueError` if `items` is empty.
+
+  """
+  if not items:
+    raise ValueError('empty items')
+  widths = [max(len(str(e.get(field, ''))) for e in items) for field in fields]
+  widths = [max(w, len(f)) for (w, f) in zip(widths, fields)]
+  tpl = '%s\n' % (''.join('%%%ss' % (w + 1, ) for w in widths), )
+  if header:
+    writer.write(tpl % tuple(fields))
+  for item in items:
+    writer.write(tpl % tuple(item.get(f, '') for f in fields))
+    writer.flush()
+
 @contextmanager
 def temppath():
   """Create a temporary filepath.
@@ -82,7 +110,39 @@ def temppath():
     if exists(path):
       remove(path)
 
+def azkaban_request(method, url, **kwargs):
+  """Make request to azkaban server and catch common errors.
 
-class AzkabanError(Exception):
+  :param method: get, post, etc.
+  :param url: endpoint url
+  :param kwargs: arguments forwarded to the request handler
 
-  """Base error class."""
+  This function is meant to handle common errors and return a more helpful
+  message than the default one.
+
+  """
+  try:
+    handler = getattr(rq, method.lower())
+  except AttributeError as err:
+    raise ValueError('invalid method: %r' % (method, ))
+  else:
+    try:
+      response = handler(url, verify=False, **kwargs)
+    except ConnectionError:
+      raise AzkabanError('unable to connect to azkaban at %r' % (url, ))
+    except MissingSchema:
+      raise AzkabanError('invalid azkaban server url: %r' % (url, ))
+    else:
+      return response
+
+def extract_json(response):
+  """Extract json from Azkaban response, gracefully handling errors.
+
+  :param response: request response object
+
+  """
+  json = response.json()
+  if 'error' in res:
+    raise AzkabanError(json['error'])
+  else:
+    return json

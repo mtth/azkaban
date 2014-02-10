@@ -38,7 +38,11 @@ Options:
   -h --help                   Show this message and exit.
   -m MODE --mode=MODE         Run concurrency mode. Available options: skip
                               (do not run if this flow is already being
-                              executed), ... [default: ...].
+                              executed), concurrent (run flow concurrently).
+                              pipeline1 (block jobs until their runs in previous
+                              worklows have completed), pipeline2 (block jobs
+                              until their children's runs have completed)
+                              [default: concurrent].
   -o --overwrite              Overwrite any existing file.
   -p --pretty                 Organize jobs by type and show dependencies. If
                               used with the `--files` option, will show the
@@ -61,7 +65,7 @@ Options:
 Examples:
   azkaban my_project run -a my_alias my_flow
   azkaban my_project upload -u http://url.to.azkaban
-  azkaban my_project build -z archive.zip script.py
+  azkaban my_project build -z archive.zip -s script.py
 
 Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 
