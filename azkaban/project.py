@@ -7,8 +7,6 @@
 from ConfigParser import RawConfigParser
 from getpass import getpass, getuser
 from os.path import abspath, exists, expanduser, getsize, isabs, relpath
-from requests import post, ConnectionError
-from requests.exceptions import MissingSchema
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
 
@@ -29,7 +27,9 @@ class EmptyProject(object):
 
   :param name: project name
 
-  Doesn't contain any information about jobs.
+  This class is never meant to be instantiated from a user's code. It is only
+  used by the command line interface to execute commands on the server which
+  do not require building a project.
 
   """
 
@@ -38,6 +38,54 @@ class EmptyProject(object):
   def __init__(self, name):
     self.name = name
     registry[name] = self
+
+  def run(self, flow, jobs=None, url=None, user=None, password=None,
+    alias=None):
+    """Run a workflow on Azkaban.
+
+    :param flow: name of the workflow
+    :param jobs: name of the workflow
+    :param url: http endpoint URL (including protocol)
+    :param user: Azkaban username (must have the appropriate permissions)
+    :param password: Azkaban login password
+    :param alias: section of rc file used to cache URLs (will enable session
+      ID caching)
+
+    Note that in order to run a workflow on Azkaban, it must already have been
+    uploaded and the corresponding user must have permissions to run.
+
+    """
+    (url, session_id) = self._get_credentials(url, user, password, alias)
+    if not jobs:
+      logger.debug('running flow %s on %r', flow, url)
+      res = extract_json(azkaban_request(
+        'POST',
+        '%s/executor' % (url, ),
+        data={
+          'ajax': 'executeFlow',
+          'session.id': session_id,
+          'project': self.name,
+          'flow': flow,
+        },
+      ))
+      logger.info(
+        'successfully started flow %s (execution id: %s)' %
+        (flow, res['execid'])
+      )
+    else:
+      raise NotImplementedError('TODO')
+      all_names = self._get_flow_jobs(flow)
+      run_names = set(jobs)
+      missing_names = run_names - all_names
+      if missing_names:
+        raise AzkabanError(
+          'jobs %r not found in flow %r' %
+          (missing_names, flow)
+        )
+    #   logger.info(
+    #     'details at %s/executor?execid=%s' % (url, res['execid'])
+    #   )
+    return res
 
   def upload(self, archive, url=None, user=None, password=None, alias=None):
     """Build and upload project to Azkaban.
@@ -77,41 +125,6 @@ class EmptyProject(object):
         (res['projectId'], res['version'])
       )
       return res
-
-  def run(self, flow, url=None, user=None, password=None, alias=None):
-    """Run a workflow on Azkaban.
-
-    :param flow: name of the workflow
-    :param url: http endpoint URL (including protocol)
-    :param user: Azkaban username (must have the appropriate permissions)
-    :param password: Azkaban login password
-    :param alias: section of rc file used to cache URLs (will enable session
-      ID caching)
-
-    Note that in order to run a workflow on Azkaban, it must already have been
-    uploaded and the corresponding user must have permissions to run.
-
-    """
-    (url, session_id) = self._get_credentials(url, user, password, alias)
-    logger.debug('running flow %s on %r', flow, url)
-    res = extract_json(azkaban_request(
-      'POST',
-      '%s/executor' % (url, ),
-      data={
-        'ajax': 'executeFlow',
-        'session.id': session_id,
-        'project': self.name,
-        'flow': flow,
-      },
-    ))
-    logger.info(
-      'successfully started flow %s (execution id: %s)' %
-      (flow, res['execid'])
-    )
-    #   logger.info(
-    #     'details at %s/executor?execid=%s' % (url, res['execid'])
-    #   )
-    return res
 
   def _get_credentials(self, url=None, user=None, password=None, alias=None):
     """Get valid session ID.
@@ -159,6 +172,15 @@ class EmptyProject(object):
           parser.write(writer)
     return (url, session_id)
 
+  def _get_flow_jobs(self, flow, session_id):
+    """TODO: _get_flow_jobs docstring.
+
+    :param flow: TODO
+    :param session_id: TODO
+
+    """
+    pass
+
 
 class Project(EmptyProject):
 
@@ -169,10 +191,21 @@ class Project(EmptyProject):
   """
 
   def __init__(self, name):
-    self.name = name
+    super(Project, self).__init__(name)
     self._jobs = {}
     self._files = {}
-    registry[name] = self
+
+  @property
+  def jobs(self):
+    """Returns a dictionary with each job options.
+
+    This property should not be used to add jobs. Use `add_job` instead.
+
+    """
+    return dict(
+      (name, job.options)
+      for name, job in self._jobs.items()
+    )
 
   def add_file(self, path, archive_path=None):
     """Include a file in the project archive.
@@ -257,18 +290,6 @@ class Project(EmptyProject):
       writer.close()
     size = human_readable(getsize(path))
     logger.info('project successfully built (size: %s)' % (size, ))
-
-  @property
-  def jobs(self):
-    """Returns a dictionary with each job.
-
-    This property should not be used to add jobs. Use `add_job` instead.
-
-    """
-    return dict(
-      (name, job.options)
-      for name, job in self._jobs.items()
-    )
 
   def main(self, suppress_warning=False):
     """Command line argument parser.

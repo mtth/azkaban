@@ -7,6 +7,8 @@
 from contextlib import contextmanager
 from os import close, remove
 from os.path import exists
+from requests import ConnectionError
+from requests.exceptions import MissingSchema
 from sys import stdout
 from tempfile import mkstemp
 
