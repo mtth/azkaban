@@ -124,7 +124,7 @@ class TestProject(object):
     self.project.get_session('foo', alias='bar')
 
 
-class TestUpload(object):
+class _TestServer(object):
 
   # requires valid credentials and an 'azkabancli' project on the server
 
@@ -162,8 +162,13 @@ class TestUpload(object):
   def setup(self):
     if not self.session_id:
       raise SkipTest
-    self.wait()
     self.project = Project('azkabancli')
+
+  def teardown(self):
+    sleep(3)
+
+
+class TestUpload(_TestServer):
 
   @raises(AzkabanError)
   def test_missing_archive(self):
@@ -210,6 +215,30 @@ class TestUpload(object):
         res = self.project.upload(archive, self.url, self.session_id)
         eq_(['projectId', 'version'], sorted(res.keys()))
 
+
+class TestGetFlowJobs(_TestServer):
+
+  @raises(AzkabanError)
+  def test_get_invalid_flow(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    with temppath() as archive:
+      self.project.build(archive)
+      self.project.upload(archive, self.url, self.session_id)
+    self.project.get_flow_jobs('baz', self.url, self.session_id)
+
+  def test_get_single_job(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    with temppath() as archive:
+      self.project.build(archive)
+      self.project.upload(archive, self.url, self.session_id)
+    jobs = self.project.get_flow_jobs('foo', self.url, self.session_id)
+    eq_(jobs, ['foo'])
+
+
+class TestRun(_TestServer):
+
   def test_run_simple_workflow(self):
     options = {'type': 'command', 'command': 'ls'}
     self.project.add_job('foo', Job(options))
@@ -233,7 +262,7 @@ class TestUpload(object):
 
   @raises(AzkabanError)
   def test_run_missing_workflow(self):
-    self.project.run('foo', self.url, self.session_id)
+    self.project.run('baz', self.url, self.session_id)
 
   @raises(AzkabanError)
   def test_run_non_workflow_job(self):
@@ -244,3 +273,33 @@ class TestUpload(object):
       self.project.build(archive)
       self.project.upload(archive, self.url, self.session_id)
     self.project.run('foo', self.url, self.session_id)
+
+  @raises(AzkabanError)
+  def test_run_blocking_workflow(self):
+    options = {'type': 'command', 'command': 'sleep 2'}
+    self.project.add_job('foo', Job(options))
+    with temppath() as archive:
+      self.project.build(archive)
+      self.project.upload(archive, self.url, self.session_id)
+    self.project.run('foo', self.url, self.session_id)
+    self.project.run('foo', self.url, self.session_id, block=True)
+
+  def test_run_non_blocking_workflow(self):
+    options = {'type': 'command', 'command': 'sleep 2'}
+    self.project.add_job('foo', Job(options))
+    with temppath() as archive:
+      self.project.build(archive)
+      self.project.upload(archive, self.url, self.session_id)
+    self.project.run('foo', self.url, self.session_id)
+    res = self.project.run('foo', self.url, self.session_id)
+    eq_(['execid', 'flow', 'message', 'project'], sorted(res.keys()))
+    eq_(res['message'][:32], 'Flow foo is already running with')
+
+  @raises(AzkabanError)
+  def test_run_wrong_job_in_workflow(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    with temppath() as archive:
+      self.project.build(archive)
+      self.project.upload(archive, self.url, self.session_id)
+    self.project.run('foo', self.url, self.session_id, jobs=['bar'])

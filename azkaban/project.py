@@ -41,7 +41,7 @@ class EmptyProject(object):
   def __repr__(self):
     return '<%s %r>' % (self.__class__, self.name)
 
-  def run(self, flow, url, session_id, jobs=None, block=False, cont=False):
+  def run(self, flow, url, session_id, jobs=None, block=False):
     """Run a workflow on Azkaban.
 
     :param flow: name of the workflow
@@ -49,25 +49,14 @@ class EmptyProject(object):
     :param session_id: Azkaban session ID
     :param jobs: name of jobs to run (run entire workflow by default)
     :param block: don't run if the same workflow is already running
-    :param cont: dont' kill flow if a job fails
 
     Note that in order to run a workflow on Azkaban, it must already have been
     uploaded and the corresponding user must have permissions to run.
 
     """
-    # TODO: implement block, cont parameter
     if not jobs:
       logger.debug('running flow %r on %r', flow, url)
-      res = extract_json(azkaban_request(
-        'POST',
-        '%s/executor' % (url, ),
-        data={
-          'ajax': 'executeFlow',
-          'session.id': session_id,
-          'project': self.name,
-          'flow': flow,
-        },
-      ))
+      disabled = []
     else:
       raise NotImplementedError('TODO')
       logger.debug('running jobs %r of flow %r on %r', jobs, flow, url)
@@ -79,6 +68,19 @@ class EmptyProject(object):
           'Jobs %r not found in flow %r.' %
           (missing_names, flow)
         )
+    res = extract_json(azkaban_request(
+      'POST',
+      '%s/executor' % (url, ),
+      data={
+        'ajax': 'executeFlow',
+        'session.id': session_id,
+        'project': self.name,
+        'flow': flow,
+        'disabled': disabled,
+        'concurrentOption': 'skip' if block else 'concurrent',
+      },
+    ))
+    logger.debug('azkaban response: %r' % (res, ))
     return res
 
   def upload(self, archive, url, session_id):
@@ -107,7 +109,29 @@ class EmptyProject(object):
         'file': ('file.zip', open(archive, 'rb'), 'application/zip'),
       },
     ))
+    logger.debug('azkaban response: %r' % (res, ))
     return res
+
+  def get_flow_jobs(self, flow, url, session_id):
+    """Get list of jobs corresponding to flow on Azkaban server.
+
+    :param flow: TODO
+    :param session_id: TODO
+
+    """
+    logger.debug('finding jobs for flow %r on %r', flow, url)
+    res = extract_json(azkaban_request(
+      'GET',
+      '%s/manager' % (url, ),
+      data={
+        'ajax': 'fetchflowjobs',
+        'session.id': session_id,
+        'project': self.name,
+        'flow': flow,
+      },
+    ))
+    logger.debug('azkaban response: %r' % (res, ))
+    return [n['id'] for n in res['nodes']]
 
   def get_session(self, url=None, password=None, alias=None):
     """Get URL and associated valid session ID.
@@ -164,25 +188,6 @@ class EmptyProject(object):
         with open(self.rcpath, 'w') as writer:
           parser.write(writer)
     return {'url': url, 'session_id': session_id}
-
-  def _get_flow_jobs(self, flow, session_id):
-    """Get list of jobs corresponding to flow on Azkaban server.
-
-    :param flow: TODO
-    :param session_id: TODO
-
-    """
-    logger.debug('finding jobs for flow %r on %r', flow, url)
-    res = extract_json(azkaban_request(
-      'POST',
-      '%s/executor' % (url, ),
-      data={
-        'ajax': 'executeFlow',
-        'session.id': session_id,
-        'project': self.name,
-        'flow': flow,
-      },
-    ))
 
 
 class Project(EmptyProject):

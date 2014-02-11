@@ -4,10 +4,10 @@
 """Azkaban CLI: a lightweight command line interface for Azkaban.
 
 Usage:
-  azkaban run [-bcp PROJECT] [-s SCRIPT] (-u URL | -a ALIAS) FLOW [JOB ...]
+  azkaban run [-bp PROJECT] [-s SCRIPT] (-u URL | -a ALIAS) FLOW [JOB ...]
   azkaban upload [-p PROJECT] [-s SCRIPT | -z ZIP] (-u URL | -a ALIAS)
   azkaban build [-op PROJECT] [-s SCRIPT] [-z ZIP]
-  azkaban list [-fip PROJECT] [-s SCRIPT]
+  azkaban list [-p PROJECT] [-s SCRIPT] [-f | FLOW]
   azkaban view [-p PROJECT] [-s SCRIPT] JOB
   azkaban create | delete
   azkaban -h | --help | -v | --version
@@ -36,9 +36,6 @@ Options:
                                 reuse session IDs for later connections.
   -b --block                    Don't run workflow concurrently if it is
                                 already running.
-  -c --continue                 Continue executing jobs as long as their
-                                dependencies are met. The default is to kill
-                                all jobs immediately.
   -f --files                    List project files instead of jobs.
   -h --help                     Show this message and exit.
   -i --info                     Organize jobs by type and show dependencies. If
@@ -93,6 +90,7 @@ def main(project=None):
   try:
     if args['run']:
       flow = args['FLOW']
+      jobs = args['JOB']
       if not project:
         if name:
           project = EmptyProject(name)
@@ -103,14 +101,16 @@ def main(project=None):
         flow=flow,
         url=session['url'],
         session_id=session['session_id'],
-        jobs=args['JOB'],
+        jobs=jobs,
         block=args['--block'],
-        cont=args['--continue'],
       )
       # TODO: make this change if only some jobs are submitted
+      exec_id = res['execid']
+      job_names = ', jobs: %s' % (', '.join(jobs), ) if jobs else ''
       stdout.write(
-        'Flow %s successfully submitted.\nDetails at %s/executor?execid=%s\n'
-        % (flow, session['url'], res['execid'])
+        'Flow %s successfully submitted (execution id: %s%s).\n'
+        'Details at %s/executor?execid=%s\n'
+        % (flow, exec_id, job_names, session['url'], exec_id)
       )
     elif args['build']:
       project = project or Project.load_from_script(args['--script'], name)
