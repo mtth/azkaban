@@ -5,7 +5,7 @@
 
 Usage:
   azkaban run [-bp PROJECT] [-s SCRIPT] (-u URL | -a ALIAS) FLOW [JOB ...]
-  azkaban upload [-p PROJECT] [-s SCRIPT | -z ZIP] (-u URL | -a ALIAS)
+  azkaban upload [-cp PROJECT] [-s SCRIPT | -z ZIP] (-u URL | -a ALIAS)
   azkaban build [-op PROJECT] [-s SCRIPT] [-z ZIP]
   azkaban list [-p PROJECT] [-s SCRIPT] [-f | FLOW]
   azkaban view [-p PROJECT] [-s SCRIPT] JOB
@@ -41,6 +41,7 @@ Options:
                                 reuse session IDs for later connections.
   -b --block                    Don't run workflow concurrently if it is
                                 already running.
+  -c --create                   Create the project if it does not exist.
   -f --files                    List project files instead of jobs.
   -h --help                     Show this message and exit.
   -i --info                     Organize jobs by type and show dependencies. If
@@ -129,7 +130,8 @@ def main(project=None):
       )
       stdout.write(
         'Project %s successfully created.\n'
-        % (name, )
+        'Details at %s/manager?project=%s\n'
+        % (project.name, session['url'], project.name)
       )
     elif args['delete']:
       name = raw_input('Project name: ')
@@ -155,28 +157,49 @@ def main(project=None):
       )
     elif args['upload']:
       path = args['--zip']
-      if path:
-        project = project or EmptyProject(name)
-        session = project.get_session(url=args['--url'], alias=args['--alias'])
-        size = getsize(path)
-        res = project.upload(
-          path,
-          url=session['url'],
-          session_id=session['session_id'],
-        )
-      else:
-        project = project or Project.load_from_script(args['--script'], name)
-        session = project.get_session(url=args['--url'], alias=args['--alias'])
-        with temppath() as path:
+      if not project:
+        if path:
+          project = EmptyProject(name)
+        else:
+          project = Project.load_from_script(args['--script'], name)
+      session = project.get_session(url=args['--url'], alias=args['--alias'])
+      with temppath() as tpath:
+        if not path:
+          path = tpath
           size = project.build(path)
+        else:
+          size = getsize(path)
+        try:
           res = project.upload(
             path,
             url=session['url'],
             session_id=session['session_id'],
           )
+        except AzkabanError as err:
+          if args['--create']:
+            project.create(
+              description=project.name,
+              url=session['url'],
+              session_id=session['session_id'],
+            )
+            res = project.upload(
+              path,
+              url=session['url'],
+              session_id=session['session_id'],
+            )
+          else:
+            raise err
       stdout.write(
-        'Project %s successfully uploaded (id: %s, size: %s, version: %s).\n' %
-        (project.name, res['projectId'], human_readable(size), res['version'])
+        'Project %s successfully uploaded (id: %s, size: %s, version: %s).\n'
+        'Details at %s/manager?project=%s\n'
+        % (
+          project.name,
+          res['projectId'],
+          human_readable(size),
+          res['version'],
+          session['url'],
+          project.name
+        )
       )
     elif args['view']:
       project = project or Project.load_from_script(args['--script'], name)

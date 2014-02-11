@@ -44,7 +44,6 @@ class EmptyProject(object):
   def create(self, description, url, session_id):
     """Create a new project on Azkaban.
 
-    :param name: name of the project
     :param description: description of the project
     :param url: http endpoint URL (including protocol)
     :param session_id: Azkaban session ID
@@ -67,7 +66,6 @@ class EmptyProject(object):
   def delete(self, url, session_id):
     """Delete a project on Azkaban.
 
-    :param name: name of the project
     :param url: http endpoint URL (including protocol)
     :param session_id: Azkaban session ID
 
@@ -83,6 +81,11 @@ class EmptyProject(object):
         'azkaban.browser.session.id': session_id,
       },
     )
+    success = "Project '%s' was successfully deleted" % (self.name, )
+    if success in res.text:
+      return res
+    else:
+      raise AzkabanError('Delete failed. Check permissions and existence.')
     return res
 
   def run(self, flow, url, session_id, jobs=None, block=False):
