@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-"""Pog: a command line Azkaban client."""
+"""Azkaban CLI: a lightweight command line interface for Azkaban."""
 
 from azkaban import __version__
-from setuptools import setup
+from setuptools import find_packages, setup
 
 setup(
     name='azkaban',
@@ -14,7 +14,8 @@ setup(
     author_email='monsch@alum.mit.edu',
     url='http://github.com/mtth/azkaban/',
     license='MIT',
-    py_modules=['azkaban'],
+    # py_modules=['azkaban'],
+    packages=find_packages(),
     classifiers=[
       'Development Status :: 4 - Beta',
       'Intended Audience :: Developers',
@@ -25,5 +26,5 @@ setup(
       'docopt',
       'requests>=2.0.1',
     ],
-    # entry_points={'console_scripts': []},
+    entry_points={'console_scripts': ['azkaban = azkaban.__main__:main']},
 )
