@@ -176,7 +176,7 @@ class _TestServer(object):
 
 class TestCreateDelete(_TestServer):
 
-  def super(self):
+  def setup(self):
     super(TestCreateDelete, self).setup()
     self.projects = []
 
@@ -215,10 +215,15 @@ class TestCreateDelete(_TestServer):
 
   def test_delete_project(self):
     project = Project('azkabancli_foo')
-    self.projects = [project]
     project.create('desc', self.url, self.session_id)
     project.delete(self.url, self.session_id)
     ok_(not self.project_exists(project))
+
+  @raises(AzkabanError)
+  def test_delete_nonexistent_project(self):
+    project = Project('azkabancli_foo')
+    ok_(not self.project_exists(project))
+    project.delete(self.url, self.session_id)
 
 
 class TestUpload(_TestServer):
