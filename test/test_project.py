@@ -121,7 +121,7 @@ class TestProject(object):
 
   @raises(AzkabanError)
   def test_missing_alias(self):
-    self.project.upload('foo', alias='bar')
+    self.project.get_session('foo', alias='bar')
 
 
 class TestUpload(object):
@@ -129,12 +129,11 @@ class TestUpload(object):
   # requires valid credentials and an 'azkabancli' project on the server
 
   last_request = time()
+  session_id = None
   url = None
-  valid_alias = None
 
   @classmethod
   def setup_class(cls):
-    # skip tests if no valid credentials found
     parser = RawConfigParser()
     parser.read(Project.rcpath)
     for section in parser.sections():
@@ -147,10 +146,11 @@ class TestUpload(object):
             {'session.id': session_id},
             verify=False
           ).text:
+            cls.session_id = session_id
             cls.url = url
-            cls.valid_alias = section
             return
         except ConnectionError:
+          # skip tests if no valid credentials found
           pass
 
   def wait(self, ms=2000):
@@ -160,41 +160,37 @@ class TestUpload(object):
     self.last_request = time()
 
   def setup(self):
-    if not self.valid_alias:
+    if not self.session_id:
       raise SkipTest
     self.wait()
     self.project = Project('azkabancli')
 
-  @raises(ValueError)
-  def test_bad_parameters(self):
-    self.project.upload('foo', user='bar')
+  @raises(AzkabanError)
+  def test_missing_archive(self):
+    self.project.upload('foo', self.url, self.session_id)
 
   @raises(AzkabanError)
   def test_invalid_project(self):
     project = Project('foobarzz')
-    project.upload('foo', alias=self.valid_alias)
+    project.upload('foo', self.url, self.session_id)
 
   @raises(AzkabanError)
   def test_bad_url(self):
-    self.project._get_credentials('http://foo', password='bar')
+    self.project.get_session('http://foo', password='bar')
 
   @raises(AzkabanError)
   def test_missing_protocol(self):
-    self.project._get_credentials('foo', password='bar')
+    self.project.get_session('foo', password='bar')
 
   @raises(AzkabanError)
   def test_bad_password(self):
-    self.project._get_credentials(self.url, password='bar')
-
-  @raises(AzkabanError)
-  def test_missing_archive(self):
-    self.project.upload('foo', alias=self.valid_alias)
+    self.project.get_session(self.url, password='bar')
 
   def test_upload_simple(self):
     with temppath() as archive:
       self.project.add_job('test', Job({'type': 'noop'}))
       self.project.build(archive)
-      res = self.project.upload(archive, alias=self.valid_alias)
+      res = self.project.upload(archive, self.url, self.session_id)
       eq_(['projectId', 'version'], res.keys())
 
   @raises(AzkabanError)
@@ -202,7 +198,7 @@ class TestUpload(object):
     with temppath() as archive:
       self.project.add_job('test', Job())
       self.project.build(archive)
-      self.project.upload(archive, alias=self.valid_alias)
+      self.project.upload(archive, self.url, self.session_id)
 
   def test_upload_pig_job(self):
     with temppath() as path:
@@ -211,7 +207,7 @@ class TestUpload(object):
       self.project.add_job('foo', PigJob(path))
       with temppath() as archive:
         self.project.build(archive)
-        res = self.project.upload(archive, alias=self.valid_alias)
+        res = self.project.upload(archive, self.url, self.session_id)
         eq_(['projectId', 'version'], sorted(res.keys()))
 
   def test_run_simple_workflow(self):
@@ -219,8 +215,8 @@ class TestUpload(object):
     self.project.add_job('foo', Job(options))
     with temppath() as archive:
       self.project.build(archive)
-      self.project.upload(archive, alias=self.valid_alias)
-    res = self.project.run('foo', alias=self.valid_alias)
+      self.project.upload(archive, self.url, self.session_id)
+    res = self.project.run('foo', self.url, self.session_id)
     eq_(['execid', 'flow', 'message', 'project'], sorted(res.keys()))
     eq_(res['message'][:32], 'Execution submitted successfully')
 
@@ -230,14 +226,14 @@ class TestUpload(object):
     self.project.add_job('bar', Job(options, {'dependencies': 'foo'}))
     with temppath() as archive:
       self.project.build(archive)
-      self.project.upload(archive, alias=self.valid_alias)
-    res = self.project.run('bar', alias=self.valid_alias)
+      self.project.upload(archive, self.url, self.session_id)
+    res = self.project.run('bar', self.url, self.session_id)
     eq_(['execid', 'flow', 'message', 'project'], sorted(res.keys()))
     eq_(res['message'][:32], 'Execution submitted successfully')
 
   @raises(AzkabanError)
   def test_run_missing_workflow(self):
-    self.project.run('foo', alias=self.valid_alias)
+    self.project.run('foo', self.url, self.session_id)
 
   @raises(AzkabanError)
   def test_run_non_workflow_job(self):
@@ -246,5 +242,5 @@ class TestUpload(object):
     self.project.add_job('bar', Job(options, {'dependencies': 'foo'}))
     with temppath() as archive:
       self.project.build(archive)
-      self.project.upload(archive, alias=self.valid_alias)
-    self.project.run('foo', alias=self.valid_alias)
+      self.project.upload(archive, self.url, self.session_id)
+    self.project.run('foo', self.url, self.session_id)

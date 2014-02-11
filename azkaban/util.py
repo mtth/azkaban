@@ -143,8 +143,13 @@ def extract_json(response):
   :param response: request response object
 
   """
-  json = response.json()
-  if 'error' in res:
-    raise AzkabanError(json['error'])
+  try:
+    json = response.json()
+  except ValueError:
+    # no json decoded probably
+    raise ValueError('No JSON decoded from response %r' % (response.text, ))
   else:
-    return json
+    if 'error' in json:
+      raise AzkabanError(json['error'])
+    else:
+      return json
