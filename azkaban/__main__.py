@@ -118,12 +118,11 @@ def main(project=None):
         % (flow, exec_id, job_names, session['url'], exec_id)
       )
     elif args['create']:
-      project = project or EmptyProject(name)
+      name = raw_input('Project name: ').strip()
+      project = EmptyProject(name)
       session = project.get_session(url=args['--url'], alias=args['--alias'])
-      name = raw_input("Project name: ")
-      description = raw_input("Project description: ").strip() or name
+      description = raw_input('Project description [%s]: ' % (name, )) or name
       project.create(
-        name=name,
         description=description,
         url=session['url'],
         session_id=session['session_id'],
@@ -133,11 +132,10 @@ def main(project=None):
         % (name, )
       )
     elif args['delete']:
+      name = raw_input('Project name: ')
       project = project or EmptyProject(name)
       session = project.get_session(url=args['--url'], alias=args['--alias'])
-      name = raw_input("Project name: ")
       project.delete(
-        name=name,
         url=session['url'],
         session_id=session['session_id'],
       )

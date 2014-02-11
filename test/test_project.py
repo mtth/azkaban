@@ -126,9 +126,17 @@ class TestProject(object):
 
 class _TestServer(object):
 
-  # requires valid credentials and an 'azkabancli' project on the server
+  """Base class to run tests on an Azkaban server.
 
-  last_request = time()
+  These will be skipped if no valid credentials (url and associated session id)
+  are found.
+
+  If the class variable `project_name` is specified, the corresponding project
+  will be created before each test.
+
+  """
+
+  project_name = None
   session_id = None
   url = None
 
@@ -153,50 +161,69 @@ class _TestServer(object):
           # skip tests if no valid credentials found
           pass
 
-  def wait(self, ms=2000):
-    # wait before making a request
-    delay = time() - self.last_request
-    sleep(max(0, ms * 1e-3 - delay))
-    self.last_request = time()
-
   def setup(self):
     if not self.session_id:
       raise SkipTest
-    self.project = Project('azkabancli')
+    if self.project_name:
+      self.project = Project(self.project_name)
+      self.project.create('testing project', self.url, self.session_id)
 
   def teardown(self):
     sleep(3)
+    if self.project_name:
+      self.project.delete(self.url, self.session_id)
 
-class TestCreate(_TestServer):
 
-  def setup(self):
-    super(TestCreate, self).setup()
-    self.project.delete('azkabancli_foo', self.url, self.session_id)
-    self.project.delete('azkabancli_bar', self.url, self.session_id)
+class TestCreateDelete(_TestServer):
+
+  def super(self):
+    super(TestCreateDelete, self).setup()
+    self.projects = []
 
   def teardown(self):
-    super(TestCreate, self).teardown()
-    self.project.delete('azkabancli_foo', self.url, self.session_id)
-    self.project.delete('azkabancli_bar', self.url, self.session_id)
+    super(TestCreateDelete, self).teardown()
+    for project in self.projects:
+      project.delete(self.url, self.session_id)
+
+  def project_exists(self, project):
+    try:
+      try:
+        project.add_job('test', Job({'type': 'noop'}))
+      except AzkabanError:
+        pass # job was already added
+      with temppath() as archive:
+        project.build(archive)
+        project.upload(archive, self.url, self.session_id)
+    except AzkabanError:
+      return False
+    else:
+      return True
 
   def test_create_project(self):
-    self.project.create('azkabancli_foo', 'desc', self.url, self.session_id)
+    project = Project('azkabancli_foo')
+    self.projects = [project]
+    ok_(not self.project_exists(project))
+    project.create('desc', self.url, self.session_id)
+    ok_(self.project_exists(project))
 
   @raises(AzkabanError)
   def test_create_duplicate_project(self):
-    self.project.create('azkabancli_bar', 'desc', self.url, self.session_id)
-    self.project.create('azkabancli_bar', 'desc', self.url, self.session_id)
-
-class TestDelete(_TestServer):
-
-  def setup(self):
-    super(TestDelete, self).setup()
-    self.project.create('azkabancli_foo', 'desc', self.url, self.session_id)
+    project = Project('azkabancli_foo')
+    self.projects = [project]
+    project.create('desc', self.url, self.session_id)
+    project.create('desc2', self.url, self.session_id)
 
   def test_delete_project(self):
-    self.project.delete('azkabancli_foo', self.url, self.session_id)
+    project = Project('azkabancli_foo')
+    self.projects = [project]
+    project.create('desc', self.url, self.session_id)
+    project.delete(self.url, self.session_id)
+    ok_(not self.project_exists(project))
+
 
 class TestUpload(_TestServer):
+
+  project_name = 'azkaban_cli_upload'
 
   @raises(AzkabanError)
   def test_missing_archive(self):
@@ -205,7 +232,10 @@ class TestUpload(_TestServer):
   @raises(AzkabanError)
   def test_invalid_project(self):
     project = Project('foobarzz')
-    project.upload('foo', self.url, self.session_id)
+    with temppath() as archive:
+      project.add_job('test', Job({'type': 'noop'}))
+      project.build(archive)
+      project.upload(archive, self.url, self.session_id)
 
   @raises(AzkabanError)
   def test_bad_url(self):
@@ -246,6 +276,8 @@ class TestUpload(_TestServer):
 
 class TestGetFlowJobs(_TestServer):
 
+  project_name = 'azkaban_cli_flow_jobs'
+
   @raises(AzkabanError)
   def test_get_invalid_flow(self):
     options = {'type': 'command', 'command': 'ls'}
@@ -264,8 +296,20 @@ class TestGetFlowJobs(_TestServer):
     jobs = self.project.get_flow_jobs('foo', self.url, self.session_id)
     eq_(jobs, ['foo'])
 
+  def test_get_multiple_jobs(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    self.project.add_job('bar', Job(options, {'dependencies': 'foo'}))
+    with temppath() as archive:
+      self.project.build(archive)
+      self.project.upload(archive, self.url, self.session_id)
+    jobs = self.project.get_flow_jobs('bar', self.url, self.session_id)
+    eq_(sorted(jobs), ['bar', 'foo'])
+
 
 class TestRun(_TestServer):
+
+  project_name = 'azkaban_cli_run'
 
   def test_run_simple_workflow(self):
     options = {'type': 'command', 'command': 'ls'}

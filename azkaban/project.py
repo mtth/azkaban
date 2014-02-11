@@ -41,7 +41,7 @@ class EmptyProject(object):
   def __repr__(self):
     return '<%s %r>' % (self.__class__, self.name)
 
-  def create(self, name, description, url, session_id):
+  def create(self, description, url, session_id):
     """Create a new project on Azkaban.
 
     :param name: name of the project
@@ -55,7 +55,7 @@ class EmptyProject(object):
       '%s/manager' % (url, ),
       data={
         'action': 'create',
-        'name': name,
+        'name': self.name,
         'description': description,
       },
       cookies={
@@ -64,7 +64,7 @@ class EmptyProject(object):
     ))
     return res
 
-  def delete(self, name, url, session_id):
+  def delete(self, url, session_id):
     """Delete a project on Azkaban.
 
     :param name: name of the project
@@ -76,7 +76,7 @@ class EmptyProject(object):
       'GET',
       '%s/manager' % (url, ),
       params={
-        'project': name,
+        'project': self.name,
         'delete': 'true',
       },
       cookies={
@@ -164,18 +164,25 @@ class EmptyProject(object):
 
     """
     logger.debug('finding jobs for flow %r on %r', flow, url)
-    res = extract_json(azkaban_request(
+    raw_res = azkaban_request(
       'GET',
       '%s/manager' % (url, ),
-      data={
+      params={
         'ajax': 'fetchflowjobs',
-        'session.id': session_id,
         'project': self.name,
         'flow': flow,
       },
-    ))
-    logger.debug('azkaban response: %r' % (res, ))
-    return [n['id'] for n in res['nodes']]
+      cookies={
+        'azkaban.browser.session.id': session_id,
+      },
+    )
+    logger.debug('azkaban response: %r' % (raw_res, ))
+    try:
+      res = extract_json(raw_res)
+    except ValueError:
+      raise AzkabanError('Flow %r not found.' % (flow, ))
+    else:
+      return [n['id'] for n in res['nodes']]
 
   def get_session(self, url=None, password=None, alias=None):
     """Get URL and associated valid session ID.
@@ -188,7 +195,7 @@ class EmptyProject(object):
 
     """
     if alias:
-      parser = RawConfigParser({'user': getuser(), 'session_id': ''})
+      parser = RawConfigParser({'user': '', 'session_id': ''})
       parser.read(self.rcpath)
       if not parser.has_section(alias):
         raise AzkabanError('Missing alias %r.' % (alias, ))
@@ -215,12 +222,12 @@ class EmptyProject(object):
       # CLI (handled by docopt)
       raise ValueError('Either url or alias must be specified.')
     url = url.rstrip('/')
+    user = user or getuser()
     if not session_id or azkaban_request(
       'POST',
       '%s/manager' % (url, ),
       data={'session.id': session_id},
     ).text:
-      user = user or getuser()
       password = password or getpass('azkaban password for %s: ' % (user, ))
       res = extract_json(azkaban_request(
         'POST',
