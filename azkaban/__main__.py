@@ -154,7 +154,10 @@ def main(project=None):
       path = args['--zip']
       if not project:
         if path:
-          project = EmptyProject(name)
+          if name:
+            project = EmptyProject(name)
+          else:
+            raise AzkabanError('Unspecified project name. Use -p option.')
         else:
           project = Project.load_from_script(args['--script'], name)
       session = project.get_session(url=args['--url'], alias=args['--alias'])

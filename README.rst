@@ -3,8 +3,9 @@ Azkaban
 
 Lightweight command line interface (CLI) for Azkaban_:
 
+* Create and delete projects from the command line.
 * Define jobs from a single python file.
-* Build projects, upload to Azkaban, and run workflows from the command line.
+* Build, upload to an Azkaban server, and run workflows programmatically.
 
 
 Installation
@@ -156,6 +157,7 @@ and adds the corresponding script file to the project.
 Using a custom pig type is as simple as changing the :code:`PigJob.type` class 
 variable.
 
+
 Merging projects
 ****************
 
@@ -178,8 +180,6 @@ retain its original name.
   # project1 will now contain baz.txt and the baz job from project2
   project1.merge(project2)
 
-  if __name__ == '__main__':
-    project1.main()
 
 Next steps
 **********
