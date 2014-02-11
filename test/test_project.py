@@ -380,3 +380,12 @@ class TestRun(_TestServer):
       self.project.build(archive)
       self.project.upload(archive, self.url, self.session_id)
     self.project.run('foo', self.url, self.session_id, jobs=['bar'])
+
+  def test_run_single_job_in_workflow(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    self.project.add_job('bar', Job(options, {'dependencies': 'foo'}))
+    with temppath() as archive:
+      self.project.build(archive)
+      self.project.upload(archive, self.url, self.session_id)
+    self.project.run('bar', self.url, self.session_id, jobs=['foo'])

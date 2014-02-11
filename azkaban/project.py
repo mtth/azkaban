@@ -9,7 +9,7 @@ from getpass import getpass, getuser
 from os import sep
 from os.path import (basename, dirname, exists, expanduser, getsize, isabs,
   splitext)
-from sys import path
+from sys import path as sys_path
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
 
@@ -103,17 +103,21 @@ class EmptyProject(object):
     """
     if not jobs:
       logger.debug('running flow %r on %r', flow, url)
-      disabled = []
+      disabled = '[]'
     else:
-      raise NotImplementedError('TODO')
       logger.debug('running jobs %r of flow %r on %r', jobs, flow, url)
-      all_names = self._get_flow_jobs(flow)
+      all_names = set(self.get_flow_jobs(flow, url, session_id))
       run_names = set(jobs)
       missing_names = run_names - all_names
       if missing_names:
         raise AzkabanError(
-          'Jobs %r not found in flow %r.' %
-          (missing_names, flow)
+          'Jobs not found in flow %r: %s.' %
+          (flow, ', '.join(missing_names))
+        )
+      else:
+        disabled = (
+          '[%s]'
+          % (','.join('"%s"' % (n, ) for n in all_names - run_names), )
         )
     res = extract_json(azkaban_request(
       'POST',
@@ -162,8 +166,9 @@ class EmptyProject(object):
   def get_flow_jobs(self, flow, url, session_id):
     """Get list of jobs corresponding to flow on Azkaban server.
 
-    :param flow: TODO
-    :param session_id: TODO
+    :param flow: name of flow in project
+    :param url: Azkaban server endpoint
+    :param session_id: valid session id
 
     """
     logger.debug('finding jobs for flow %r on %r', flow, url)
@@ -367,7 +372,7 @@ class Project(EmptyProject):
 
     """
     from sys import argv
-    from __main__ import main
+    from .__main__ import main
     import warnings
     script = argv[0]
     argv.insert(1, self.name)
@@ -400,7 +405,7 @@ class Project(EmptyProject):
     * in any other case, an error is thrown.
 
     """
-    path.append(dirname(script))
+    sys_path.append(dirname(script))
     module = splitext(basename(script.rstrip(sep)))[0]
     try:
       __import__(module)

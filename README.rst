@@ -21,8 +21,9 @@ Quickstart
 ----------
 
 We first create a configuration file for our project. Let's call it 
-:code:`jobs.py`, although any name would work. Here's a simple example of how 
-we could define a project with a single job and static file:
+:code:`jobs.py`, the default file name the command line tool will look for. 
+Here's a simple example of how we could define a project with a single job and 
+static file:
 
 .. code:: python
 
@@ -32,9 +33,6 @@ we could define a project with a single job and static file:
   project.add_file('/path/to/bar.txt', 'bar.txt')
   project.add_job('bar', Job({'type': 'command', 'command': 'cat bar.txt'}))
 
-  if __name__ == '__main__':
-    project.main()
-
 The :code:`add_file` method adds a file to the project archive (the second 
 optional argument specifies the destination path inside the zip file). The 
 :code:`add_job` method will trigger the creation of a :code:`.job` file. The 
@@ -43,18 +41,15 @@ first argument will be the file's name, the second is a :code:`Job` instance
 
 Once we've saved our jobs file, the following commands are available to us:
 
-* :code:`python jobs.py list`, see the list of all jobs in the current 
-  project.
-* :code:`python jobs.py view`, view the contents of the :code:`.job` file for 
-  a given job.
-* :code:`python jobs.py build`, build the project archive and store it 
-  locally.
-* :code:`python jobs.py upload`, build and upload the project to an Azkaban 
-  server.
-* :code:`python jobs.py run`, trigger a workflow run on the Azkaban server.
+* :code:`azkaban list`, see the list of all jobs in the current project.
+* :code:`azkaban view`, view the contents of the :code:`.job` file for a given 
+  job.
+* :code:`azkaban build`, build the project archive and store it locally.
+* :code:`azkaban upload`, build and upload the project to an Azkaban server.
+* :code:`azkaban run`, trigger a workflow run on the Azkaban server.
 
-Running :code:`python jobs.py --help` shows the list of options for each of 
-the previous commands.
+Running :code:`azkaban --help` shows the list of options for each of the 
+previous commands.
 
 
 Job options
@@ -117,7 +112,7 @@ We can now upload directly to each of these URLs with the shorthand:
 
 .. code:: bash
 
-  $ python jobs.py upload -a foo
+  $ azkaban upload -a foo
 
 This has the added benefit that we won't have to authenticate on every upload. 
 The session ID is cached and reused for later connections.

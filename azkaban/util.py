@@ -125,7 +125,7 @@ def azkaban_request(method, url, **kwargs):
   """
   try:
     handler = getattr(rq, method.lower())
-  except AttributeError as err:
+  except AttributeError:
     raise ValueError('invalid method: %r' % (method, ))
   else:
     try:
