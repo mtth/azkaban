@@ -151,5 +151,7 @@ def extract_json(response):
   else:
     if 'error' in json:
       raise AzkabanError(json['error'])
+    elif json.get('status') == 'error':
+      raise AzkabanError(json['message'])
     else:
       return json

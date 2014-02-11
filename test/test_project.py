@@ -167,6 +167,34 @@ class _TestServer(object):
   def teardown(self):
     sleep(3)
 
+class TestCreate(_TestServer):
+
+  def setup(self):
+    super(TestCreate, self).setup()
+    self.project.delete('azkabancli_foo', self.url, self.session_id)
+    self.project.delete('azkabancli_bar', self.url, self.session_id)
+
+  def teardown(self):
+    super(TestCreate, self).teardown()
+    self.project.delete('azkabancli_foo', self.url, self.session_id)
+    self.project.delete('azkabancli_bar', self.url, self.session_id)
+
+  def test_create_project(self):
+    self.project.create('azkabancli_foo', 'desc', self.url, self.session_id)
+
+  @raises(AzkabanError)
+  def test_create_duplicate_project(self):
+    self.project.create('azkabancli_bar', 'desc', self.url, self.session_id)
+    self.project.create('azkabancli_bar', 'desc', self.url, self.session_id)
+
+class TestDelete(_TestServer):
+
+  def setup(self):
+    super(TestDelete, self).setup()
+    self.project.create('azkabancli_foo', 'desc', self.url, self.session_id)
+
+  def test_delete_project(self):
+    self.project.delete('azkabancli_foo', self.url, self.session_id)
 
 class TestUpload(_TestServer):
 

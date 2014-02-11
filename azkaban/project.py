@@ -41,6 +41,50 @@ class EmptyProject(object):
   def __repr__(self):
     return '<%s %r>' % (self.__class__, self.name)
 
+  def create(self, name, description, url, session_id):
+    """Create a new project on Azkaban.
+
+    :param name: name of the project
+    :param description: description of the project
+    :param url: http endpoint URL (including protocol)
+    :param session_id: Azkaban session ID
+
+    """
+    res = extract_json(azkaban_request(
+      'POST',
+      '%s/manager' % (url, ),
+      data={
+        'action': 'create',
+        'name': name,
+        'description': description,
+      },
+      cookies={
+        'azkaban.browser.session.id': session_id,
+      },
+    ))
+    return res
+
+  def delete(self, name, url, session_id):
+    """Delete a project on Azkaban.
+
+    :param name: name of the project
+    :param url: http endpoint URL (including protocol)
+    :param session_id: Azkaban session ID
+
+    """
+    res = azkaban_request(
+      'GET',
+      '%s/manager' % (url, ),
+      params={
+        'project': name,
+        'delete': 'true',
+      },
+      cookies={
+        'azkaban.browser.session.id': session_id,
+      },
+    )
+    return res
+
   def run(self, flow, url, session_id, jobs=None, block=False):
     """Run a workflow on Azkaban.
 
@@ -176,6 +220,7 @@ class EmptyProject(object):
       '%s/manager' % (url, ),
       data={'session.id': session_id},
     ).text:
+      user = user or getuser()
       password = password or getpass('azkaban password for %s: ' % (user, ))
       res = extract_json(azkaban_request(
         'POST',

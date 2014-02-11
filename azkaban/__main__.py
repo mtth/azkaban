@@ -9,10 +9,15 @@ Usage:
   azkaban build [-op PROJECT] [-s SCRIPT] [-z ZIP]
   azkaban list [-p PROJECT] [-s SCRIPT] [-f | FLOW]
   azkaban view [-p PROJECT] [-s SCRIPT] JOB
-  azkaban create | delete
+  azkaban (create | delete) (-u URL | -a ALIAS)
+
   azkaban -h | --help | -v | --version
 
 Commmands:
+  create                        Create a project on Azkaban. Will be prompted
+                                for a name and description.
+  delete                        Delete a project on Azkaban. Will be prompted
+                                for a name.
   run                           Run jobs or workflows. If no job is specified,
                                 the entire workflow will be executed. The
                                 workflow must have already been uploaded to the
@@ -111,6 +116,34 @@ def main(project=None):
         'Flow %s successfully submitted (execution id: %s%s).\n'
         'Details at %s/executor?execid=%s\n'
         % (flow, exec_id, job_names, session['url'], exec_id)
+      )
+    elif args['create']:
+      project = project or EmptyProject(name)
+      session = project.get_session(url=args['--url'], alias=args['--alias'])
+      name = raw_input("Project name: ")
+      description = raw_input("Project description: ").strip() or name
+      project.create(
+        name=name,
+        description=description,
+        url=session['url'],
+        session_id=session['session_id'],
+      )
+      stdout.write(
+        'Project %s successfully created.\n'
+        % (name, )
+      )
+    elif args['delete']:
+      project = project or EmptyProject(name)
+      session = project.get_session(url=args['--url'], alias=args['--alias'])
+      name = raw_input("Project name: ")
+      project.delete(
+        name=name,
+        url=session['url'],
+        session_id=session['session_id'],
+      )
+      stdout.write(
+        'Project %s successfully deleted.\n'
+        % (name, )
       )
     elif args['build']:
       project = project or Project.load_from_script(args['--script'], name)
