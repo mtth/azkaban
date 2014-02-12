@@ -18,13 +18,10 @@ Two parts:
     project.add_job('bar', Job())
     project.add_file('/some/file.path')
 
-    if __name__ == '__main__':
-      project.main()
-
 """
 
 __all__ = ['Project', 'Job', 'PigJob']
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
 
 try:
