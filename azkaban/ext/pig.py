@@ -19,7 +19,9 @@ Options:
   -a ALIAS --alias=ALIAS        Cf. `azkaban --help`.
   -h --help                     Show this message and exit.
   -j JAR --jar=JAR              Path to jar file. It will be available on the
-                                class path when the pig script is run.
+                                class path when the pig script is run, no need
+                                to register it inside your scripts. Note that
+                                you still need to import it however.
   -o OPTION --option=OPTION     Azkaban option. Should be of the form
                                 key=value. E.g. '-o param.foo=bar' will
                                 substitute parameter '$foo' with 'bar' in the
@@ -68,7 +70,7 @@ class PigProject(Project):
     for jar in jars:
       self.add_file(abspath(jar))
     for path, dep in zip(paths, [None] + paths):
-      dep_opts = {'dependencies': dep} if dep else {}
+      dep_opts = {'dependencies': basename(dep)} if dep else {}
       self.add_job(basename(path), PigJob(abspath(path), dep_opts, *opts))
 
 
@@ -96,9 +98,13 @@ def main():
       project.build(tpath)
       try:
         project.upload(tpath, url, session_id)
-      except AzkabanError:
-        project.create(project.name, url, session_id)
-        project.upload(tpath, url, session_id)
+      except AzkabanError as err:
+        try:
+          project.create(project.name, url, session_id)
+        except AzkabanError:
+          raise err
+        else:
+          project.upload(tpath, url, session_id)
     res = project.run(basename(paths[-1]), url, session_id)
     exec_id = res['execid']
     if len(paths) == 1:
@@ -108,7 +114,7 @@ def main():
       )
     else:
       stdout.write(
-        'Pig jobs flow running at %s/executor?execid=%s\n'
+        'Pig jobs workflow running at %s/executor?execid=%s\n'
         % (session['url'], exec_id)
       )
   except AzkabanError as err:

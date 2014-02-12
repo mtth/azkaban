@@ -1,6 +1,13 @@
 Azkaban
 =======
 
+Version 0.2.2 (02/12/2014)
+--------------------------
+
+* Added `create` and `delete` commands.
+* Added `azkabanpig` extension.
+
+
 Version 0.2.0 (02/07/2014)
 --------------------------
 
