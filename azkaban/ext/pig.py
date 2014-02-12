@@ -20,8 +20,7 @@ Options:
   -h --help                     Show this message and exit.
   -j JAR --jar=JAR              Path to jar file. It will be available on the
                                 class path when the pig script is run, no need
-                                to register it inside your scripts. Note that
-                                you still need to import it however.
+                                to register it inside your scripts.
   -o OPTION --option=OPTION     Azkaban option. Should be of the form
                                 key=value. E.g. '-o param.foo=bar' will
                                 substitute parameter '$foo' with 'bar' in the
@@ -30,6 +29,12 @@ Options:
                                 [default: pig_${user}].
   -t TYPE --type=TYPE           Pig job type used [default: pig].
   -u URL --url=URL              Cf. `azkaban --help`.
+
+Examples:
+  azkabanpig -a my_alias my_script.pig
+  azkabanpig -url http://url.to.azkaban -o param.my_output=bar.dat foo.pig
+
+AzkabanPig returns with exit code 1 if an error occurred and 0 otherwise.
 
 """
 

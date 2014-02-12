@@ -27,9 +27,7 @@ Commmands:
                                 server.
   upload                        Upload project to Azkaban server. If a script
                                 is passed as argument, the project will be
-                                built to a temporary file then uploaded. Note
-                                that the project must have been created on the
-                                server prior to uploading.
+                                built to a temporary file then uploaded.
   view                          View job options.
 
 Arguments:

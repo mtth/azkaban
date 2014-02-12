@@ -4,7 +4,7 @@ Azkaban
 A lightweight Azkaban_ client providing:
 
 * A `command line interface`_ to run workflows, upload projects, and more.
-* A simple and convenient syntax_ to define jobs from a single python file.
+* A simple syntax_ to define jobs from a single python file.
 * Extensions_ for your favorite job types.
 
 
@@ -56,10 +56,23 @@ The session ID is cached and reused for later connections.
 Syntax
 ------
 
+For medium to large sized projects, it quickly becomes tricky to manage the 
+multitude of files required for each workflow. :code:`.properties` files are 
+helpful but still do not provide the flexibility to generate jobs 
+programmatically (i.e. using :code:`for` loops, etc.). This approach also 
+requires us to manually bundle and upload our project to the gateway every 
+time.
+
+We provide here a convenient framework to define jobs from a single python 
+file. This framework is entirely compatible with the command line interface 
+above, and even provides additional functionality (e.g. building and uploading 
+projects in a single command).
+
+
 Quickstart
 **********
 
-We first create a configuration file for our project. Let's call it 
+We start by creating a configuration file for our project. Let's call it 
 :code:`jobs.py`, the default file name the command line tool will look for. 
 Here's a simple example of how we could define a project with a single job and 
 static file:
