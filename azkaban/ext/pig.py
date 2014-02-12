@@ -4,7 +4,7 @@
 """AzkabanPig: an extension for pig scripts to Azkaban CLI.
 
 Usage:
-  azkabanpig [-p PROJECT] [-t TYPE] (-u URL | -a ALIAS) PATH ...
+  azkabanpig [-sp PROJECT] [-t TYPE] (-u URL | -a ALIAS) PATH ...
              [-j JAR] ... [-o OPTION] ...
   azkabanpig -h | --help
 
@@ -27,6 +27,11 @@ Options:
                                 pig script.
   -p PROJECT --project=PROJECT  Project name under which to run the pig script
                                 [default: pig_${user}].
+  -s --sync                     Do not return until the pig scripts have
+                                finished running. This is done by polling
+                                Azkaban every minute. The return status of the
+                                command can be used to determine if the
+                                workflow completed successfully or not.
   -t TYPE --type=TYPE           Pig job type used [default: pig].
   -u URL --url=URL              Cf. `azkaban --help`.
 
@@ -44,9 +49,10 @@ from os import sep
 from os.path import abspath, basename
 from string import Template
 from sys import exit, stderr, stdout
+from time import sleep
 from ..job import PigJob
 from ..project import Project
-from ..util import AzkabanError, temppath
+from ..util import AzkabanError, azkaban_request, extract_json, temppath
 
 
 class PigProject(Project):
@@ -122,6 +128,25 @@ def main():
         'Pig jobs workflow running at %s/executor?execid=%s\n'
         % (session['url'], exec_id)
       )
+    if args['--sync']:
+      while True:
+        sleep(60)
+        res = extract_json(azkaban_request(
+          'GET',
+          '%s/executor' % (url, ),
+          params={
+            'execid': exec_id,
+            'ajax': 'fetchexecflow',
+          },
+          cookies={
+            'azkaban.browser.session.id': session_id,
+          },
+        ))
+        status = res['status'] 
+        if status == 'SUCCESS':
+          break
+        elif status != 'RUNNING':
+          raise AzkabanError('Workflow failed with status %s.' % (status, ))
   except AzkabanError as err:
     stderr.write('%s\n' % (err, ))
     exit(1)

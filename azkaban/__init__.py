@@ -21,7 +21,7 @@ Two parts:
 """
 
 __all__ = ['Project', 'Job', 'PigJob']
-__version__ = '0.2.4'
+__version__ = '0.2.5'
 
 
 try:
