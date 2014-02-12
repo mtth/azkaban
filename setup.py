@@ -26,5 +26,8 @@ setup(
       'docopt',
       'requests>=2.0.1',
     ],
-    entry_points={'console_scripts': ['azkaban = azkaban.__main__:main']},
+    entry_points={'console_scripts': [
+      'azkaban = azkaban.__main__:main',
+      'azkabanpig = azkaban.ext.pig:main',
+    ]},
 )
