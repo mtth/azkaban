@@ -9,7 +9,7 @@ from azkaban.util import AzkabanError, flatten, temppath
 from ConfigParser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
-from os.path import relpath, abspath
+from os.path import relpath, abspath, join
 from requests import ConnectionError, post
 from time import sleep, time
 from zipfile import ZipFile
@@ -23,6 +23,11 @@ class TestProject(object):
   def test_add_file(self):
     self.project.add_file(__file__, 'bar')
     eq_(self.project._files, {__file__: 'bar'})
+
+  def test_add_relative_file(self):
+    project = Project('foo', root=__file__)
+    project.add_file('test_job.py', 'bar')
+    eq_(project._files, {join(dirname(__file__), 'test_job.py'): 'bar'})
 
   @raises(AzkabanError)
   def test_missing_file(self):
