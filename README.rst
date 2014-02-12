@@ -21,7 +21,36 @@ Using pip_:
 Command line interface
 ----------------------
 
-:code:`azkaban`
+Once the package is installed, we have access to the :code:`azkaban` command. 
+From there, without leaving our terminal, we can:
+
+* Create and delete projects on an Azkaban server: :code:`azkaban create`
+* Upload a project archive: :code:`azkaban upload`
+* Run entire workflows, or individual jobs: :code:`azkaban run`
+
+Running :code:`azkaban --help` shows the list of options for each of these 
+commands.
+
+These previous commands all take a :code:`--url` parameter used to specify the 
+Azkaban server (and user). In order to avoid having to do this every time, we 
+can also define aliases in :code:`~/.azkabanrc`:
+
+.. code:: cfg
+
+  [foo]
+  url = http://url.to.foo.server:port
+  [bar]
+  url = http://url.to.bar.server
+  user = baruser
+
+We can now interact directly to each of these URLs with the shorthand:
+
+.. code:: bash
+
+  $ azkaban upload -a foo -z project.zip
+
+This has the added benefit that we won't have to authenticate on every upload. 
+The session ID is cached and reused for later connections.
 
 
 Syntax
@@ -49,17 +78,13 @@ optional argument specifies the destination path inside the zip file). The
 first argument will be the file's name, the second is a :code:`Job` instance 
 (cf. `Job options`_).
 
-Once we've saved our jobs file, the following commands are available to us:
+Once we've saved our jobs file, the following additional commands are 
+available to us:
 
 * :code:`azkaban list`, see the list of all jobs in the current project.
 * :code:`azkaban view`, view the contents of the :code:`.job` file for a given 
   job.
 * :code:`azkaban build`, build the project archive and store it locally.
-* :code:`azkaban upload`, build and upload the project to an Azkaban server.
-* :code:`azkaban run`, trigger a workflow run on the Azkaban server.
-
-Running :code:`azkaban --help` shows the list of options for each of the 
-previous commands.
 
 
 Job options
@@ -103,31 +128,6 @@ we can create a new :code:`Job` subclass to do it for us:
 More
 ****
 
-Aliases
-^^^^^^^
-
-To avoid having to enter the server's URL and our username on every upload (or 
-hard-coding it into our project's configuration file, ugh), we can define 
-aliases in :code:`~/.azkabanrc`:
-
-.. code:: cfg
-
-  [foo]
-  url = http://url.to.foo.server:port
-  [bar]
-  url = http://url.to.bar.server
-  user = baruser
-
-We can now upload directly to each of these URLs with the shorthand:
-
-.. code:: bash
-
-  $ azkaban upload -a foo
-
-This has the added benefit that we won't have to authenticate on every upload. 
-The session ID is cached and reused for later connections.
-
-
 Nested options
 ^^^^^^^^^^^^^^
 
@@ -170,9 +170,9 @@ variable.
 Merging projects
 ^^^^^^^^^^^^^^^^
 
-If you have multiple projects, you can merge them together to create a single project.
-The merge is done in place on the project the method is called on. The first project will
-retain its original name.
+If you have multiple projects, you can merge them together to create a single 
+project. The merge is done in place on the project the method is called on. 
+The first project will retain its original name.
 
 .. code:: python
 
@@ -187,7 +187,7 @@ retain its original name.
   project2.add_job('baz', Job({'type': 'command', 'command': 'cat baz.txt'}))
 
   # project1 will now contain baz.txt and the baz job from project2
-  project1.merge(project2)
+  project2.merge_into(project1)
 
 
 Next steps
@@ -205,7 +205,10 @@ Extensions
 Pig
 ***
 
-:code:`azkabanpig`
+Azkaban comes with a :code:`azkabanpig` utility which enables us to run pig 
+scripts directly. :code:`azkabanpig --help` will display the list of available 
+options (using UDFs, substituting parameters, running several scripts in 
+order, etc.).
 
 
 .. _Azkaban: http://data.linkedin.com/opensource/azkaban
