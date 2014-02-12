@@ -130,7 +130,7 @@ def main():
       )
     if args['--sync']:
       while True:
-        sleep(60)
+        sleep(5)
         res = extract_json(azkaban_request(
           'GET',
           '%s/executor' % (url, ),
@@ -142,11 +142,13 @@ def main():
             'azkaban.browser.session.id': session_id,
           },
         ))
-        status = res['status'] 
-        if status == 'SUCCESS':
+        status = res['status']
+        if status == 'SUCCEEDED':
           break
         elif status != 'RUNNING':
           raise AzkabanError('Workflow failed with status %s.' % (status, ))
+        else:
+          sleep(55)
   except AzkabanError as err:
     stderr.write('%s\n' % (err, ))
     exit(1)
