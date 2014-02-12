@@ -1,11 +1,11 @@
 Azkaban
 =======
 
-Lightweight command line interface (CLI) for Azkaban_:
+A lightweight Azkaban_ client providing:
 
-* Create and delete projects from the command line.
-* Define jobs from a single python file.
-* Build, upload to an Azkaban server, and run workflows programmatically.
+* A `command line interface`_ to run workflows, upload projects, and more.
+* A simple and convenient syntax_ to define jobs from a single python file.
+* Extensions_ for your favorite job types.
 
 
 Installation
@@ -18,8 +18,17 @@ Using pip_:
   $ pip install azkaban
 
 
+Command line interface
+----------------------
+
+:code:`azkaban`
+
+
+Syntax
+------
+
 Quickstart
-----------
+**********
 
 We first create a configuration file for our project. Let's call it 
 :code:`jobs.py`, the default file name the command line tool will look for. 
@@ -54,7 +63,7 @@ previous commands.
 
 
 Job options
------------
+***********
 
 The :code:`Job` class is a light wrapper which allows the creation of 
 :code:`.job` files using python dictionaries.
@@ -92,10 +101,10 @@ we can create a new :code:`Job` subclass to do it for us:
 
 
 More
-----
+****
 
 Aliases
-*******
+^^^^^^^
 
 To avoid having to enter the server's URL and our username on every upload (or 
 hard-coding it into our project's configuration file, ugh), we can define 
@@ -120,7 +129,7 @@ The session ID is cached and reused for later connections.
 
 
 Nested options
-**************
+^^^^^^^^^^^^^^
 
 Nested dictionaries can be used to group options concisely:
 
@@ -141,7 +150,7 @@ Nested dictionaries can be used to group options concisely:
 
 
 Pig jobs
-********
+^^^^^^^^
 
 Because pig jobs are so common, a :code:`PigJob` class is provided which 
 accepts a file path (to the pig script) as first constructor argument, 
@@ -159,7 +168,7 @@ variable.
 
 
 Merging projects
-****************
+^^^^^^^^^^^^^^^^
 
 If you have multiple projects, you can merge them together to create a single project.
 The merge is done in place on the project the method is called on. The first project will
@@ -182,12 +191,21 @@ retain its original name.
 
 
 Next steps
-**********
+^^^^^^^^^^
 
 Any valid python code can go inside the jobs configuration file. This includes 
 using loops to add jobs, subclassing the base :code:`Job` class to better suit 
 a project's needs (e.g. by implementing the :code:`on_add` and 
 :code:`on_build` handlers), ...
+
+
+Extensions
+----------
+
+Pig
+***
+
+:code:`azkabanpig`
 
 
 .. _Azkaban: http://data.linkedin.com/opensource/azkaban
