@@ -8,7 +8,7 @@ from ConfigParser import RawConfigParser
 from getpass import getpass, getuser
 from os import sep
 from os.path import (basename, dirname, exists, expanduser, getsize, isabs,
-  splitext)
+  splitext, join)
 from sys import path as sys_path
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
@@ -262,8 +262,9 @@ class Project(EmptyProject):
 
   _registry = WeakValueDictionary()
 
-  def __init__(self, name, register=True):
+  def __init__(self, name, register=True, root=None):
     super(Project, self).__init__(name)
+    self.root = dirname(root) if root else None
     self._jobs = {}
     self._files = {}
     if register:
@@ -293,8 +294,14 @@ class Project(EmptyProject):
     """
     logger.debug('adding file %r as %r', path, archive_path or path)
     if not isabs(path):
-      raise AzkabanError('Relative path not allowed: %r.' % (path, ))
-    elif path in self._files:
+      if self.root:
+        path = join(self.root, path)
+      else:
+        raise AzkabanError(
+          'Relative path not allowed without specifying a project root: %r.'
+          % (path, )
+        )
+    if path in self._files:
       if self._files[path] != archive_path:
         raise AzkabanError('Inconsistent duplicate file: %r.' % (path, ))
     else:
