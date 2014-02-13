@@ -4,7 +4,7 @@
 """AzkabanPig: an extension for pig scripts to Azkaban CLI.
 
 Usage:
-  azkabanpig [-sp PROJECT] [-t TYPE] (-u URL | -a ALIAS) PATH ...
+  azkabanpig [-lsp PROJECT] [-t TYPE] (-u URL | -a ALIAS) PATH ...
              [-j JAR] ... [-o OPTION] ...
   azkabanpig -h | --help
 
@@ -21,6 +21,8 @@ Options:
   -j JAR --jar=JAR              Path to jar file. It will be available on the
                                 class path when the pig script is run, no need
                                 to register it inside your scripts.
+  -l --log                      Print pig logs to standard out. This implies
+                                the `--sync` option.
   -o OPTION --option=OPTION     Azkaban option. Should be of the form
                                 key=value. E.g. '-o param.foo=bar' will
                                 substitute parameter '$foo' with 'bar' in the
@@ -29,8 +31,8 @@ Options:
                                 [default: pig_${user}].
   -s --sync                     Do not return until the pig scripts have
                                 finished running. This is done by polling
-                                Azkaban every minute. The return status of the
-                                command can be used to determine if the
+                                Azkaban every 5 seconds. The return status of
+                                the command can be used to determine if the
                                 workflow completed successfully or not.
   -t TYPE --type=TYPE           Pig job type used [default: pig].
   -u URL --url=URL              Cf. `azkaban --help`.
@@ -52,7 +54,8 @@ from sys import exit, stderr, stdout
 from time import sleep
 from ..job import PigJob
 from ..project import Project
-from ..util import AzkabanError, azkaban_request, extract_json, temppath
+from ..util import (AzkabanError, temppath, get_session, get_execution_status,
+  get_job_logs, cancel_execution)
 
 
 class PigProject(Project):
@@ -84,6 +87,24 @@ class PigProject(Project):
       dep_opts = {'dependencies': basename(dep)} if dep else {}
       self.add_job(basename(path), PigJob(abspath(path), dep_opts, *opts))
 
+  def get_status(self, exec_id, url, session_id):
+    """Get status of an execution, along with currently running job.
+
+    :param exec_id: execution ID
+    :param url: Azkaban server endpoint
+    :param session_id: valid session id
+
+    This method is able to simply find which unique job is running because of
+    the linear structure of the workflow.
+
+    """
+    status = get_execution_status(exec_id, url, session_id)
+    running = [e['id'] for e in status['nodes'] if e['status'] == 'RUNNING']
+    return {
+      'flow_status': status['status'],
+      'running_job': running[0] if running else '',
+    }
+
 
 def main():
   """AzkabanPig entry point."""
@@ -102,7 +123,7 @@ def main():
       jars=args['--jar'],
       options=job_options,
     )
-    session = project.get_session(url=args['--url'], alias=args['--alias'])
+    session = get_session(url=args['--url'], alias=args['--alias'])
     url = session['url']
     session_id = session['session_id']
     with temppath() as tpath:
@@ -128,27 +149,40 @@ def main():
         'Pig jobs workflow running at %s/executor?execid=%s\n'
         % (session['url'], exec_id)
       )
-    if args['--sync']:
-      while True:
-        sleep(5)
-        res = extract_json(azkaban_request(
-          'GET',
-          '%s/executor' % (url, ),
-          params={
-            'execid': exec_id,
-            'ajax': 'fetchexecflow',
-          },
-          cookies={
-            'azkaban.browser.session.id': session_id,
-          },
-        ))
-        status = res['status']
-        if status == 'SUCCEEDED':
-          break
-        elif status != 'RUNNING':
-          raise AzkabanError('Workflow failed with status %s.' % (status, ))
-        else:
-          sleep(55)
+    if args['--sync'] or args['--log']:
+      current_job = None
+      try:
+        while True:
+          sleep(5)
+          status = project.get_status(exec_id, url, session_id)
+          if status['running_job'] != current_job:
+            current_job = status['running_job']
+            if current_job:
+              offset = 0
+              if args['--log']:
+                stdout.write('\nJob %s:\n' % (current_job, ))
+          if current_job and args['--log']:
+            logs = get_job_logs(
+              exec_id=exec_id,
+              url=url,
+              session_id=session_id,
+              job=current_job,
+              offset=offset,
+            )
+            offset += logs['length']
+            stdout.write(logs['data'])
+          if status['flow_status'] == 'SUCCEEDED':
+            if args['--log']:
+              stdout.write('\nWorkflow execution succeeded!\n')
+            break
+          elif status['flow_status'] != 'RUNNING':
+            raise AzkabanError('Workflow failed.')
+      except KeyboardInterrupt as err:
+        choice = raw_input('\nKill workflow execution [yN]? ').lower()
+        if choice and choice[0] == 'y':
+          stdout.write('Killing workflow... ')
+          cancel_execution(exec_id, url, session_id)
+          stdout.write('Done.\n')
   except AzkabanError as err:
     stderr.write('%s\n' % (err, ))
     exit(1)

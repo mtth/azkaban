@@ -50,3 +50,17 @@ class TestTabularize(object):
       with open(path, 'w') as writer:
         tabularize(data, ['bc', 'a'], writer=writer)
       eq_(open(path).read(), ' bc  a\n  3 21\n     4\n')
+
+class TestGetSession(object):
+
+  @raises(AzkabanError)
+  def test_missing_alias(self):
+    get_session('foo', alias='bar')
+
+  @raises(AzkabanError)
+  def test_bad_url(self):
+    get_session('http://foo', password='bar')
+
+  @raises(AzkabanError)
+  def test_missing_protocol(self):
+    get_session('foo', password='bar')

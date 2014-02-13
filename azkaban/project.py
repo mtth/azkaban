@@ -4,11 +4,8 @@
 """Project definition module."""
 
 
-from ConfigParser import RawConfigParser
-from getpass import getpass, getuser
 from os import sep
-from os.path import (basename, dirname, exists, expanduser, getsize, isabs,
-  splitext, join)
+from os.path import basename, dirname, exists, getsize, isabs, splitext, join
 from sys import path as sys_path
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
@@ -32,8 +29,6 @@ class EmptyProject(object):
   do not require building a project.
 
   """
-
-  rcpath = expanduser('~/.azkabanrc')
 
   def __init__(self, name):
     self.name = name
@@ -191,63 +186,6 @@ class EmptyProject(object):
       raise AzkabanError('Flow %r not found.' % (flow, ))
     else:
       return [n['id'] for n in res['nodes']]
-
-  def get_session(self, url=None, password=None, alias=None):
-    """Get URL and associated valid session ID.
-
-    :param url: http endpoint (including port and optional user)
-    :param password: password used to log into Azkaban (only used if no alias
-      is provided)
-    :param alias: alias name used to find the URL, user, and an existing
-      session ID if possible (will override the `url` parameter)
-
-    """
-    if alias:
-      parser = RawConfigParser({'user': '', 'session_id': ''})
-      parser.read(self.rcpath)
-      if not parser.has_section(alias):
-        raise AzkabanError('Missing alias %r.' % (alias, ))
-      elif not parser.has_option(alias, 'url'):
-        raise AzkabanError('Missing url for alias %r.' % (alias, ))
-      else:
-        url = parser.get(alias, 'url')
-        user = parser.get(alias, 'user')
-        session_id = parser.get(alias, 'session_id')
-    elif url:
-      session_id = None
-      parsed_url = url.split('@')
-      parsed_url_length = len(parsed_url)
-      if parsed_url_length == 1:
-        user = getuser()
-        url = parsed_url[0]
-      elif parsed_url_length == 2:
-        user = parsed_url[0]
-        url = parsed_url[1]
-      else:
-        raise AzkabanError('Malformed url: %r' % (url, ))
-    else:
-      # value error since this is never supposed to happen when called by the
-      # CLI (handled by docopt)
-      raise ValueError('Either url or alias must be specified.')
-    url = url.rstrip('/')
-    user = user or getuser()
-    if not session_id or azkaban_request(
-      'POST',
-      '%s/manager' % (url, ),
-      data={'session.id': session_id},
-    ).text:
-      password = password or getpass('azkaban password for %s: ' % (user, ))
-      res = extract_json(azkaban_request(
-        'POST',
-        url,
-        data={'action': 'login', 'username': user, 'password': password},
-      ))
-      session_id = res['session.id']
-      if alias:
-        parser.set(alias, 'session_id', session_id)
-        with open(self.rcpath, 'w') as writer:
-          parser.write(writer)
-    return {'url': url, 'session_id': session_id}
 
 
 class Project(EmptyProject):

@@ -4,9 +4,11 @@
 """Utility module."""
 
 
+from ConfigParser import RawConfigParser
 from contextlib import contextmanager
+from getpass import getpass, getuser
 from os import close, remove
-from os.path import exists
+from os.path import exists, expanduser
 from requests import ConnectionError
 from requests.exceptions import MissingSchema
 from sys import stdout
@@ -155,3 +157,129 @@ def extract_json(response):
       raise AzkabanError(json['message'])
     else:
       return json
+
+def get_session(url=None, password=None, alias=None):
+  """Get URL and associated valid session ID.
+
+  :param url: http endpoint (including port and optional user)
+  :param password: password used to log into Azkaban (only used if no alias
+    is provided)
+  :param alias: alias name used to find the URL, user, and an existing
+    session ID if possible (will override the `url` parameter)
+
+  """
+  rcpath = expanduser('~/.azkabanrc')
+  if alias:
+    parser = RawConfigParser({'user': '', 'session_id': ''})
+    parser.read(rcpath)
+    if not parser.has_section(alias):
+      raise AzkabanError('Missing alias %r.' % (alias, ))
+    elif not parser.has_option(alias, 'url'):
+      raise AzkabanError('Missing url for alias %r.' % (alias, ))
+    else:
+      url = parser.get(alias, 'url')
+      user = parser.get(alias, 'user')
+      session_id = parser.get(alias, 'session_id')
+  elif url:
+    session_id = None
+    parsed_url = url.split('@')
+    parsed_url_length = len(parsed_url)
+    if parsed_url_length == 1:
+      user = getuser()
+      url = parsed_url[0]
+    elif parsed_url_length == 2:
+      user = parsed_url[0]
+      url = parsed_url[1]
+    else:
+      raise AzkabanError('Malformed url: %r' % (url, ))
+  else:
+    # value error since this is never supposed to happen when called by the
+    # CLI (handled by docopt)
+    raise ValueError('Either url or alias must be specified.')
+  url = url.rstrip('/')
+  user = user or getuser()
+  if not session_id or azkaban_request(
+    'POST',
+    '%s/manager' % (url, ),
+    data={'session.id': session_id},
+  ).text:
+    password = password or getpass('azkaban password for %s: ' % (user, ))
+    res = extract_json(azkaban_request(
+      'POST',
+      url,
+      data={'action': 'login', 'username': user, 'password': password},
+    ))
+    session_id = res['session.id']
+    if alias:
+      parser.set(alias, 'session_id', session_id)
+      with open(rcpath, 'w') as writer:
+        parser.write(writer)
+  return {'url': url, 'session_id': session_id}
+
+def get_execution_status(exec_id, url, session_id):
+  """Get status of an execution.
+
+  :param exec_id: execution ID
+  :param url: Azkaban server endpoint
+  :param session_id: valid session id
+
+  """
+  return extract_json(azkaban_request(
+    'GET',
+    '%s/executor' % (url, ),
+    params={
+      'execid': exec_id,
+      'ajax': 'fetchexecflow',
+    },
+    cookies={
+      'azkaban.browser.session.id': session_id,
+    },
+  ))
+
+def get_job_logs(exec_id, url, session_id, job, offset=0, limit=50000):
+  """Get logs from a job execution.
+
+  :param exec_id: execution ID
+  :param url: Azkaban server endpoint
+  :param session_id: valid session id
+  :param job: job name
+  :param offset: log offset
+  :param limit: size of log to download
+
+  """
+  return extract_json(azkaban_request(
+    'GET',
+    '%s/executor' % (url, ),
+    params={
+      'execid': exec_id,
+      'jobId': job,
+      'ajax': 'fetchExecJobLogs',
+      'offset': offset,
+      'length': limit,
+    },
+    cookies={
+      'azkaban.browser.session.id': session_id,
+    },
+  ))
+
+def cancel_execution(exec_id, url, session_id):
+  """Cancel workflow execution.
+
+  :param exec_id: execution ID
+  :param url: Azkaban server endpoint
+  :param session_id: valid session id
+
+  """
+  res = extract_json(azkaban_request(
+    'GET',
+    '%s/executor' % (url, ),
+    params={
+      'execid': exec_id,
+      'ajax': 'cancelFlow',
+    },
+    cookies={
+      'azkaban.browser.session.id': session_id,
+    },
+  ))
+  if 'error' in res:
+    raise AzkabanError('Execution %s is not running.' % (exec_id, ))

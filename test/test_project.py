@@ -5,11 +5,11 @@
 
 from azkaban.project import *
 from azkaban.job import Job, PigJob
-from azkaban.util import AzkabanError, flatten, temppath
+from azkaban.util import AzkabanError, flatten, get_session, temppath
 from ConfigParser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
-from os.path import relpath, abspath, join
+from os.path import expanduser, relpath, abspath, join
 from requests import ConnectionError, post
 from time import sleep, time
 from zipfile import ZipFile
@@ -124,10 +124,6 @@ class TestProject(object):
       finally:
         reader.close()
 
-  @raises(AzkabanError)
-  def test_missing_alias(self):
-    self.project.get_session('foo', alias='bar')
-
 
 class _TestServer(object):
 
@@ -141,6 +137,7 @@ class _TestServer(object):
 
   """
 
+  rcpath = expanduser('~/.azkabanrc')
   project_name = None
   session_id = None
   url = None
@@ -148,7 +145,7 @@ class _TestServer(object):
   @classmethod
   def setup_class(cls):
     parser = RawConfigParser()
-    parser.read(Project.rcpath)
+    parser.read(cls.rcpath)
     for section in parser.sections():
       url = parser.get(section, 'url').rstrip('/')
       if parser.has_option(section, 'session_id'):
@@ -248,16 +245,8 @@ class TestUpload(_TestServer):
       project.upload(archive, self.url, self.session_id)
 
   @raises(AzkabanError)
-  def test_bad_url(self):
-    self.project.get_session('http://foo', password='bar')
-
-  @raises(AzkabanError)
-  def test_missing_protocol(self):
-    self.project.get_session('foo', password='bar')
-
-  @raises(AzkabanError)
   def test_bad_password(self):
-    self.project.get_session(self.url, password='bar')
+    get_session(self.url, password='bar')
 
   def test_upload_simple(self):
     with temppath() as archive:

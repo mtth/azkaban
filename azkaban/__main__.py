@@ -73,7 +73,8 @@ Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 
 from azkaban import __version__
 from azkaban.project import EmptyProject, Project
-from azkaban.util import AzkabanError, human_readable, pretty_print, temppath
+from azkaban.util import (AzkabanError, human_readable, pretty_print, temppath,
+  get_session)
 from docopt import docopt
 from os.path import getsize, relpath
 from sys import exit, stdout, stderr
@@ -96,7 +97,7 @@ def main(project=None):
           project = EmptyProject(name)
         else:
           project = Project.load_from_script(args['--script'])
-      session = project.get_session(url=args['--url'], alias=args['--alias'])
+      session = get_session(url=args['--url'], alias=args['--alias'])
       res = project.run(
         flow=flow,
         url=session['url'],
@@ -114,7 +115,7 @@ def main(project=None):
     elif args['create']:
       name = raw_input('Project name: ').strip()
       project = EmptyProject(name)
-      session = project.get_session(url=args['--url'], alias=args['--alias'])
+      session = get_session(url=args['--url'], alias=args['--alias'])
       description = raw_input('Project description [%s]: ' % (name, )) or name
       project.create(
         description=description,
@@ -129,7 +130,7 @@ def main(project=None):
     elif args['delete']:
       name = raw_input('Project name: ')
       project = project or EmptyProject(name)
-      session = project.get_session(url=args['--url'], alias=args['--alias'])
+      session = get_session(url=args['--url'], alias=args['--alias'])
       project.delete(
         url=session['url'],
         session_id=session['session_id'],
@@ -158,7 +159,7 @@ def main(project=None):
             raise AzkabanError('Unspecified project name. Use -p option.')
         else:
           project = Project.load_from_script(args['--script'], name)
-      session = project.get_session(url=args['--url'], alias=args['--alias'])
+      session = get_session(url=args['--url'], alias=args['--alias'])
       with temppath() as tpath:
         if path:
           size = getsize(path)
