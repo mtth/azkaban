@@ -4,7 +4,7 @@
 """AzkabanPig: an extension for pig scripts to Azkaban CLI.
 
 Usage:
-  azkabanpig [-lsp PROJECT] [-t TYPE] (-u URL | -a ALIAS) PATH ...
+  azkabanpig [-bp PROJECT] [-t TYPE] (-u URL | -a ALIAS) PATH ...
              [-j JAR] ... [-o OPTION] ...
   azkabanpig -h | --help
 
@@ -17,23 +17,18 @@ Arguments:
 
 Options:
   -a ALIAS --alias=ALIAS        Cf. `azkaban --help`.
+  -b --background               Run job asynchronously. `azkabanpig` will
+                                launch the workflow and return.
   -h --help                     Show this message and exit.
   -j JAR --jar=JAR              Path to jar file. It will be available on the
                                 class path when the pig script is run, no need
                                 to register it inside your scripts.
-  -l --log                      Print pig logs to standard out. This implies
-                                the `--sync` option.
   -o OPTION --option=OPTION     Azkaban option. Should be of the form
                                 key=value. E.g. '-o param.foo=bar' will
                                 substitute parameter '$foo' with 'bar' in the
                                 pig script.
   -p PROJECT --project=PROJECT  Project name under which to run the pig script
                                 [default: pig_${user}].
-  -s --sync                     Do not return until the pig scripts have
-                                finished running. This is done by polling
-                                Azkaban every 5 seconds. The return status of
-                                the command can be used to determine if the
-                                workflow completed successfully or not.
   -t TYPE --type=TYPE           Pig job type used [default: pig].
   -u URL --url=URL              Cf. `azkaban --help`.
 
@@ -94,15 +89,19 @@ class PigProject(Project):
     :param url: Azkaban server endpoint
     :param session_id: valid session id
 
-    This method is able to simply find which unique job is running because of
+    This method is able to simply find which unique job is active because of
     the linear structure of the workflow.
 
     """
     status = get_execution_status(exec_id, url, session_id)
-    running = [e['id'] for e in status['nodes'] if e['status'] == 'RUNNING']
+    active = [
+      e['id']
+      for e in status['nodes']
+      if e['status'] == 'RUNNING' or e['status'] == 'FAILED'
+    ]
     return {
       'flow_status': status['status'],
-      'running_job': running[0] if running else '',
+      'active_job': active[0] if active else '',
     }
 
 
@@ -139,29 +138,29 @@ def main():
           project.upload(tpath, url, session_id)
     res = project.run(basename(paths[-1]), url, session_id)
     exec_id = res['execid']
-    if len(paths) == 1:
-      stdout.write(
-        'Pig job running at %s/executor?execid=%s&job=%s\n'
-        % (session['url'], exec_id, basename(paths[0]))
-      )
+    if args['--background']:
+      if len(paths) == 1:
+        stdout.write(
+          'Pig job running at %s/executor?execid=%s&job=%s\n'
+          % (session['url'], exec_id, basename(paths[0]))
+        )
+      else:
+        stdout.write(
+          'Pig jobs running at %s/executor?execid=%s\n'
+          % (session['url'], exec_id)
+        )
     else:
-      stdout.write(
-        'Pig jobs workflow running at %s/executor?execid=%s\n'
-        % (session['url'], exec_id)
-      )
-    if args['--sync'] or args['--log']:
       current_job = None
       try:
         while True:
           sleep(5)
           status = project.get_status(exec_id, url, session_id)
-          if status['running_job'] != current_job:
-            current_job = status['running_job']
+          if status['active_job'] != current_job:
+            current_job = status['active_job']
             if current_job:
               offset = 0
-              if args['--log']:
-                stdout.write('\nJob %s:\n' % (current_job, ))
-          if current_job and args['--log']:
+              stdout.write('\n[Job %s]\n' % (current_job, ))
+          if current_job:
             logs = get_job_logs(
               exec_id=exec_id,
               url=url,
@@ -169,20 +168,24 @@ def main():
               job=current_job,
               offset=offset,
             )
-            offset += logs['length']
             stdout.write(logs['data'])
+            offset += logs['length']
           if status['flow_status'] == 'SUCCEEDED':
-            if args['--log']:
-              stdout.write('\nWorkflow execution succeeded!\n')
+            stdout.write('\nExecution succeeded.\n')
             break
           elif status['flow_status'] != 'RUNNING':
-            raise AzkabanError('Workflow failed.')
+            raise AzkabanError('Execution failed.')
       except KeyboardInterrupt as err:
-        choice = raw_input('\nKill workflow execution [yN]? ').lower()
+        choice = raw_input('\nKill execution [yN]? ').lower()
         if choice and choice[0] == 'y':
-          stdout.write('Killing workflow... ')
+          stdout.write('Killing... ')
           cancel_execution(exec_id, url, session_id)
           stdout.write('Done.\n')
+        else:
+          stdout.write(
+            'Execution still running at %s/executor?execid=%s\n'
+            % (session['url'], exec_id)
+          )
   except AzkabanError as err:
     stderr.write('%s\n' % (err, ))
     exit(1)
