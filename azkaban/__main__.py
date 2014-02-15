@@ -5,10 +5,10 @@
 
 Usage:
   azkaban build [-op PROJECT] [-s SCRIPT] [-z ZIP]
-  azkaban (create | delete) (-u URL | -a ALIAS)
+  azkaban (create | delete) [-u URL | -a ALIAS]
   azkaban list [-fp PROJECT] [-s SCRIPT]
-  azkaban run [-bp PROJECT] [-s SCRIPT] (-u URL | -a ALIAS) FLOW [JOB ...]
-  azkaban upload [-cp PROJECT] [-s SCRIPT | -z ZIP] (-u URL | -a ALIAS)
+  azkaban run [-bp PROJECT] [-s SCRIPT] [-u URL | -a ALIAS] FLOW [JOB ...]
+  azkaban upload [-cp PROJECT] [-s SCRIPT | -z ZIP] [-u URL | -a ALIAS]
   azkaban view [-p PROJECT] [-s SCRIPT] JOB
   azkaban -h | --help | -v | --version
 
@@ -48,13 +48,14 @@ Options:
                                 script.
   -s SCRIPT --script=SCRIPT     Project configuration script. This script must
                                 contain an `azkaban.Project` instance with name
-                                corresponding to PROJECT [default: jobs.py].
+                                corresponding to PROJECT.
   -u URL --url=URL              Azkaban endpoint (with protocol, and optionally
                                 a username): '[user@]protocol:endpoint'. E.g.
                                 'http://azkaban.server'. The username defaults
                                 to the current user, as determined by `whoami`.
                                 If you often use the same url, consider using
-                                the `--alias` option instead.
+                                the `--alias` option instead. Specifying a url
+                                overrides any `--alias` option.
   -v --version                  Show version and exit.
   -z ZIP --zip=ZIP              For `upload` and `list` commands, the path to
                                 an existing project zip archive. For `build`,

@@ -21,41 +21,7 @@ class TestFlatten(object):
     eq_(flatten(dct), {'a': 1, 'b.c': 3})
 
 
-class TestTabularize(object):
-
-  @raises(ValueError)
-  def test_empty_msg(self):
-    data = []
-    with temppath() as path:
-      with open(path, 'w') as writer:
-        tabularize(data, ['a'], writer=writer)
-
-  def test_single_field(self):
-    data = [{'a': 21, 'b': 3}, {'a': 4, 'b': 5}]
-    with temppath() as path:
-      with open(path, 'w') as writer:
-        tabularize(data, ['a'], writer=writer)
-      eq_(open(path).read(), '  a\n 21\n  4\n')
-
-  def test_multiple_fields(self):
-    data = [{'a': 21, 'bc': 3}, {'a': 4, 'bc': 5}]
-    with temppath() as path:
-      with open(path, 'w') as writer:
-        tabularize(data, ['bc', 'a'], writer=writer)
-      eq_(open(path).read(), ' bc  a\n  3 21\n  5  4\n')
-
-  def test_empty_fields(self):
-    data = [{'a': 21, 'bc': 3}, {'a': 4, 'b': 5}]
-    with temppath() as path:
-      with open(path, 'w') as writer:
-        tabularize(data, ['bc', 'a'], writer=writer)
-      eq_(open(path).read(), ' bc  a\n  3 21\n     4\n')
-
 class TestGetSession(object):
-
-  @raises(AzkabanError)
-  def test_missing_alias(self):
-    get_session('foo', alias='bar')
 
   @raises(AzkabanError)
   def test_bad_url(self):

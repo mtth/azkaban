@@ -11,7 +11,6 @@ from os import close, remove
 from os.path import exists, expanduser
 from requests import ConnectionError
 from requests.exceptions import MissingSchema
-from sys import stdout
 from tempfile import mkstemp
 
 import requests as rq
@@ -20,6 +19,66 @@ import requests as rq
 class AzkabanError(Exception):
 
   """Base error class."""
+
+
+class Config(object):
+
+  """Configuration class. Not meant to be instantiated."""
+
+  rcpath = expanduser('~/.azkabanrc')
+
+  def __init__(self):
+    self.parser = RawConfigParser()
+    if exists(self.rcpath):
+      self.parser.read(self.rcpath)
+
+  def get(self, section, name):
+    """Get option from the azkaban RC file.
+
+    :param section: which section to look into
+    :param name: option name
+
+    Sugar method that wraps the `RawConfigParser.get` method to raise an
+    `AzkabanError` if no section of name is found in the configuration file.
+
+    """
+    if not self.parser.has_section(section):
+      raise AzkabanError('Missing section %r.' % (section, ))
+    elif not self.parser.has_option(section, name):
+      raise AzkabanError('Missing option %r for section %r.' % (name, section))
+    else:
+      return self.parser.get(section, name)
+
+  def get_default(self, command, option):
+    """Get default option value for a command.
+
+    :param command: command the option should be looked up for
+    :param option: name of the option
+
+    """
+    try:
+      return self.get(command, 'default.%s' % (option, ))
+    except AzkabanError:
+      raise AzkabanError(
+        'No default option %r set for command %r. '
+        'Specify one using the --%s flag.'
+        % (option, command, option)
+      )
+
+  def set(self, section, name, value):
+    """Proxy method to set an option on the parser.
+
+    :param section: section name
+    :param name: option name
+    :param value: value to set
+
+    """
+    self.parser.set(section, name, value)
+
+  def save(self):
+    """Save configuration parser back to file."""
+    with open(self.rcpath, 'w') as writer:
+      self.parser.write(writer)
 
 
 def flatten(dct, sep='.'):
@@ -51,47 +110,6 @@ def human_readable(size):
     if size < 1024.0:
       return '%3.1f%s' % (size, suffix)
     size /= 1024.0
-
-def pretty_print(info):
-  """Prints pretty representation of dictionary to stdout.
-
-  :param info: dictionary
-
-  """
-  keys = sorted(info.keys())
-  padding = max(len(key) for key in keys)
-  header_format = '%%%ss: %%s\n' % (padding + 1, )
-  content_format = ' ' * (padding + 3) + '%s\n'
-  for key in keys:
-    value = info[key]
-    if isinstance(value, list):
-      options = sorted(value)
-      stdout.write(header_format % (key, options[0]))
-      for option in options[1:]:
-        stdout.write(content_format % (option, ))
-    else:
-      stdout.write(header_format % (key, value))
-
-def tabularize(items, fields, header=True, writer=stdout):
-  """Formatted list of dictionaries.
-
-  :param items: list of dictionaries
-  :param fields: list of keys
-  :param writer: output writer
-
-  Will raise `ValueError` if `items` is empty.
-
-  """
-  if not items:
-    raise ValueError('empty items')
-  widths = [max(len(str(e.get(field, ''))) for e in items) for field in fields]
-  widths = [max(w, len(f)) for (w, f) in zip(widths, fields)]
-  tpl = '%s\n' % (''.join('%%%ss' % (w + 1, ) for w in widths), )
-  if header:
-    writer.write(tpl % tuple(fields))
-  for item in items:
-    writer.write(tpl % tuple(item.get(f, '') for f in fields))
-    writer.flush()
 
 @contextmanager
 def temppath():
@@ -168,36 +186,26 @@ def get_session(url=None, password=None, alias=None):
     session ID if possible (will override the `url` parameter)
 
   """
-  rcpath = expanduser('~/.azkabanrc')
-  if alias:
-    parser = RawConfigParser({'user': '', 'session_id': ''})
-    parser.read(rcpath)
-    if not parser.has_section(alias):
-      raise AzkabanError('Missing alias %r.' % (alias, ))
-    elif not parser.has_option(alias, 'url'):
-      raise AzkabanError('Missing url for alias %r.' % (alias, ))
-    else:
-      url = parser.get(alias, 'url')
-      user = parser.get(alias, 'user')
-      session_id = parser.get(alias, 'session_id')
-  elif url:
+  config = Config()
+  if url:
     session_id = None
-    parsed_url = url.split('@')
-    parsed_url_length = len(parsed_url)
-    if parsed_url_length == 1:
-      user = getuser()
-      url = parsed_url[0]
-    elif parsed_url_length == 2:
-      user = parsed_url[0]
-      url = parsed_url[1]
-    else:
-      raise AzkabanError('Malformed url: %r' % (url, ))
   else:
-    # value error since this is never supposed to happen when called by the
-    # CLI (handled by docopt)
-    raise ValueError('Either url or alias must be specified.')
-  url = url.rstrip('/')
-  user = user or getuser()
+    alias = alias or config.get_default('azkaban', 'alias')
+    url = config.get('alias', alias)
+    try:
+      session_id = config.get('session_id', alias)
+    except AzkabanError:
+      session_id = None
+  parsed_url = url.rstrip('/').split('@')
+  parsed_url_length = len(parsed_url)
+  if parsed_url_length == 1:
+    user = getuser()
+    url = parsed_url[0]
+  elif parsed_url_length == 2:
+    user = parsed_url[0]
+    url = parsed_url[1]
+  else:
+    raise AzkabanError('Malformed url: %r' % (url, ))
   if not session_id or azkaban_request(
     'POST',
     '%s/manager' % (url, ),
@@ -211,9 +219,8 @@ def get_session(url=None, password=None, alias=None):
     ))
     session_id = res['session.id']
     if alias:
-      parser.set(alias, 'session_id', session_id)
-      with open(rcpath, 'w') as writer:
-        parser.write(writer)
+      config.set('session_id', alias, session_id)
+      config.save()
   return {'url': url, 'session_id': session_id}
 
 def get_execution_status(exec_id, url, session_id):
