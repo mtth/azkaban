@@ -68,32 +68,23 @@ class Config(object):
     with open(self.path, 'w') as writer:
       self.parser.write(writer)
 
-  def get_default_option(self, command, option):
+  def get_default_option(self, command, name):
     """Get default option value for a command.
 
     :param command: command the option should be looked up for
-    :param option: name of the option
+    :param name: name of the option
 
     """
     try:
-      return self.parser.get(command, 'default.%s' % (option, ))
+      return self.parser.get(command, 'default.%s' % (name, ))
     except (NoOptionError, NoSectionError):
       raise AzkabanError(
-        'No default option %r set for command %r. '
-        'Specify one using the --%s flag.',
-        option, command, option,
+        'In order to omit the `--%(name)s` option, '
+        'a default %(name)s must be defined in %(path)r.\n'
+        'This is done by adding a `default.%(name)s` option in the '
+        '`%(command)s` section.'
+        % {'command': command, 'name': name, 'path': self.path}
       )
-
-  def docopt(self, *args, **kwargs):
-    """Light wrapper around docopt which injects configuration defaults.
-
-    :param *args: forwarded to docopt
-    :param **kwargs: forwarded to docopt
-
-    Note that some care must be taken when dealing with exclusive options.
-
-    """
-    pass
 
 
 @contextmanager

@@ -76,7 +76,7 @@ Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 from azkaban import __version__
 from azkaban.project import Project
 from azkaban.session import Session
-from azkaban.util import AzkabanError, Config, catch, human_readable, temppath
+from azkaban.util import AzkabanError, catch, human_readable, temppath
 from docopt import docopt
 from os.path import exists, getsize, relpath
 from sys import stdout
@@ -94,7 +94,7 @@ def get_project(project, strict=False):
     if exists(parts[0]):
       project = Project.load_from_script(parts[0])
     elif not strict:
-      project = Project(name, register=False)
+      project = Project(project, register=False)
     else:
       raise AzkabanError(
         'This command requires a registered project as `--project` option.\n'
@@ -103,21 +103,6 @@ def get_project(project, strict=False):
   else:
     project = Project.load_from_script(*parts)
   return project
-
-def get_session(url=None, alias=None):
-  """Get session from CLI options.
-
-  :param url: `--url` option
-  :param alias: `--alias` option
-
-  """
-  if url:
-    session = Session(url)
-  else:
-    config = Config()
-    alias = alias or config.get_default_option('azkaban', 'alias')
-    session = Session(**config.resolve_alias(alias))
-  return session
 
 @catch(AzkabanError)
 def main():
@@ -135,7 +120,7 @@ def main():
     else:
       with temppath() as path:
         project.build(path)
-        session = get_session(url=args['--url'], alias=args['--alias'])
+        session = Session.from_url_or_alias(args['--url'], args['--alias'])
         res = session.upload_project(project, path)
         stdout.write(
           'Project %s successfully built and uploaded '
@@ -151,7 +136,7 @@ def main():
           )
         )
   elif args['create']:
-    session = get_session(url=args['--url'], alias=args['--alias'])
+    session = Session.from_url_or_alias(args['--url'], args['--alias'])
     project = raw_input('Project name: ').strip()
     description = raw_input('Project description [%s]: ' % (project, ))
     session.create_project(project, description.strip() or project)
@@ -161,7 +146,7 @@ def main():
       % (project, session.url, project)
     )
   elif args['delete']:
-    session = get_session(url=args['--url'], alias=args['--alias'])
+    session = Session.from_url_or_alias(args['--url'], args['--alias'])
     project = raw_input('Project name: ')
     session.delete_project(project)
     stdout.write('Project %s successfully deleted.\n' % (project, ))
@@ -177,7 +162,7 @@ def main():
     project = get_project(args['--project'])
     flow = args['FLOW']
     jobs = args['JOB']
-    session = get_session(url=args['--url'], alias=args['--alias'])
+    session = Session.from_url_or_alias(args['--url'], args['--alias'])
     res = session.run_workflow(
       project=project,
       flow=flow,
@@ -194,7 +179,7 @@ def main():
   elif args['upload']:
     path = args['ZIP']
     project = get_project(args['--project'])
-    session = get_session(url=args['--url'], alias=args['--alias'])
+    session = Session.from_url_or_alias(args['--url'], args['--alias'])
     while True:
       try:
         res = session.upload_project(project, path)

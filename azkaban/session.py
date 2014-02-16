@@ -11,7 +11,7 @@ a remote Azkaban server.
 
 from getpass import getpass, getuser
 from os.path import exists
-from .util import AzkabanError, azkaban_request, extract_json
+from .util import AzkabanError, Config, azkaban_request, extract_json
 import logging
 
 
@@ -273,3 +273,17 @@ class Session(object):
       return extract_json(raw_res)
     except ValueError:
       raise AzkabanError('Flow %r not found.' % (flow, ))
+
+  @classmethod
+  def from_url_or_alias(cls, url=None, alias=None):
+    """Get default session for command.
+
+    :param command: name of command.
+
+    """
+    if url:
+      return cls(url)
+    else:
+      config = Config()
+      alias = alias or config.get_default_option('azkaban', 'alias')
+      return cls(**config.resolve_alias(alias))
