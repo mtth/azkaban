@@ -7,12 +7,14 @@
 from ConfigParser import (NoOptionError, NoSectionError, ParsingError,
   RawConfigParser)
 from contextlib import contextmanager
+from functools import wraps
 from os import close, remove
 from os.path import exists, expanduser
 from requests import ConnectionError
 from requests.exceptions import MissingSchema
 from tempfile import mkstemp
 import requests as rq
+import sys
 
 
 class AzkabanError(Exception):
@@ -114,6 +116,27 @@ def temppath():
   finally:
     if exists(path):
       remove(path)
+
+def catch(*error_classes):
+  """Returns a decorator that catches errors and prints messages to stderr.
+
+  :param *error_classes: error classes
+
+  Also exits with status 1 if any errors are caught.
+
+  """
+  def decorator(func):
+    """Decorator."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+      """Wrapper. Finally."""
+      try:
+        return func(*args, **kwargs)
+      except error_classes as err:
+        sys.stderr.write('%s\n' % (err, ))
+        sys.exit(1)
+    return wrapper
+  return decorator
 
 def flatten(dct, sep='.'):
   """Flatten a nested dictionary.

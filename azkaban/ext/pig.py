@@ -47,12 +47,12 @@ from getpass import getuser
 from os import sep
 from os.path import abspath, basename
 from string import Template
-from sys import exit, stderr, stdout
+from sys import stdout
 from time import sleep
 from ..job import Job
 from ..project import Project
 from ..session import Session
-from ..util import AzkabanError, temppath
+from ..util import AzkabanError, catch, temppath
 
 
 class PigJob(Job):
@@ -132,91 +132,88 @@ class PigProject(Project):
     }
 
 
+@catch(AzkabanError)
 def main():
   """AzkabanPig entry point."""
   args = docopt(__doc__)
   project_name = Template(args['--project']).substitute(user=getuser())
   paths = args['PATH']
   try:
+    job_options = dict(opt.split('=', 1) for opt in args['--option'])
+  except ValueError:
+    raise AzkabanError('Invalid options: %r' % (' '.join(args['OPTION']), ))
+  project = PigProject(
+    name=project_name,
+    paths=paths,
+    user=None,# TODO
+    pig_type=args['--type'],
+    jars=args['--jar'],
+    options=job_options,
+  )
+  session = get_session(url=args['--url'], alias=args['--alias'])
+  url = session['url']
+  session_id = session['session_id']
+  with temppath() as tpath:
+    project.build(tpath)
     try:
-      job_options = dict(opt.split('=', 1) for opt in args['--option'])
-    except ValueError:
-      raise AzkabanError('Invalid options: %r' % (' '.join(args['OPTION']), ))
-    project = PigProject(
-      name=project_name,
-      paths=paths,
-      user=None,# TODO
-      pig_type=args['--type'],
-      jars=args['--jar'],
-      options=job_options,
-    )
-    session = get_session(url=args['--url'], alias=args['--alias'])
-    url = session['url']
-    session_id = session['session_id']
-    with temppath() as tpath:
-      project.build(tpath)
+      project.upload(tpath, url, session_id)
+    except AzkabanError as err:
       try:
+        project.create(project.name, url, session_id)
+      except AzkabanError:
+        raise err
+      else:
         project.upload(tpath, url, session_id)
-      except AzkabanError as err:
-        try:
-          project.create(project.name, url, session_id)
-        except AzkabanError:
-          raise err
-        else:
-          project.upload(tpath, url, session_id)
-    res = project.run(basename(paths[-1]), url, session_id)
-    exec_id = res['execid']
-    if args['--background']:
-      if len(paths) == 1:
-        stdout.write(
-          'Pig job running at %s/executor?execid=%s&job=%s\n'
-          % (session['url'], exec_id, basename(paths[0]))
-        )
+  res = project.run(basename(paths[-1]), url, session_id)
+  exec_id = res['execid']
+  if args['--background']:
+    if len(paths) == 1:
+      stdout.write(
+        'Pig job running at %s/executor?execid=%s&job=%s\n'
+        % (session['url'], exec_id, basename(paths[0]))
+      )
+    else:
+      stdout.write(
+        'Pig jobs running at %s/executor?execid=%s\n'
+        % (session['url'], exec_id)
+      )
+  else:
+    current_job = None
+    try:
+      while True:
+        sleep(5)
+        status = project.get_status(exec_id, url, session_id)
+        if status['active_job'] != current_job:
+          current_job = status['active_job']
+          if current_job:
+            offset = 0
+            stdout.write('\n[Job %s]\n' % (current_job, ))
+        if current_job:
+          logs = get_job_logs(
+            exec_id=exec_id,
+            url=url,
+            session_id=session_id,
+            job=current_job,
+            offset=offset,
+          )
+          stdout.write(logs['data'])
+          offset += logs['length']
+        if status['flow_status'] == 'SUCCEEDED':
+          stdout.write('\nExecution succeeded.\n')
+          break
+        elif status['flow_status'] != 'RUNNING':
+          raise AzkabanError('Execution failed.')
+    except KeyboardInterrupt as err:
+      choice = raw_input('\nKill execution [yN]? ').lower()
+      if choice and choice[0] == 'y':
+        stdout.write('Killing... ')
+        cancel_execution(exec_id, url, session_id)
+        stdout.write('Done.\n')
       else:
         stdout.write(
-          'Pig jobs running at %s/executor?execid=%s\n'
+          'Execution still running at %s/executor?execid=%s\n'
           % (session['url'], exec_id)
         )
-    else:
-      current_job = None
-      try:
-        while True:
-          sleep(5)
-          status = project.get_status(exec_id, url, session_id)
-          if status['active_job'] != current_job:
-            current_job = status['active_job']
-            if current_job:
-              offset = 0
-              stdout.write('\n[Job %s]\n' % (current_job, ))
-          if current_job:
-            logs = get_job_logs(
-              exec_id=exec_id,
-              url=url,
-              session_id=session_id,
-              job=current_job,
-              offset=offset,
-            )
-            stdout.write(logs['data'])
-            offset += logs['length']
-          if status['flow_status'] == 'SUCCEEDED':
-            stdout.write('\nExecution succeeded.\n')
-            break
-          elif status['flow_status'] != 'RUNNING':
-            raise AzkabanError('Execution failed.')
-      except KeyboardInterrupt as err:
-        choice = raw_input('\nKill execution [yN]? ').lower()
-        if choice and choice[0] == 'y':
-          stdout.write('Killing... ')
-          cancel_execution(exec_id, url, session_id)
-          stdout.write('Done.\n')
-        else:
-          stdout.write(
-            'Execution still running at %s/executor?execid=%s\n'
-            % (session['url'], exec_id)
-          )
-  except AzkabanError as err:
-    stderr.write('%s\n' % (err, ))
-    exit(1)
 
 if __name__ == '__main__':
   main()

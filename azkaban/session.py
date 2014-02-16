@@ -30,11 +30,10 @@ class Session(object):
 
   def __init__(self, url, session_id=None):
     parsed_url = url.rstrip('/').split('@')
-    parsed_url_length = len(parsed_url)
-    if parsed_url_length == 1:
+    if len(parsed_url) == 1:
       user = getuser()
       url = parsed_url[0]
-    elif parsed_url_length == 2:
+    elif len(parsed_url) == 2:
       user = parsed_url[0]
       url = parsed_url[1]
     else:

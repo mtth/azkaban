@@ -76,10 +76,10 @@ Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 from azkaban import __version__
 from azkaban.project import Project
 from azkaban.session import Session
-from azkaban.util import AzkabanError, Config, human_readable, temppath
+from azkaban.util import AzkabanError, Config, catch, human_readable, temppath
 from docopt import docopt
 from os.path import exists, getsize, relpath
-from sys import exit, stdout, stderr
+from sys import stdout
 
 
 def get_project(project, strict=False):
@@ -119,115 +119,112 @@ def get_session(url=None, alias=None):
     session = Session(**config.resolve_alias(alias))
   return session
 
+@catch(AzkabanError)
 def main():
   """Command line argument parser."""
   args = docopt(__doc__, version=__version__)
-  try:
-    if args['build']:
-      project = get_project(args['--project'], strict=True)
-      if args['ZIP']:
-        path = args['ZIP']
-        project.build(path, overwrite=args['--force'])
-        stdout.write(
-          'Project successfully built and saved as %r (size: %s).\n'
-          % (path, human_readable(getsize(path)))
-        )
-      else:
-        with temppath() as path:
-          project.build(path)
-          session = get_session(url=args['--url'], alias=args['--alias'])
-          res = session.upload_project(project, path)
-          stdout.write(
-            'Project %s successfully built and uploaded '
-            '(id: %s, size: %s, version: %s).\n'
-            'Details at %s/manager?project=%s\n'
-            % (
-              project,
-              res['projectId'],
-              human_readable(getsize(path)),
-              res['version'],
-              session.url,
-              project,
-            )
-          )
-    elif args['create']:
-      session = get_session(url=args['--url'], alias=args['--alias'])
-      project = raw_input('Project name: ').strip()
-      description = raw_input('Project description [%s]: ' % (project, ))
-      session.create_project(project, description.strip() or project)
-      stdout.write(
-        'Project %s successfully created.\n'
-        'Details at %s/manager?project=%s\n'
-        % (project, session.url, project)
-      )
-    elif args['delete']:
-      session = get_session(url=args['--url'], alias=args['--alias'])
-      project = raw_input('Project name: ')
-      session.delete_project(project)
-      stdout.write('Project %s successfully deleted.\n' % (project, ))
-    elif args['list']:
-      project = get_project(args['--project'], strict=True)
-      if args['--static']:
-        for path in project._files:
-          stdout.write('%s\n' % (relpath(path), ))
-      else:
-        for name in project.jobs:
-          stdout.write('%s\n' % (name, ))
-    elif args['run']:
-      project = get_project(args['--project'])
-      flow = args['FLOW']
-      jobs = args['JOB']
-      session = get_session(url=args['--url'], alias=args['--alias'])
-      res = session.run_workflow(
-        project=project,
-        flow=flow,
-        jobs=jobs,
-        block=args['--block'],
-      )
-      exec_id = res['execid']
-      job_names = ', jobs: %s' % (', '.join(jobs), ) if jobs else ''
-      stdout.write(
-        'Flow %s successfully submitted (execution id: %s%s).\n'
-        'Details at %s/executor?execid=%s\n'
-        % (flow, exec_id, job_names, session.url, exec_id)
-      )
-    elif args['upload']:
+  if args['build']:
+    project = get_project(args['--project'], strict=True)
+    if args['ZIP']:
       path = args['ZIP']
-      project = get_project(args['--project'])
-      session = get_session(url=args['--url'], alias=args['--alias'])
-      while True:
-        try:
-          res = session.upload_project(project, path)
-        except AzkabanError as err:
-          if args['--create']:
-            session.create_project(project, project)
-          else:
-            raise err
-        else:
-          break
+      project.build(path, overwrite=args['--force'])
       stdout.write(
-        'Project %s successfully uploaded (id: %s, size: %s, version: %s).\n'
-        'Details at %s/manager?project=%s\n'
-        % (
-          project,
-          res['projectId'],
-          human_readable(getsize(path)),
-          res['version'],
-          session.url,
-          project,
-        )
+        'Project successfully built and saved as %r (size: %s).\n'
+        % (path, human_readable(getsize(path)))
       )
-    elif args['view']:
-      project = get_project(args['--project'])
-      job_name = args['JOB'][0]
-      if job_name in project.jobs:
-        for option, value in sorted(project.jobs[job_name].items()):
-          stdout.write('%s=%s\n' % (option, value))
+    else:
+      with temppath() as path:
+        project.build(path)
+        session = get_session(url=args['--url'], alias=args['--alias'])
+        res = session.upload_project(project, path)
+        stdout.write(
+          'Project %s successfully built and uploaded '
+          '(id: %s, size: %s, version: %s).\n'
+          'Details at %s/manager?project=%s\n'
+          % (
+            project,
+            res['projectId'],
+            human_readable(getsize(path)),
+            res['version'],
+            session.url,
+            project,
+          )
+        )
+  elif args['create']:
+    session = get_session(url=args['--url'], alias=args['--alias'])
+    project = raw_input('Project name: ').strip()
+    description = raw_input('Project description [%s]: ' % (project, ))
+    session.create_project(project, description.strip() or project)
+    stdout.write(
+      'Project %s successfully created.\n'
+      'Details at %s/manager?project=%s\n'
+      % (project, session.url, project)
+    )
+  elif args['delete']:
+    session = get_session(url=args['--url'], alias=args['--alias'])
+    project = raw_input('Project name: ')
+    session.delete_project(project)
+    stdout.write('Project %s successfully deleted.\n' % (project, ))
+  elif args['list']:
+    project = get_project(args['--project'], strict=True)
+    if args['--static']:
+      for path in project._files:
+        stdout.write('%s\n' % (relpath(path), ))
+    else:
+      for name in project.jobs:
+        stdout.write('%s\n' % (name, ))
+  elif args['run']:
+    project = get_project(args['--project'])
+    flow = args['FLOW']
+    jobs = args['JOB']
+    session = get_session(url=args['--url'], alias=args['--alias'])
+    res = session.run_workflow(
+      project=project,
+      flow=flow,
+      jobs=jobs,
+      block=args['--block'],
+    )
+    exec_id = res['execid']
+    job_names = ', jobs: %s' % (', '.join(jobs), ) if jobs else ''
+    stdout.write(
+      'Flow %s successfully submitted (execution id: %s%s).\n'
+      'Details at %s/executor?execid=%s\n'
+      % (flow, exec_id, job_names, session.url, exec_id)
+    )
+  elif args['upload']:
+    path = args['ZIP']
+    project = get_project(args['--project'])
+    session = get_session(url=args['--url'], alias=args['--alias'])
+    while True:
+      try:
+        res = session.upload_project(project, path)
+      except AzkabanError as err:
+        if args['--create']:
+          session.create_project(project, project)
+        else:
+          raise err
       else:
-        raise AzkabanError('Job %r not found.' % (job_name, ))
-  except AzkabanError as err:
-    stderr.write('%s\n' % (err, ))
-    exit(1)
+        break
+    stdout.write(
+      'Project %s successfully uploaded (id: %s, size: %s, version: %s).\n'
+      'Details at %s/manager?project=%s\n'
+      % (
+        project,
+        res['projectId'],
+        human_readable(getsize(path)),
+        res['version'],
+        session.url,
+        project,
+      )
+    )
+  elif args['view']:
+    project = get_project(args['--project'])
+    job_name = args['JOB'][0]
+    if job_name in project.jobs:
+      for option, value in sorted(project.jobs[job_name].items()):
+        stdout.write('%s=%s\n' % (option, value))
+    else:
+      raise AzkabanError('Job %r not found.' % (job_name, ))
 
 if __name__ == '__main__':
   main()
