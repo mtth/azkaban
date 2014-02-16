@@ -7,25 +7,25 @@ A lightweight Azkaban_ client providing:
 
 * A `command line interface`_ to run jobs, upload projects, and much more.
 
-.. code:: bash
+  .. code:: bash
 
-  $ azkaban upload my_project.zip
-  Project my_project successfully uploaded (id: 1, size: 205kB, version: 1).
-  Details at https://azkaban.server.url/manager?project=my_project
+    $ azkaban upload my_project.zip
+    Project my_project successfully uploaded (id: 1, size: 205kB, version: 1).
+    Details at https://azkaban.server.url/manager?project=my_project
 
-  $ azkaban run my_workflow
-  Flow my_workflow successfully submitted (execution id: 1).
-  Details at https://azkaban.server.url/executor?execid=12
+    $ azkaban run my_workflow
+    Flow my_workflow successfully submitted (execution id: 1).
+    Details at https://azkaban.server.url/executor?execid=1
 
 * A simple syntax_ to define workflows from a single python file.
 
-.. code:: python
+  .. code:: python
 
-  from azkaban import Job, Project
+    from azkaban import Job, Project
 
-  project = Project('my_project')
-  project.add_file('/path/to/bar.txt', 'bar.txt')
-  project.add_job('bar', Job({'type': 'command', 'command': 'cat bar.txt'}))
+    project = Project('my_project')
+    project.add_file('/path/to/bar.txt', 'bar.txt')
+    project.add_job('bar', Job({'type': 'command', 'command': 'cat bar.txt'}))
 
 
 Installation
@@ -70,7 +70,6 @@ defines aliases in `~/.azkabanrc`:
 
   [azkaban]
   default.alias = foo
-
   [alias]
   foo = http://url.to.foo.server:port
   bar = baruser@http://url.to.bar.server
@@ -95,29 +94,29 @@ Examples
 
 * Creating and deleting projects:
 
-.. code:: bash
+  .. code:: bash
 
-  $ azkaban create
-  Project name: my_project
-  Description [my_project]: Some interesting description.
-  Project my_project successfully created.
-  Details at https://azkaban.server.url/manager?project=my_project
+    $ azkaban create
+    Project name: my_project
+    Description [my_project]: Some interesting description.
+    Project my_project successfully created.
+    Details at https://azkaban.server.url/manager?project=my_project
 
-  $ azkaban delete -a bar
-  Project name: my_project
-  Project my_project successfully deleted.
+    $ azkaban delete -a bar
+    Project name: my_project
+    Project my_project successfully deleted.
 
 * Uploading an already built archive to an Azkaban server:
 
-.. code:: bash
+  .. code:: bash
 
-  $ azkaban upload -p my_project my_project.zip
+    $ azkaban upload -p my_project my_project.zip
 
-* Run entire workflows, or individual jobs: `azkaban run`
+* Run entire workflows, or individual jobs:
 
-.. code:: bash
+  .. code:: bash
 
-  $ azkaban run -p my_project my_workflow
+    $ azkaban run -p my_project my_workflow
 
 
 Syntax
