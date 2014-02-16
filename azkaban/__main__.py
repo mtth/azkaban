@@ -12,8 +12,8 @@ Usage:
   azkaban -h | --help | -v | --version
 
 Commmands:
-  build*                        Build project. The resulting archive can
-                                be uploaded to Azkaban or saved locally.
+  build*                        Build project and upload to Azkaban or save
+                                locally the resulting archive.
   create                        Create a project on the Azkaban server.
   delete                        Delete a project on the Azkaban server.
   info*                         View information about jobs or files.
