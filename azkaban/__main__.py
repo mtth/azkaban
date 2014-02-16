@@ -122,7 +122,7 @@ def build_project(project, zip, url, alias, replace):
   else:
     with temppath() as zip:
       project.build(zip)
-      session = Session.from_url_or_alias(url, alias)
+      session = Session(url, alias)
       res = session.upload_project(project, zip)
       stdout.write(
         'Project %s successfully built and uploaded '
@@ -144,7 +144,7 @@ def create_project(url, alias):
   :param args: dictionary of parsed arguments (output of `docopt.docopt`)
 
   """
-  session = Session.from_url_or_alias(url, alias)
+  session = Session(url, alias)
   project = raw_input('Project name: ').strip()
   description = raw_input('Project description [%s]: ' % (project, ))
   session.create_project(project, description.strip() or project)
@@ -160,7 +160,7 @@ def delete_project(url, alias):
   :param args: dictionary of parsed arguments (output of `docopt.docopt`)
 
   """
-  session = Session.from_url_or_alias(url, alias)
+  session = Session(url, alias)
   project = raw_input('Project name: ')
   session.delete_project(project)
   stdout.write('Project %s successfully deleted.\n' % (project, ))
@@ -197,7 +197,7 @@ def run_flow(project_name, flow, job, url, alias, skip):
   :param args: dictionary of parsed arguments (output of `docopt.docopt`)
 
   """
-  session = Session.from_url_or_alias(url, alias)
+  session = Session(url, alias)
   res = session.run_workflow(project_name, flow, job, skip)
   exec_id = res['execid']
   job_names = ', jobs: %s' % (', '.join(job), ) if job else ''
@@ -213,7 +213,7 @@ def upload_project(project_name, zip, url, alias, create):
   :param args: dictionary of parsed arguments (output of `docopt.docopt`)
 
   """
-  session = Session.from_url_or_alias(url, alias)
+  session = Session(url, alias)
   while True:
     try:
       res = session.upload_project(project_name, zip)

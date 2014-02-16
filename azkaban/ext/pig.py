@@ -138,7 +138,7 @@ def main():
   paths = args['PATH']
   pj = args['--project'] or config.get_default_option('azkabanpig', 'project')
   tpe = args['--type'] or config.get_default_option('azkabanpig', 'type')
-  session = Session.from_url_or_alias(args['--url'], args['--alias'])
+  session = Session(args['--url'], args['--alias'])
   try:
     job_options = dict(opt.split('=', 1) for opt in args['--option'])
   except ValueError:
