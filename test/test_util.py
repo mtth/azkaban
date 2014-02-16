@@ -21,12 +21,55 @@ class TestFlatten(object):
     eq_(flatten(dct), {'a': 1, 'b.c': 3})
 
 
-class TestGetSession(object):
+class TestConfig(object):
 
   @raises(AzkabanError)
-  def test_bad_url(self):
-    get_session('http://foo', password='bar')
+  def test_missing(self):
+    Config('some/inexistent/path')
 
   @raises(AzkabanError)
-  def test_missing_protocol(self):
-    get_session('foo', password='bar')
+  def test_invalid_file(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
+        writer.write('a = 1\n')
+      Config(path)
+
+  def test_parser_get(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
+        writer.write('[alias]\nfoo = 1\n')
+      config = Config(path)
+      eq_(config.parser.get('alias', 'foo'), '1')
+
+  def test_save(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
+        writer.write('[alias]\nfoo = 1\n')
+      config = Config(path)
+      config.parser.set('alias', 'bar', 'hello')
+      config.save()
+      same_config = Config(path)
+      eq_(same_config.parser.get('alias', 'bar'), 'hello')
+
+  def test_get_default_option_when_exists(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
+        writer.write('[cmd]\ndefault.opt = foo\ndefault.bar = hi\n')
+      config = Config(path)
+      eq_(config.get_default_option('cmd', 'opt'), 'foo')
+
+  @raises(AzkabanError)
+  def test_get_default_option_when_option_is_missing(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
+        writer.write('[cmd]\ndefault.opt = foo\ndefault.bar = hi\n')
+      config = Config(path)
+      config.get_default_option('cmd', 'opt2')
+
+  @raises(AzkabanError)
+  def test_get_default_option_when_section_is_missing(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
+        writer.write('[cmd]\ndefault.opt = foo\ndefault.bar = hi\n')
+      config = Config(path)
+      config.get_default_option('cmd2', 'opt2')

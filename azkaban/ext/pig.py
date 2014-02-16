@@ -4,8 +4,9 @@
 """AzkabanPig: an extension for pig scripts to Azkaban CLI.
 
 Usage:
-  azkabanpig [-bp PROJECT] [-t TYPE] (-u URL | -a ALIAS) PATH ...
+  azkabanpig PATH ...
              [-j JAR] ... [-o OPTION] ...
+             [-bp PROJECT] [-t TYPE] [-a ALIAS | -u URL]
   azkabanpig -h | --help
 
 Arguments:
@@ -27,18 +28,19 @@ Options:
                                 key=value. E.g. '-o param.foo=bar' will
                                 substitute parameter '$foo' with 'bar' in the
                                 pig script.
-  -p PROJECT --project=PROJECT  Project name under which to run the pig script
-                                [default: pig_${user}].
-  -t TYPE --type=TYPE           Pig job type used [default: pig].
+  -p PROJECT --project=PROJECT  Project name under which to run the pig script.
+  -t TYPE --type=TYPE           Pig job type used.
   -u URL --url=URL              Cf. `azkaban --help`.
 
 Examples:
-  azkabanpig -a my_alias my_script.pig
+  azkabanpig my_script.pig
+  azkabanpig -a foo first_script.pig second_script.pig
   azkabanpig -url http://url.to.azkaban -o param.my_output=bar.dat foo.pig
 
 AzkabanPig returns with exit code 1 if an error occurred and 0 otherwise.
 
 """
+
 
 from docopt import docopt
 from getpass import getuser
@@ -47,10 +49,35 @@ from os.path import abspath, basename
 from string import Template
 from sys import exit, stderr, stdout
 from time import sleep
-from ..job import PigJob
+from ..job import Job
 from ..project import Project
-from ..util import (AzkabanError, temppath, get_session, get_execution_status,
-  get_job_logs, cancel_execution)
+from ..session import Session
+from ..util import AzkabanError, temppath
+
+
+class PigJob(Job):
+
+  """Job class corresponding to pig jobs.
+
+  :param path: absolute path to pig script (this script will automatically be
+    added to the project archive)
+  :param options: cf. `Job`
+
+  """
+
+  #: Job type used (change this to use a custom pig type).
+  type = 'pig'
+
+  def __init__(self, path, *options):
+    super(PigJob, self).__init__(
+      {'type': self.type, 'pig.script': path.lstrip(sep)},
+      *options
+    )
+    self.path = path
+
+  def on_add(self, project, name):
+    """This handler adds the corresponding script file to the project."""
+    project.add_file(self.path)
 
 
 class PigProject(Project):
@@ -59,19 +86,19 @@ class PigProject(Project):
 
   :param name: project name used
   :param paths: paths to pig scripts, these will be run in order
-  :param pig_type: pig job type used
+  :param type: pig job type used
   :param jars: jars to include, these will also be added to the classpath
   :param options: options forwarded to pig scripts
 
   """
 
-  def __init__(self, name, paths, pig_type='pig', jars=None, options=None):
+  def __init__(self, name, paths, user, type='pig', jars=None, options=None):
     super(PigProject, self).__init__(name, register=False)
     jars = jars or []
     opts = [
       {
-        'type': pig_type,
-        'user.to.proxy': getuser(),
+        'type': type,
+        'user.to.proxy': user,
         'pig.additional.jars': ','.join(abspath(j).lstrip(sep) for j in jars),
       },
       options or {}
@@ -118,6 +145,7 @@ def main():
     project = PigProject(
       name=project_name,
       paths=paths,
+      user=None,# TODO
       pig_type=args['--type'],
       jars=args['--jar'],
       options=job_options,

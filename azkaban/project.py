@@ -5,208 +5,41 @@
 
 
 from os import sep
-from os.path import basename, dirname, exists, getsize, isabs, splitext, join
+from os.path import basename, dirname, exists, isabs, isdir, splitext, join
 from sys import path as sys_path
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
-
-from .util import AzkabanError, temppath, azkaban_request, extract_json
-
+from .util import AzkabanError, temppath
 import logging
 
 
 logger = logging.getLogger(__name__)
 
 
-class EmptyProject(object):
-
-  """Azkaban project.
-
-  :param name: project name
-
-  This class is never meant to be instantiated from a user's code. It is only
-  used by the command line interface to execute commands on the server which
-  do not require building a project.
-
-  """
-
-  def __init__(self, name):
-    self.name = name
-
-  def __repr__(self):
-    return '<%s %r>' % (self.__class__, self.name)
-
-  def create(self, description, url, session_id):
-    """Create a new project on Azkaban.
-
-    :param description: description of the project
-    :param url: http endpoint URL (including protocol)
-    :param session_id: Azkaban session ID
-
-    """
-    res = extract_json(azkaban_request(
-      'POST',
-      '%s/manager' % (url, ),
-      data={
-        'action': 'create',
-        'name': self.name,
-        'description': description,
-      },
-      cookies={
-        'azkaban.browser.session.id': session_id,
-      },
-    ))
-    return res
-
-  def delete(self, url, session_id):
-    """Delete a project on Azkaban.
-
-    :param url: http endpoint URL (including protocol)
-    :param session_id: Azkaban session ID
-
-    """
-    res = azkaban_request(
-      'GET',
-      '%s/manager' % (url, ),
-      params={
-        'project': self.name,
-        'delete': 'true',
-      },
-      cookies={
-        'azkaban.browser.session.id': session_id,
-      },
-    )
-    success = "Project '%s' was successfully deleted" % (self.name, )
-    if success in res.text:
-      return res
-    else:
-      raise AzkabanError('Delete failed. Check permissions and existence.')
-    return res
-
-  def run(self, flow, url, session_id, jobs=None, block=False):
-    """Run a workflow on Azkaban.
-
-    :param flow: name of the workflow
-    :param url: http endpoint URL (including protocol and user name)
-    :param session_id: Azkaban session ID
-    :param jobs: name of jobs to run (run entire workflow by default)
-    :param block: don't run if the same workflow is already running
-
-    Note that in order to run a workflow on Azkaban, it must already have been
-    uploaded and the corresponding user must have permissions to run.
-
-    """
-    if not jobs:
-      logger.debug('running flow %r on %r', flow, url)
-      disabled = '[]'
-    else:
-      logger.debug('running jobs %r of flow %r on %r', jobs, flow, url)
-      all_names = set(self.get_flow_jobs(flow, url, session_id))
-      run_names = set(jobs)
-      missing_names = run_names - all_names
-      if missing_names:
-        raise AzkabanError(
-          'Jobs not found in flow %r: %s.' %
-          (flow, ', '.join(missing_names))
-        )
-      else:
-        disabled = (
-          '[%s]'
-          % (','.join('"%s"' % (n, ) for n in all_names - run_names), )
-        )
-    res = extract_json(azkaban_request(
-      'POST',
-      '%s/executor' % (url, ),
-      data={
-        'ajax': 'executeFlow',
-        'session.id': session_id,
-        'project': self.name,
-        'flow': flow,
-        'disabled': disabled,
-        'concurrentOption': 'skip' if block else 'concurrent',
-      },
-    ))
-    logger.debug('azkaban response: %r' % (res, ))
-    return res
-
-  def upload(self, archive, url, session_id):
-    """Build and upload project to Azkaban.
-
-    :param archive: path to zip file (typically the output of `build`)
-    :param url: http endpoint URL (including protocol)
-    :param session_id: Azkaban session ID
-
-    Note that in order to upload to Azkaban, the project must have already been
-    created and the corresponding user must have permissions to upload.
-
-    """
-    logger.debug('uploading project to %r', url)
-    if not exists(archive):
-      raise AzkabanError('Unable to find archive at %r.' % (archive, ))
-    res = extract_json(azkaban_request(
-      'POST',
-      '%s/manager' % (url, ),
-      data={
-        'ajax': 'upload',
-        'session.id': session_id,
-        'project': self.name,
-      },
-      files={
-        'file': ('file.zip', open(archive, 'rb'), 'application/zip'),
-      },
-    ))
-    logger.debug('azkaban response: %r' % (res, ))
-    return res
-
-  def get_flow_jobs(self, flow, url, session_id):
-    """Get list of jobs corresponding to flow on Azkaban server.
-
-    :param flow: name of flow in project
-    :param url: Azkaban server endpoint
-    :param session_id: valid session id
-
-    """
-    logger.debug('finding jobs for flow %r on %r', flow, url)
-    raw_res = azkaban_request(
-      'GET',
-      '%s/manager' % (url, ),
-      params={
-        'ajax': 'fetchflowjobs',
-        'project': self.name,
-        'flow': flow,
-      },
-      cookies={
-        'azkaban.browser.session.id': session_id,
-      },
-    )
-    logger.debug('azkaban response: %r' % (raw_res, ))
-    try:
-      res = extract_json(raw_res)
-    except ValueError:
-      raise AzkabanError('Flow %r not found.' % (flow, ))
-    else:
-      return [n['id'] for n in res['nodes']]
-
-
-class Project(EmptyProject):
+class Project(object):
 
   """Azkaban project.
 
   :param name: name of the project
   :param register: add project to registry. setting this to false will make it
     invisible to the CLI
+  :param root: optional path to a root file or directory used to enable adding
+    files with relative paths (typically used with root=__file__)
 
   """
 
   _registry = WeakValueDictionary()
 
-  def __init__(self, name, register=True, root=None):
-    super(Project, self).__init__(name)
-    self.root = dirname(root) if root else None
-    self._jobs = {}
-    self._files = {}
+  def __init__(self, name, root=None, register=True):
+    self.name = name
+    self.root = root if not root or isdir(root) else dirname(root)
     if register:
       self._registry[name] = self
+    self._jobs = {}
+    self._files = {}
+
+  def __str__(self):
+    return self.name
 
   @property
   def jobs(self):
@@ -307,36 +140,6 @@ class Project(EmptyProject):
         writer.write(fpath, apath)
     finally:
       writer.close()
-    return getsize(path)
-
-  def main(self, suppress_warning=False):
-    """Command line argument parser.
-
-    This method will be removed in a future version (using the `azkaban`
-    executable is now the preferred way of running the CLI).
-
-    """
-    from sys import argv
-    from .__main__ import main
-    import warnings
-    script = argv[0]
-    argv.insert(1, self.name)
-    msg = """
-
-      Use azkaban executable instead of running module directly:
-
-        $ azkaban %s%s
-
-      This current method leads to inconsistent error handling and will be
-      disabled in a future release.
-    """ % (
-      ' '.join(argv[1:]),
-      '' if argv[2] == 'run' or script == 'jobs.py' else ' -s %s' % (script, ),
-    )
-    if not suppress_warning:
-      warnings.simplefilter('default')
-    warnings.warn(msg, DeprecationWarning)
-    main(self)
 
   @classmethod
   def load_from_script(cls, script, name=None):

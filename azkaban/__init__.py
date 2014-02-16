@@ -21,12 +21,13 @@ Two parts:
 """
 
 __all__ = ['Project', 'Job', 'PigJob']
-__version__ = '0.2.7'
+__version__ = '0.3.0'
 
 
 try:
+  from .ext.pig import PigJob
+  from .job import Job
   from .project import Project
-  from .job import Job, PigJob
 except ImportError:
   pass # in setup.py
 

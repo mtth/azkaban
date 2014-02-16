@@ -4,7 +4,6 @@
 """Job definition module."""
 
 
-from os import sep
 from .util import AzkabanError, flatten
 
 
@@ -122,28 +121,3 @@ class Job(object):
 
     """
     pass
-
-
-class PigJob(Job):
-
-  """Job class corresponding to pig jobs.
-
-  :param path: absolute path to pig script (this script will automatically be
-    added to the project archive)
-  :param options: cf. `Job`
-
-  """
-
-  #: Job type used (change this to use a custom pig type).
-  type = 'pig'
-
-  def __init__(self, path, *options):
-    super(PigJob, self).__init__(
-      {'type': self.type, 'pig.script': path.lstrip(sep)},
-      *options
-    )
-    self.path = path
-
-  def on_add(self, project, name):
-    """This handler adds the corresponding script file to the project."""
-    project.add_file(self.path)
