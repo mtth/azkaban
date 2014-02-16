@@ -234,7 +234,7 @@ class TestRun(_TestSession):
       self.project.build(path)
       self.session.upload_project(self.project, path)
     self.session.run_workflow(self.project, 'foo')
-    self.session.run_workflow(self.project, 'foo', block=True)
+    self.session.run_workflow(self.project, 'foo', skip=True)
 
   def test_run_non_blocking_workflow(self):
     options = {'type': 'command', 'command': 'sleep 2'}

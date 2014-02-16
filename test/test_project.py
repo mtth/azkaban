@@ -4,8 +4,8 @@
 """Test Azkaban project module."""
 
 from azkaban.project import *
-from azkaban.job import Job, PigJob
-from azkaban.util import AzkabanError, flatten, get_session, temppath
+from azkaban.job import Job
+from azkaban.util import AzkabanError, flatten, temppath
 from ConfigParser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest

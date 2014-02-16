@@ -162,24 +162,6 @@ Nested dictionaries can be used to group options concisely:
   })
 
 
-Pig jobs
-^^^^^^^^
-
-Because pig jobs are so common, a :code:`PigJob` class is provided which 
-accepts a file path (to the pig script) as first constructor argument, 
-optionally followed by job options. It then automatically sets the job type 
-and adds the corresponding script file to the project.
-
-.. code:: python
-
-  from azkaban import PigJob
-
-  project.add_job('baz', PigJob('/.../baz.pig', {'dependencies': 'bar'}))
-
-Using a custom pig type is as simple as changing the :code:`PigJob.type` class 
-variable.
-
-
 Merging projects
 ^^^^^^^^^^^^^^^^
 
@@ -203,6 +185,22 @@ The first project will retain its original name.
   project2.merge_into(project1)
 
 
+Job details
+^^^^^^^^^^^
+
+The :code:`info` command becomes quite powerful when combined with other Unix 
+tools. Here are a few examples:
+
+.. code:: bash
+
+  $ # To count the number of jobs per type
+  $ azkaban info -o type | cut -f 2 | sort | uniq -c
+  $ # To only view the list of jobs of a certain type with their dependencies
+  $ azkaban info -o type,dependencies | awk -F '\t' '($2 == "job_type")'
+  $ # To view the size of each file in the project
+  $ azkaban info -f | xargs -n 1 du -h
+
+
 Next steps
 ^^^^^^^^^^
 
@@ -217,6 +215,20 @@ Extensions
 
 Pig
 ***
+
+Because pig jobs are so common, a :code:`PigJob` class is provided which 
+accepts a file path (to the pig script) as first constructor argument, 
+optionally followed by job options. It then automatically sets the job type 
+and adds the corresponding script file to the project.
+
+.. code:: python
+
+  from azkaban import PigJob
+
+  project.add_job('baz', PigJob('/.../baz.pig', {'dependencies': 'bar'}))
+
+Using a custom pig type is as simple as changing the :code:`PigJob.type` class 
+variable.
 
 Azkaban comes with a :code:`azkabanpig` utility which enables us to run pig 
 scripts directly. :code:`azkabanpig --help` will display the list of available 

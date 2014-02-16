@@ -5,12 +5,13 @@
 
 
 from os import sep
-from os.path import basename, dirname, exists, isabs, isdir, splitext, join
-from sys import path as sys_path
+from os.path import (basename, dirname, exists, isabs, isdir, join, relpath, 
+  splitext)
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
 from .util import AzkabanError, temppath
 import logging
+import sys
 
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,15 @@ class Project(object):
 
   def __str__(self):
     return self.name
+
+  @property
+  def files(self):
+    """Returns a list of files that will be included in the project archive.
+
+    This property should not be used to add files. Use `add_files` instead.
+
+    """
+    return [relpath(e) for e in self._files]
 
   @property
   def jobs(self):
@@ -153,7 +163,7 @@ class Project(object):
     * in any other case, an error is thrown.
 
     """
-    sys_path.append(dirname(script))
+    sys.path.append(dirname(script))
     module = splitext(basename(script.rstrip(sep)))[0]
     try:
       __import__(module)
@@ -177,6 +187,6 @@ class Project(object):
         else:
           raise AzkabanError(
             'Multiple projects found in %r: %s.\n'
-            'Disambiguate using the --project option.'
-            % (', '.join(cls._registry.keys()), script)
+            'Disambiguate using --project=%s:project_name.'
+            % (', '.join(cls._registry.keys()), script, script)
           )

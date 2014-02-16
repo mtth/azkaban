@@ -1,17 +1,21 @@
 Azkaban
 =======
 
-Version 0.3.0 (02/12/2014)
+Version 0.3.0 (02/16/2014)
 --------------------------
 
-* Added `azkabanpig` extension.
+* Added `azkabanpig` extension. It includes the `PigJob` class and
+  a new entry point that allows for easy running of pig scripts.
+* Made `--alias` and `--url` options optional (indeed).
+* Enabled session refresh after initialization (useful for long running
+  jobs, for example with the `azkabanpig` extension).
 
 Breaking changes:
 
 * `~/.azkabanrc` format changed and isn't compatible with the previous
-  one. It now allows for specifying option defaults for all `azkaban`
-  commands.
+  one. It now allows for specifying custom defaults for some options.
 * `Project.main` method is not supported anymore.
+* `azkaban list` and `azkaban view` are now combined into `azkaban info`.
 
 
 Version 0.2.0 (02/07/2014)

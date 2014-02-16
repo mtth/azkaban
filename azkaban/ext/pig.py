@@ -41,6 +41,7 @@ AzkabanPig returns with exit code 1 if an error occurred and 0 otherwise.
 
 """
 
+__all__ = ['PigJob']
 
 from docopt import docopt
 from os import sep
@@ -107,27 +108,27 @@ class PigProject(Project):
       dep_opts = {'dependencies': basename(dep)} if dep else {}
       self.add_job(basename(path), PigJob(abspath(path), dep_opts, *opts))
 
-  def get_status(self, session, exec_id):
-    """Get status of an execution, along with currently running job.
 
-    :param session: `azkaban.session.Session`
-    :param exec_id: execution ID
+def _get_status(session, exec_id):
+  """Get status of a PigProject execution, along with currently running job.
 
-    This method is able to simply find which unique job is active because of
-    the linear structure of the workflow.
+  :param session: `azkaban.session.Session`
+  :param exec_id: execution ID
 
-    """
-    status = session.get_execution_status(exec_id)
-    active = [
-      e['id']
-      for e in status['nodes']
-      if e['status'] == 'RUNNING' or e['status'] == 'FAILED'
-    ]
-    return {
-      'flow_status': status['status'],
-      'active_job': active[0] if active else '',
-    }
+  This method is able to simply find which unique job is active because of
+  the linear structure of the workflow.
 
+  """
+  status = session.get_execution_status(exec_id)
+  active = [
+    e['id']
+    for e in status['nodes']
+    if e['status'] == 'RUNNING' or e['status'] == 'FAILED'
+  ]
+  return {
+    'flow_status': status['status'],
+    'active_job': active[0] if active else '',
+  }
 
 @catch(AzkabanError)
 def main():
@@ -177,7 +178,7 @@ def main():
     try:
       while True:
         sleep(5)
-        status = project.get_status(session, exec_id)
+        status = _get_status(session, exec_id)
         if status['active_job'] != current_job:
           current_job = status['active_job']
           if current_job:

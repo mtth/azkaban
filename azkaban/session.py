@@ -187,13 +187,13 @@ class Session(object):
       raise AzkabanError('Delete failed. Check permissions and existence.')
     return res
 
-  def run_workflow(self, project, flow, jobs=None, block=False):
+  def run_workflow(self, project, flow, jobs=None, skip=False):
     """Launch a workflow.
 
     :param project: name of the project
     :param flow: name of the workflow
     :param jobs: name of jobs to run (run entire workflow by default)
-    :param block: don't run if the same workflow is already running
+    :param skip: don't run if the same workflow is already running
 
     Note that in order to run a workflow on Azkaban, it must already have been
     uploaded and the corresponding user must have permissions to run.
@@ -227,7 +227,7 @@ class Session(object):
         'project': project,
         'flow': flow,
         'disabled': disabled,
-        'concurrentOption': 'skip' if block else 'concurrent',
+        'concurrentOption': 'skip' if skip else 'concurrent',
       },
     ))
 

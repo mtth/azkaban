@@ -4,30 +4,22 @@
 """Azkaban CLI: a lightweight command line interface for Azkaban.
 
 Usage:
-  azkaban build [-fp PROJECT] [-a ALIAS | -u URL | ZIP]
+  azkaban build [-rp PROJECT] [-a ALIAS | -u URL | ZIP]
   azkaban (create | delete) [-a ALIAS | -u URL]
-  azkaban list [-p PROJECT] [-s | -o OPTIONS]
-  azkaban run [-bp PROJECT]  [-a ALIAS | -u URL] FLOW [JOB ...]
+  azkaban info [-p PROJECT] [-f | -o OPTIONS | JOB]
+  azkaban run [-sp PROJECT]  [-a ALIAS | -u URL] FLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
-  azkaban view [-p PROJECT] JOB
   azkaban -h | --help | -v | --version
 
 Commmands:
-  build*                        Build project. The resulting archive can either
-                                be directly uploaded to Azkaban or saved
-                                locally.
-  create                        Create a project on Azkaban. Will be prompted
-                                for a name and description.
-  delete                        Delete a project on Azkaban. Will be prompted
-                                for a name.
-  list*                         View list of jobs or other files inside a
-                                project.
+  build*                        Build project. The resulting archive can
+                                be uploaded to Azkaban or saved locally.
+  create                        Create a project on the Azkaban server.
+  delete                        Delete a project on the Azkaban server.
+  info*                         View information about jobs or files.
   run                           Run jobs or workflows. If no job is specified,
-                                the entire workflow will be executed. The
-                                workflow must have already been uploaded to the
-                                server.
+                                the entire workflow will be executed.
   upload                        Upload archive to Azkaban server.
-  view*                         View job options.
 
 Arguments:
   FLOW                          Workflow (job without children) name.
@@ -39,34 +31,28 @@ Arguments:
 Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
                                 to reuse session IDs for later connections.
-  -b --block                    Don't run workflow concurrently if it is
-                                already running.
   -c --create                   Create the project if it does not exist.
-  -f --force                    Overwrite any existing file.
+  -f --files                    List project files instead of jobs.
   -h --help                     Show this message and exit.
   -o OPTIONS --options=OPTIONS  Comma separated list of options that will be
                                 displayed next to each job. E.g. `-o type,foo`.
+                                The resulting output will be tab separated.
   -p PROJECT --project=PROJECT  Azkaban project. Can either be a project name
                                 or a path to file defining an `azkaban.Project`
                                 instance. If more than one project is defined
                                 in the script, you can disambiguate as follows:
-                                `--project=jobs.py:my_project`. Some commands
-                                (those followed by an asterisk) will only work
-                                when passed a path to a configuration file.
-  -s --static                   List static project files instead of jobs.
+                                `--project=jobs.py:my_project`. Commands which
+                                are followed by an asterisk will only work when
+                                passed a path to a configuration file.
+  -r --replace                  Overwrite any existing file.
+  -s --skip                     Skip if workflow is already running.
   -u URL --url=URL              Azkaban endpoint (with protocol, and optionally
                                 a username): '[user@]protocol:endpoint'. E.g.
                                 'http://azkaban.server'. The username defaults
                                 to the current user, as determined by `whoami`.
                                 If you often use the same url, consider using
-                                the `--alias` option instead. Specifying a url
-                                overrides any `--alias` option.
+                                the `--alias` option instead.
   -v --version                  Show version and exit.
-
-Examples:
-  azkaban run -a my_alias my_flow
-  azkaban upload -p my_project -u http://url.to.azkaban
-  azkaban build -z archive.zip -s script.py
 
 Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 
@@ -78,138 +64,206 @@ from azkaban.project import Project
 from azkaban.session import Session
 from azkaban.util import AzkabanError, catch, human_readable, temppath
 from docopt import docopt
-from os.path import exists, getsize, relpath
+from os.path import exists, getsize
 from sys import stdout
 
 
-def get_project(project, strict=False):
-  """Resolve project from CLI argument.
+def _forward(args, names):
+  """Forward subset of arguments from initial dictionary.
 
-  :param project: `--project` argument
-  :param strict: only accept registered projects
+  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
+  :param names: list of names that will be included
 
   """
-  parts = (project or '').rsplit(':', 1)
+  names = set(names)
+  return dict(
+    (k.lower().lstrip('-'), v)
+    for (k, v) in args.items() if k in names
+  )
+
+def _get_project_name(project_arg):
+  """Return project name.
+
+  :param project_arg: `--project` argument
+
+  """
+  parts = (project_arg or 'jobs.py').rsplit(':', 1)
   if len(parts) == 1:
     if exists(parts[0]):
-      project = Project.load_from_script(parts[0])
-    elif not strict:
-      project = Project(project, register=False)
+      return Project.load_from_script(parts[0]).name
     else:
-      raise AzkabanError(
-        'This command requires a registered project as `--project` option.\n'
-        'Specify an existing project configuration script.'
-      )
+      return parts[0]
   else:
-    project = Project.load_from_script(*parts)
-  return project
+    return parts[1]
+
+def _load_project(project_arg):
+  """Resolve project from CLI argument.
+
+  :param project_arg: `--project` argument
+
+  """
+  parts = (project_arg or 'jobs.py').rsplit(':', 1)
+  return Project.load_from_script(*parts)
+
+def build_project(project, zip, url, alias, replace):
+  """Build project.
+
+  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
+
+  Argument name forces `zip` redefinition here. Oh well.
+
+  """
+  if zip:
+    project.build(zip, overwrite=replace)
+    stdout.write(
+      'Project successfully built and saved as %r (size: %s).\n'
+      % (zip, human_readable(getsize(zip)))
+    )
+  else:
+    with temppath() as zip:
+      project.build(zip)
+      session = Session.from_url_or_alias(url, alias)
+      res = session.upload_project(project, zip)
+      stdout.write(
+        'Project %s successfully built and uploaded '
+        '(id: %s, size: %s, version: %s).\n'
+        'Details at %s/manager?project=%s\n'
+        % (
+          project,
+          res['projectId'],
+          human_readable(getsize(zip)),
+          res['version'],
+          session.url,
+          project,
+        )
+      )
+
+def create_project(url, alias):
+  """Create new project on remote Azkaban server.
+
+  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
+
+  """
+  session = Session.from_url_or_alias(url, alias)
+  project = raw_input('Project name: ').strip()
+  description = raw_input('Project description [%s]: ' % (project, ))
+  session.create_project(project, description.strip() or project)
+  stdout.write(
+    'Project %s successfully created.\n'
+    'Details at %s/manager?project=%s\n'
+    % (project, session.url, project)
+  )
+
+def delete_project(url, alias):
+  """Delete a project on remote Azkaban server.
+
+  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
+
+  """
+  session = Session.from_url_or_alias(url, alias)
+  project = raw_input('Project name: ')
+  session.delete_project(project)
+  stdout.write('Project %s successfully deleted.\n' % (project, ))
+
+def view_info(project, files, options, job):
+  """List jobs in project.
+
+  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
+
+  """
+  if job:
+    job_name = job[0]
+    if job_name in project.jobs:
+      for option, value in sorted(project.jobs[job_name].items()):
+        stdout.write('%s=%s\n' % (option, value))
+    else:
+      raise AzkabanError('Job %r not found.' % (job_name, ))
+  elif files:
+    for path in project.files:
+      stdout.write('%s\n' % (path, ))
+  else:
+    if options:
+      option_names = options.split(',')
+      for name, opts in project.jobs.items():
+        job_opts = '\t'.join(opts.get(o, '') for o in option_names)
+        stdout.write('%s\t%s\n' % (name, job_opts))
+    else:
+      for name in project.jobs:
+        stdout.write('%s\n' % (name, ))
+
+def run_flow(project_name, flow, job, url, alias, skip):
+  """Run workflow.
+
+  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
+
+  """
+  session = Session.from_url_or_alias(url, alias)
+  res = session.run_workflow(project_name, flow, job, skip)
+  exec_id = res['execid']
+  job_names = ', jobs: %s' % (', '.join(job), ) if job else ''
+  stdout.write(
+    'Flow %s successfully submitted (execution id: %s%s).\n'
+    'Details at %s/executor?execid=%s\n'
+    % (flow, exec_id, job_names, session.url, exec_id)
+  )
+
+def upload_project(project_name, zip, url, alias, create):
+  """Upload project.
+
+  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
+
+  """
+  session = Session.from_url_or_alias(url, alias)
+  while True:
+    try:
+      res = session.upload_project(project_name, zip)
+    except AzkabanError as err:
+      if create:
+        session.create_project(project_name, project_name)
+      else:
+        raise err
+    else:
+      break
+  stdout.write(
+    'Project %s successfully uploaded (id: %s, size: %s, version: %s).\n'
+    'Details at %s/manager?project=%s\n'
+    % (
+      project_name,
+      res['projectId'],
+      human_readable(getsize(zip)),
+      res['version'],
+      session.url,
+      project_name,
+    )
+  )
 
 @catch(AzkabanError)
 def main():
   """Command line argument parser."""
   args = docopt(__doc__, version=__version__)
   if args['build']:
-    project = get_project(args['--project'], strict=True)
-    if args['ZIP']:
-      path = args['ZIP']
-      project.build(path, overwrite=args['--force'])
-      stdout.write(
-        'Project successfully built and saved as %r (size: %s).\n'
-        % (path, human_readable(getsize(path)))
-      )
-    else:
-      with temppath() as path:
-        project.build(path)
-        session = Session.from_url_or_alias(args['--url'], args['--alias'])
-        res = session.upload_project(project, path)
-        stdout.write(
-          'Project %s successfully built and uploaded '
-          '(id: %s, size: %s, version: %s).\n'
-          'Details at %s/manager?project=%s\n'
-          % (
-            project,
-            res['projectId'],
-            human_readable(getsize(path)),
-            res['version'],
-            session.url,
-            project,
-          )
-        )
+    build_project(
+      _load_project(args['--project']),
+      **_forward(args, ['ZIP', '--url', '--alias', '--replace'])
+    )
   elif args['create']:
-    session = Session.from_url_or_alias(args['--url'], args['--alias'])
-    project = raw_input('Project name: ').strip()
-    description = raw_input('Project description [%s]: ' % (project, ))
-    session.create_project(project, description.strip() or project)
-    stdout.write(
-      'Project %s successfully created.\n'
-      'Details at %s/manager?project=%s\n'
-      % (project, session.url, project)
-    )
+    create_project(**_forward(args, ['--url', '--alias']))
   elif args['delete']:
-    session = Session.from_url_or_alias(args['--url'], args['--alias'])
-    project = raw_input('Project name: ')
-    session.delete_project(project)
-    stdout.write('Project %s successfully deleted.\n' % (project, ))
-  elif args['list']:
-    project = get_project(args['--project'], strict=True)
-    if args['--static']:
-      for path in project._files:
-        stdout.write('%s\n' % (relpath(path), ))
-    else:
-      for name in project.jobs:
-        stdout.write('%s\n' % (name, ))
+    delete_project(**_forward(args, ['--url', '--alias']))
+  elif args['info']:
+    view_info(
+      _load_project(args['--project']),
+    **_forward(args, ['--files', '--options', 'JOB']))
   elif args['run']:
-    project = get_project(args['--project'])
-    flow = args['FLOW']
-    jobs = args['JOB']
-    session = Session.from_url_or_alias(args['--url'], args['--alias'])
-    res = session.run_workflow(
-      project=project,
-      flow=flow,
-      jobs=jobs,
-      block=args['--block'],
-    )
-    exec_id = res['execid']
-    job_names = ', jobs: %s' % (', '.join(jobs), ) if jobs else ''
-    stdout.write(
-      'Flow %s successfully submitted (execution id: %s%s).\n'
-      'Details at %s/executor?execid=%s\n'
-      % (flow, exec_id, job_names, session.url, exec_id)
+    run_flow(
+      _get_project_name(args['--project']),
+      **_forward(args, ['FLOW', 'JOB', '--skip', '--url', '--alias'])
     )
   elif args['upload']:
-    path = args['ZIP']
-    project = get_project(args['--project'])
-    session = Session.from_url_or_alias(args['--url'], args['--alias'])
-    while True:
-      try:
-        res = session.upload_project(project, path)
-      except AzkabanError as err:
-        if args['--create']:
-          session.create_project(project, project)
-        else:
-          raise err
-      else:
-        break
-    stdout.write(
-      'Project %s successfully uploaded (id: %s, size: %s, version: %s).\n'
-      'Details at %s/manager?project=%s\n'
-      % (
-        project,
-        res['projectId'],
-        human_readable(getsize(path)),
-        res['version'],
-        session.url,
-        project,
-      )
+    upload_project(
+      _get_project_name(args['--project']),
+      **_forward(args, ['ZIP', '--create', '--url', '--alias'])
     )
-  elif args['view']:
-    project = get_project(args['--project'])
-    job_name = args['JOB'][0]
-    if job_name in project.jobs:
-      for option, value in sorted(project.jobs[job_name].items()):
-        stdout.write('%s=%s\n' % (option, value))
-    else:
-      raise AzkabanError('Job %r not found.' % (job_name, ))
 
 if __name__ == '__main__':
   main()
