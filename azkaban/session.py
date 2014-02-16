@@ -78,11 +78,11 @@ class Session(object):
     """
     full_url = '%s/%s' % (self.url, endpoint.lstrip('/'))
     logger.debug('sending request to %r: %r', full_url, kwargs)
-    if use_cookies:
-      kwargs.setdefault('cookies', {})['azkaban.browser.session.id'] = self.id
-    else:
-      kwargs.setdefault('data', {})['session.id'] = self.id
     while True:
+      if use_cookies:
+        kwargs.setdefault('cookies', {})['azkaban.browser.session.id'] = self.id
+      else:
+        kwargs.setdefault('data', {})['session.id'] = self.id
       res = azkaban_request(method, full_url, **kwargs) if self.id else None
       if res is None or '<!-- /.login -->' in res.text:
         # checking for None because 500 responses evaluate to False
