@@ -9,6 +9,7 @@ from azkaban.project import Project
 from azkaban.job import Job
 from azkaban.session import Session
 from azkaban.util import AzkabanError, Config, temppath
+from ConfigParser import NoOptionError, NoSectionError
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
 from time import sleep
@@ -31,18 +32,14 @@ class _TestSession(object):
 
   @classmethod
   def setup_class(cls):
-    if cls.session is None: # only do this once per entire test run
+    if not cls.session:
       config = Config()
-      for alias, url in config.aliases:
-        try:
-          session = Session(**config.resolve_alias(alias))
-        except AzkabanError:
-          pass
-        else:
-          cls.session = session
-          break
+      try:
+        alias = config.parser.get('azkaban', 'test.alias')
+      except (NoOptionError, NoSectionError):
+        pass
       else:
-        cls.session = False
+        cls.session = Session(alias=alias)
 
   def setup(self):
     if not self.session:

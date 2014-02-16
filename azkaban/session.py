@@ -9,6 +9,7 @@ a remote Azkaban server.
 """
 
 
+from ConfigParser import NoOptionError, NoSectionError
 from getpass import getpass, getuser
 from os.path import exists
 from .util import AzkabanError, Config, azkaban_request, extract_json
@@ -18,30 +19,68 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _parse_url(url):
+  """Parse url.
+
+  :param url: http endpoint (including protocol, port and optional user)
+
+  """
+  parsed_url = url.rstrip('/').split('@')
+  if len(parsed_url) == 1:
+    user = getuser()
+    url = parsed_url[0]
+  elif len(parsed_url) == 2:
+    user = parsed_url[0]
+    url = parsed_url[1]
+  else:
+    raise AzkabanError('Malformed url: %r' % (url, ))
+  return (user, url)
+
+def _resolve_alias(config, alias):
+  """Get url associated with an alias.
+
+  :param alias: alias name
+
+  """
+  try:
+    return config.parser.get('alias', alias)
+  except (NoOptionError, NoSectionError):
+    raise AzkabanError('Alias %r not found.', alias)
+
+def _get_session_id(config, url):
+  """Retrieve session id associated with url.
+
+  :param url: http endpoint (including protocol, port and optional user)
+
+  """
+  try:
+    return config.parser.get('session_id', url)
+  except NoSectionError:
+    config.parser.add_section('session_id')
+  except NoOptionError:
+    pass
+
+
 class Session(object):
 
   """Azkaban session.
 
   :param url: http endpoint (including protocol, port and optional user)
-  :param session_id: optional session id (if valid this will avoid having to
-    log in)
+  :param alias: alias name
 
   """
 
-  def __init__(self, url, session_id=None):
-    parsed_url = url.rstrip('/').split('@')
-    if len(parsed_url) == 1:
-      user = getuser()
-      url = parsed_url[0]
-    elif len(parsed_url) == 2:
-      user = parsed_url[0]
-      url = parsed_url[1]
-    else:
-      raise AzkabanError('Malformed url: %r' % (url, ))
-    self.id = session_id
-    self.url = url
-    self.user = user
-    logger.debug('session %s@%s instantiated', user, url)
+  def __init__(self, url=None, alias=None):
+    self.config = Config()
+    if not url:
+      alias = alias or self.config.get_default_option('azkaban', 'alias')
+      url = _resolve_alias(self.config, alias)
+    self.user, self.url = _parse_url(url)
+    self.id = _get_session_id(self.config, str(self).replace(':', '.'))
+    logger.debug('session %s instantiated', self)
+
+  def __str__(self):
+    return '%s@%s' % (self.user, self.url)
 
   def _refresh(self, password=None):
     """Refresh session ID.
@@ -50,17 +89,20 @@ class Session(object):
       is provided). can be set to `False` to fail instead of prompting for a
       password.
 
+    Also saves session ID for future use.
+
     """
     logger.debug('refreshing session')
-    password = password or getpass(
-      'Azkaban password for %s@%s: ' % (self.user, self.url)
-    )
+    password = password or getpass('Azkaban password for %s: ' % (self, ))
     res = extract_json(azkaban_request(
       'POST',
       self.url,
       data={'action': 'login', 'username': self.user, 'password': password},
     ))
     self.id = res['session.id']
+    logger.debug('saving session id')
+    self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
+    self.config.save()
 
   def _request(self, method, endpoint, use_cookies=True, attempts=1, **kwargs):
     """Make request to Azkaban using this session.
@@ -273,17 +315,3 @@ class Session(object):
       return extract_json(raw_res)
     except ValueError:
       raise AzkabanError('Flow %r not found.' % (flow, ))
-
-  @classmethod
-  def from_url_or_alias(cls, url=None, alias=None):
-    """Get default session for command.
-
-    :param command: name of command.
-
-    """
-    if url:
-      return cls(url)
-    else:
-      config = Config()
-      alias = alias or config.get_default_option('azkaban', 'alias')
-      return cls(**config.resolve_alias(alias))

@@ -39,30 +39,6 @@ class Config(object):
     except ParsingError:
       raise AzkabanError('Invalid configuration file %r.', path)
 
-  @property
-  def aliases(self):
-    """List of registered alias names."""
-    if self.parser.has_section('alias'):
-      return self.parser.items('alias')
-    else:
-      return []
-
-  def resolve_alias(self, alias):
-    """Get url and session_id associated with an alias.
-
-    :param alias: alias name
-
-    """
-    try:
-      url = self.parser.get('alias', alias)
-    except (NoOptionError, NoSectionError):
-      raise AzkabanError('Alias %r not found.', alias)
-    try:
-      session_id = self.parser.get('session_id', alias)
-    except (NoOptionError, NoSectionError):
-      session_id = None
-    return {'url': url, 'session_id': session_id}
-
   def save(self):
     """Save configuration parser back to file."""
     with open(self.path, 'w') as writer:
