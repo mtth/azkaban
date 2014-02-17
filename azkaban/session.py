@@ -125,8 +125,11 @@ class Session(object):
       else:
         kwargs.setdefault('data', {})['session.id'] = self.id
       res = azkaban_request(method, full_url, **kwargs) if self.id else None
-      if res is None or '<!-- /.login -->' in res.text:
-        # checking for None because 500 responses evaluate to False
+      if (
+        res is None or # explicit check because 500 responses evaluate to False
+        '<!-- /.login -->' in res.text or # usual non API error response
+        'Login error' in res.text # special case for API
+      ):
         logger.debug('request failed because of invalid login')
         if attempts > 0:
           self._refresh()
@@ -291,7 +294,7 @@ class Session(object):
         'project': project,
       },
       files={
-        'file': ('file.zip', open(path, 'rb'), 'application/zip'),
+        'file': ('file.zip', open(path, 'rb').read(), 'application/zip'),
       },
     ))
 
