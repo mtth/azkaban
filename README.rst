@@ -5,17 +5,13 @@ Azkaban
 
 A lightweight Azkaban_ client providing:
 
-* A `command line interface`_ to run jobs, upload projects, and much more.
+* A `command line interface`_ to run jobs, upload projects, and more.
 
   .. code:: bash
 
     $ azkaban upload my_project.zip
     Project my_project successfully uploaded (id: 1, size: 205kB, version: 1).
     Details at https://azkaban.server.url/manager?project=my_project
-
-    $ azkaban run my_workflow
-    Flow my_workflow successfully submitted (execution id: 1).
-    Details at https://azkaban.server.url/executor?execid=1
 
 * A simple syntax_ to define workflows from a single python file.
 
@@ -116,7 +112,9 @@ Examples
 
   .. code:: bash
 
-    $ azkaban run -p my_project my_workflow
+    $ azkaban run my_workflow
+    Flow my_workflow successfully submitted (execution id: 1).
+    Details at https://azkaban.server.url/executor?execid=1
 
 
 Syntax
