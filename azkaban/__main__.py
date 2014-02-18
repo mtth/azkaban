@@ -39,11 +39,9 @@ Options:
                                 The resulting output will be tab separated.
   -p PROJECT --project=PROJECT  Azkaban project. Can either be a project name
                                 or a path to file defining an `azkaban.Project`
-                                instance. If more than one project is defined
-                                in the script, you can disambiguate as follows:
-                                `--project=jobs.py:my_project`. Commands which
-                                are followed by an asterisk will only work when
-                                passed a path to a configuration file.
+                                instance. Commands which are followed by an
+                                asterisk will only work when passed a path to a
+                                configuration file. [default: jobs.py]
   -r --replace                  Overwrite any existing file.
   -s --skip                     Skip if workflow is already running.
   -u URL --url=URL              Azkaban endpoint (with protocol, and optionally
@@ -87,23 +85,31 @@ def _get_project_name(project_arg):
   :param project_arg: `--project` argument
 
   """
-  parts = (project_arg or 'jobs.py').rsplit(':', 1)
+  parts = project_arg.split(':', 1)
   if len(parts) == 1:
     if exists(parts[0]):
       return Project.load_from_script(parts[0]).name
     else:
       return parts[0]
   else:
-    return parts[1]
+    return Project.load_from_script(*parts).name
 
 def _load_project(project_arg):
   """Resolve project from CLI argument.
 
-  :param project_arg: `--project` argument
+  :param project_arg: `--project` argument, assumed to be a path to a file
+    (or to jobs.py if omitted)
 
   """
-  parts = (project_arg or 'jobs.py').rsplit(':', 1)
-  return Project.load_from_script(*parts)
+  if ':' in project_arg:
+    script, name = project_arg.split(':', 1)
+  elif exists(project_arg):
+    script = project_arg
+    name = None
+  else:
+    script = 'jobs.py'
+    name = project_arg
+  return Project.load_from_script(script, name)
 
 def build_project(project, zip, url, alias, replace):
   """Build project.
@@ -123,7 +129,7 @@ def build_project(project, zip, url, alias, replace):
     with temppath() as zip:
       project.build(zip)
       session = Session(url, alias)
-      res = session.upload_project(project, zip)
+      res = session.upload_project(project.name, zip)
       stdout.write(
         'Project %s successfully built and uploaded '
         '(id: %s, size: %s, version: %s).\n'
@@ -145,13 +151,13 @@ def create_project(url, alias):
 
   """
   session = Session(url, alias)
-  project = raw_input('Project name: ').strip()
-  description = raw_input('Project description [%s]: ' % (project, ))
-  session.create_project(project, description.strip() or project)
+  name = raw_input('Project name: ').strip()
+  description = raw_input('Project description [%s]: ' % (name, ))
+  session.create_project(name, description.strip() or name)
   stdout.write(
     'Project %s successfully created.\n'
     'Details at %s/manager?project=%s\n'
-    % (project, session.url, project)
+    % (name, session.url, name)
   )
 
 def delete_project(url, alias):
