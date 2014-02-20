@@ -1,11 +1,12 @@
 .. default-role:: code
 
+
 Azkaban
 =======
 
 A lightweight Azkaban_ client providing:
 
-* A `command line interface`_ to run jobs, upload projects, and much more.
+* A `command line interface`_ to run jobs, upload projects, and more.
 
   .. code:: bash
 
@@ -13,19 +14,17 @@ A lightweight Azkaban_ client providing:
     Project my_project successfully uploaded (id: 1, size: 205kB, version: 1).
     Details at https://azkaban.server.url/manager?project=my_project
 
-    $ azkaban run my_workflow
-    Flow my_workflow successfully submitted (execution id: 1).
-    Details at https://azkaban.server.url/executor?execid=1
-
-* A simple syntax_ to define workflows from a single python file.
+* A convenient and extensible way to build `project configuration files`.
 
   .. code:: python
 
     from azkaban import Job, Project
 
     project = Project('my_project')
-    project.add_file('/path/to/bar.txt', 'bar.txt')
-    project.add_job('bar', Job({'type': 'command', 'command': 'cat bar.txt'}))
+    project.add_job(
+      'hello',
+      Job({'type': 'command', 'command': 'echo "hello, azkaban"'})
+    )
 
 
 Installation
@@ -41,23 +40,50 @@ Using pip_:
 Command line interface
 ----------------------
 
-Once installed, the `azkaban` executable provides the following 
-commands:
+Overview
+********
 
-.. code:: bash
+Once installed, the `azkaban` executable provides several commands. These are 
+divided into two kinds:
 
-  azkaban (create | delete) [options]
-  azkaban run [options] FLOW [JOB ...]
-  azkaban upload [options] ZIP
+Those which will work out of the box with any standard Azkaban project:
 
-Running `azkaban --help` shows the full list of options.
+* `azkaban (create | delete) [options]`
+
+  Create (or delete) a project on a remote Azkaban server.
+
+* `azkaban run [options] FLOW [JOB ...]`
+
+  Launch (asynchronously) an entire workflow or specific jobs in a given 
+  workflow. This command will print the corresponding execution's URL to 
+  standard out.
+
+* `azkaban upload [options] ZIP`
+
+  Upload an existing project zip archive.
+
+Those which require a configuration file (cf. `project configuration files`_):
+
+* `azkaban build [options]`
+
+  Generate a project's job files and package them in a zip file along with any 
+  other project dependencies (e.g. jars,  pig scripts). This archive can 
+  either be saved to disk or directly uploaded to Azkaban.
+
+* `azkaban info [options]`
+
+  View information about all the jobs inside a project, its static 
+  dependencies, or a specific job's options.
+
+Running `azkaban --help` shows the full list of options available for each 
+command.
 
 
 URLs and aliases
 ****************
 
-The previous commands all take a `--url`, or `-u`, option used to specify 
-where to find the Azkaban server (and which user to connect as).
+The previous commands all take a `--url`, option used to specify where to find 
+the Azkaban server (and which user to connect as).
 
 .. code:: bash
 
@@ -68,14 +94,14 @@ defines aliases in `~/.azkabanrc`:
 
 .. code:: cfg
 
-  [azkaban]
-  default.alias = foo
   [alias]
   foo = http://url.to.foo.server:port
   bar = baruser@http://url.to.bar.server
+  [azkaban]
+  default.alias = foo
 
-We can now interact directly with each of these URLs using the `--alias`, or 
-`-a` option followed by their corresponding alias. Since we also specified a 
+We can now interact directly with each of these URLs using the `--alias` 
+option followed by their corresponding alias. Since we also specified a 
 default alias, it is also possible to omit the option altogether. As a result,
 the commands below are all equivalent:
 
@@ -85,63 +111,36 @@ the commands below are all equivalent:
   $ azkaban create -a foo
   $ azkaban create
 
-Finally, our session ID for a given URL is cached on each successful login, so 
-that we don't have to authenticate on every remote interaction.
+Note finally that our session ID is cached on each successful login, so that 
+we won't have to authenticate on every remote interaction.
 
 
-Examples
-********
+Project configuration files
+---------------------------
 
-* Creating and deleting projects:
-
-  .. code:: bash
-
-    $ azkaban create
-    Project name: my_project
-    Description [my_project]: Some interesting description.
-    Project my_project successfully created.
-    Details at https://azkaban.server.url/manager?project=my_project
-
-    $ azkaban delete -a bar
-    Project name: my_project
-    Project my_project successfully deleted.
-
-* Uploading an already built archive to an Azkaban server:
-
-  .. code:: bash
-
-    $ azkaban upload -p my_project my_project.zip
-
-* Run entire workflows, or individual jobs:
-
-  .. code:: bash
-
-    $ azkaban run -p my_project my_workflow
+We provide here a framework to define projects, jobs, and workflows from a 
+single python file.
 
 
-Syntax
-------
+Motivation
+**********
 
 For medium to large sized projects, it quickly becomes tricky to manage the 
-multitude of files required for each workflow. `.properties` files are 
-helpful but still do not provide the flexibility to generate jobs 
-programmatically (i.e. using `for` loops, etc.). This approach also 
-requires us to manually bundle and upload our project to the gateway every 
-time.
+multitude of files required for each workflow. `.properties` files are helpful 
+but still do not provide the flexibility to generate jobs programmatically 
+(i.e. using `for` loops, etc.). This approach also requires us to manually 
+bundle and upload our project to the gateway every time.
 
-We provide here a convenient framework to define jobs from a single python 
-file. This framework is entirely compatible with the command line interface 
-above, and even provides additional functionality (e.g. building and uploading 
-projects in a single command).
+Additionally, this will enable the `build` and `info` commands.
 
 
 Quickstart
 **********
 
-We start by creating a configuration file for our project. Let's call it 
-`jobs.py`, the default file name the command line tool will look for. 
-Here's a simple example of how we could define a project with a single job and 
-static file:
+We start by creating a file. Let's call it `jobs.py` (the default file name 
+the command line tool will look for), although any name would work. Below is a 
+simple example of how we could define a project with a single job and static 
+file:
 
 .. code:: python
 
@@ -157,13 +156,10 @@ optional argument specifies the destination path inside the zip file). The
 first argument will be the file's name, the second is a `Job` instance 
 (cf. `Job options`_).
 
-Once we've saved our jobs file, the following additional commands are 
-available to us:
-
-* `azkaban list`, see the list of all jobs in the current project.
-* `azkaban view`, view the contents of the `.job` file for a given 
-  job.
-* `azkaban build`, build the project archive and store it locally.
+Once we've saved our jobs file, simply running the `azkaban` executable in the 
+same directory will pick it up automatically and activate all commands. Note 
+that we can also specify a custom configuration file location with the `-p 
+--project` option.
 
 
 Job options
@@ -251,29 +247,25 @@ The first project will retain its original name.
   project2.merge_into(project1)
 
 
-Job details
-^^^^^^^^^^^
-
-The `info` command becomes quite powerful when combined with other Unix 
-tools. Here are a few examples:
-
-.. code:: bash
-
-  $ # To count the number of jobs per type
-  $ azkaban info -o type | cut -f 2 | sort | uniq -c
-  $ # To only view the list of jobs of a certain type with their dependencies
-  $ azkaban info -o type,dependencies | awk -F '\t' '($2 == "job_type")'
-  $ # To view the size of each file in the project
-  $ azkaban info -f | xargs -n 1 du -h
-
-
 Next steps
-^^^^^^^^^^
+**********
 
-Any valid python code can go inside the jobs configuration file. This includes 
-using loops to add jobs, subclassing the base `Job` class to better suit 
-a project's needs (e.g. by implementing the `on_add` and 
-`on_build` handlers), ...
+Any valid python code can go inside a jobs configuration file. This includes 
+using loops to add jobs, subclassing the base `Job` class to better suit a 
+project's needs (e.g. by implementing the `on_add` and `on_build` handlers), 
+etc.
+
+Finally, the `info` command becomes quite powerful when combined with other 
+Unix tools. Here are a few examples:
+
+* Counting the number of jobs per type: `azkaban info -o type | cut -f 2 | 
+  sort | uniq -c`
+
+* Viewing the list of jobs of a certain type, along with their dependencies: 
+  `azkaban info -o type,dependencies | awk -F '\t' '($2 == "job_type")'`
+
+* Viewing the size of each file in the project: `azkaban info -f | xargs -n 1 
+  du -h`
 
 
 Extensions
@@ -282,10 +274,19 @@ Extensions
 Pig
 ***
 
-Because pig jobs are so common, a `PigJob` class is provided which 
-accepts a file path (to the pig script) as first constructor argument, 
-optionally followed by job options. It then automatically sets the job type 
-and adds the corresponding script file to the project.
+Since pig jobs are so common, `azkaban` comes with an extension to:
+
+* run pig script directly from the command line (and view the output logs from 
+  your terminal): `azkabanpig`. Under the hood, this will package your script 
+  along with the appropriately generated job file and upload it to Azkaban. 
+  Running `azkabanpig --help` will display the list of available options 
+  (using UDFs, substituting parameters, running several scripts in order, 
+  etc.).
+
+* integrate pig jobs easily into your project configuration via the `PigJob` 
+  class. It accepts a file path (to the pig script) as first constructor 
+  argument, optionally followed by job options. It then automatically sets the 
+  job type and adds the corresponding script file to the project.
 
 .. code:: python
 
@@ -295,10 +296,6 @@ and adds the corresponding script file to the project.
 
 Using a custom pig type is as simple as changing the `PigJob.type` class 
 variable.
-
-This extension also comes with the `azkabanpig` executable to run pig scripts 
-directly. `azkabanpig --help` will display the list of available options 
-(using UDFs, substituting parameters, running several scripts in order, etc.).
 
 
 .. _Azkaban: http://data.linkedin.com/opensource/azkaban
