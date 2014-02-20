@@ -4,6 +4,7 @@
 """Project definition module."""
 
 
+from imp import load_source
 from os import sep
 from os.path import (basename, dirname, exists, isabs, isdir, join, relpath, 
   splitext)
@@ -11,7 +12,6 @@ from weakref import WeakValueDictionary
 from zipfile import ZipFile
 from .util import AzkabanError, temppath
 import logging
-import sys
 
 
 logger = logging.getLogger(__name__)
@@ -163,10 +163,13 @@ class Project(object):
     * in any other case, an error is thrown.
 
     """
-    sys.path.append(dirname(script))
-    module = splitext(basename(script.rstrip(sep)))[0]
+    module_name = splitext(basename(script.rstrip(sep)))[0]
     try:
-      __import__(module)
+      load_source(module_name, script)
+    except IOError:
+      raise AzkabanError(
+        'Unable to find project configuration file: %r.' % (script, )
+      )
     except ImportError:
       raise AzkabanError('Unable to import script %r.' % (script, ))
     else:
@@ -176,8 +179,8 @@ class Project(object):
         except KeyError:
           raise AzkabanError(
             'Unable to find project with name %r in script %r.\n'
-            'Available projects: %r.'
-            % (name, script, ', '.join(cls._registry.keys()))
+            'Available projects: %s.'
+            % (name, script, ', '.join(cls._registry))
           )
       else:
         if len(cls._registry) == 1:
@@ -188,5 +191,5 @@ class Project(object):
           raise AzkabanError(
             'Multiple projects found in %r: %s.\n'
             'Disambiguate using --project=%s:project_name.'
-            % (', '.join(cls._registry.keys()), script, script)
+            % (script, ', '.join(cls._registry), script)
           )

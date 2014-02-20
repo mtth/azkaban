@@ -125,8 +125,11 @@ class Session(object):
       else:
         kwargs.setdefault('data', {})['session.id'] = self.id
       res = azkaban_request(method, full_url, **kwargs) if self.id else None
-      if res is None or '<!-- /.login -->' in res.text:
-        # checking for None because 500 responses evaluate to False
+      if (
+        res is None or # explicit check because 500 responses evaluate to False
+        '<!-- /.login -->' in res.text or # usual non API error response
+        'Login error' in res.text # special case for API
+      ):
         logger.debug('request failed because of invalid login')
         if attempts > 0:
           self._refresh()
@@ -229,10 +232,10 @@ class Session(object):
       raise AzkabanError('Delete failed. Check permissions and existence.')
     return res
 
-  def run_workflow(self, project, flow, jobs=None, skip=False):
+  def run_workflow(self, name, flow, jobs=None, skip=False):
     """Launch a workflow.
 
-    :param project: name of the project
+    :param name: name of the project
     :param flow: name of the workflow
     :param jobs: name of jobs to run (run entire workflow by default)
     :param skip: don't run if the same workflow is already running
@@ -246,7 +249,7 @@ class Session(object):
     else:
       all_names = set(
         n['id']
-        for n in self.get_workflow_info(project, flow)['nodes']
+        for n in self.get_workflow_info(name, flow)['nodes']
       )
       run_names = set(jobs)
       missing_names = run_names - all_names
@@ -266,17 +269,17 @@ class Session(object):
       use_cookies=False,
       data={
         'ajax': 'executeFlow',
-        'project': project,
+        'project': name,
         'flow': flow,
         'disabled': disabled,
         'concurrentOption': 'skip' if skip else 'concurrent',
       },
     ))
 
-  def upload_project(self, project, path):
+  def upload_project(self, name, path):
     """Upload project archive.
 
-    :param project: project name
+    :param name: project name
     :param path: path to zip archive
 
     """
@@ -288,17 +291,17 @@ class Session(object):
       use_cookies=False,
       data={
         'ajax': 'upload',
-        'project': project,
+        'project': name,
       },
       files={
-        'file': ('file.zip', open(path, 'rb'), 'application/zip'),
+        'file': ('file.zip', open(path, 'rb').read(), 'application/zip'),
       },
     ))
 
-  def get_workflow_info(self, project, flow):
+  def get_workflow_info(self, name, flow):
     """Get list of jobs corresponding to a workflow.
 
-    :param project: project name
+    :param name: project name
     :param flow: name of flow in project
 
     """
@@ -307,7 +310,7 @@ class Session(object):
       endpoint='manager',
       params={
         'ajax': 'fetchflowjobs',
-        'project': project,
+        'project': name,
         'flow': flow,
       },
     )

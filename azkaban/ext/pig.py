@@ -181,9 +181,7 @@ def main():
         status = _get_status(session, exec_id)
         if status['active_job'] != current_job:
           current_job = status['active_job']
-          if current_job:
-            offset = 0
-            stdout.write('\n[Job %s]\n' % (current_job, ))
+          offset = 0
         if current_job:
           logs = session.get_job_logs(
             exec_id=exec_id,
