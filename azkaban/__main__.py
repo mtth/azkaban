@@ -4,7 +4,7 @@
 """Azkaban CLI: a lightweight command line interface for Azkaban.
 
 Usage:
-  azkaban build [-rp PROJECT] [-a ALIAS | -u URL | ZIP]
+  azkaban build [-crp PROJECT] [-a ALIAS | -u URL | ZIP]
   azkaban (create | delete) [-a ALIAS | -u URL]
   azkaban info [-p PROJECT] [-f | -o OPTIONS | JOB]
   azkaban run [-sp PROJECT]  [-a ALIAS | -u URL] FLOW [JOB ...]
@@ -111,7 +111,7 @@ def _load_project(project_arg):
     name = project_arg
   return Project.load_from_script(script, name)
 
-def build_project(project, zip, url, alias, replace):
+def build_project(project, zip, url, alias, replace, create):
   """Build project.
 
   :param args: dictionary of parsed arguments (output of `docopt.docopt`)
@@ -129,7 +129,16 @@ def build_project(project, zip, url, alias, replace):
     with temppath() as zip:
       project.build(zip)
       session = Session(url, alias)
-      res = session.upload_project(project.name, zip)
+      while True:
+        try:
+          res = session.upload_project(project.name, zip)
+        except AzkabanError as err:
+          if create:
+            session.create_project(project.name, project.name)
+          else:
+            raise err
+        else:
+          break
       stdout.write(
         'Project %s successfully built and uploaded '
         '(id: %s, size: %s, version: %s).\n'
@@ -250,7 +259,7 @@ def main():
   if args['build']:
     build_project(
       _load_project(args['--project']),
-      **_forward(args, ['ZIP', '--url', '--alias', '--replace'])
+      **_forward(args, ['ZIP', '--url', '--alias', '--replace', '--create'])
     )
   elif args['create']:
     create_project(**_forward(args, ['--url', '--alias']))
