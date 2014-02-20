@@ -14,7 +14,7 @@ A lightweight Azkaban_ client providing:
     Project my_project successfully uploaded (id: 1, size: 205kB, version: 1).
     Details at https://azkaban.server.url/manager?project=my_project
 
-* A convenient and extensible way to build `project configuration files`.
+* A convenient and extensible way to build `project configuration files`_.
 
   .. code:: python
 
