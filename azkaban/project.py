@@ -4,14 +4,15 @@
 """Project definition module."""
 
 
-from imp import load_source
+from traceback import format_exc
 from os import sep
-from os.path import (basename, dirname, exists, isabs, isdir, join, relpath, 
+from os.path import (basename, dirname, exists, isabs, isdir, join, relpath,
   splitext)
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
 from .util import AzkabanError, temppath
 import logging
+import sys
 
 
 logger = logging.getLogger(__name__)
@@ -163,15 +164,14 @@ class Project(object):
     * in any other case, an error is thrown.
 
     """
+    sys.path.insert(0, dirname(script))
     module_name = splitext(basename(script.rstrip(sep)))[0]
     try:
-      load_source(module_name, script)
-    except IOError:
-      raise AzkabanError(
-        'Unable to find project configuration file: %r.' % (script, )
-      )
+      __import__(module_name)
     except ImportError:
-      raise AzkabanError('Unable to import script %r.' % (script, ))
+      raise AzkabanError(
+        'Unable to import script %r.\n%s' % (script, format_exc())
+        )
     else:
       if name:
         try:
