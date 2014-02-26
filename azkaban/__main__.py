@@ -194,16 +194,16 @@ def view_info(project, files, options, job):
     else:
       raise AzkabanError('Job %r not found.' % (job_name, ))
   elif files:
-    for path in project.files:
+    for path in sorted(project.files):
       stdout.write('%s\n' % (path, ))
   else:
     if options:
       option_names = options.split(',')
-      for name, opts in project.jobs.items():
+      for name, opts in sorted(project.jobs.items()):
         job_opts = '\t'.join(opts.get(o, '') for o in option_names)
         stdout.write('%s\t%s\n' % (name, job_opts))
     else:
-      for name in project.jobs:
+      for name in sorted(project.jobs):
         stdout.write('%s\n' % (name, ))
 
 def run_flow(project_name, flow, job, url, alias, skip):
