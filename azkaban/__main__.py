@@ -59,7 +59,7 @@ Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 
 from azkaban import __version__
 from azkaban.project import Project
-from azkaban.session import Session
+from azkaban.remote import Session
 from azkaban.util import AzkabanError, catch, human_readable, temppath
 from docopt import docopt
 from os.path import exists, getsize

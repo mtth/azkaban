@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-"""Azkaban session module.
+"""Azkaban remote interaction module.
 
 This contains the `Session` class which will be used for all interactions with
 a remote Azkaban server.
@@ -12,12 +12,57 @@ a remote Azkaban server.
 from ConfigParser import NoOptionError, NoSectionError
 from getpass import getpass, getuser
 from os.path import exists
-from .util import AzkabanError, Config, azkaban_request, extract_json
+from time import sleep
+from .util import AzkabanError, Config
 import logging
+import requests as rq
 
 
 logger = logging.getLogger(__name__)
 
+def _azkaban_request(method, url, **kwargs):
+  """Make request to azkaban server and catch common errors.
+
+  :param method: get, post, etc.
+  :param url: endpoint url
+  :param kwargs: arguments forwarded to the request handler
+
+  This function is meant to handle common errors and return a more helpful
+  message than the default one.
+
+  """
+  try:
+    handler = getattr(rq, method.lower())
+  except AttributeError:
+    raise ValueError('Invalid HTTP method: %r.' % (method, ))
+  else:
+    try:
+      response = handler(url, verify=False, **kwargs)
+    except rq.ConnectionError:
+      raise AzkabanError('Unable to connect to azkaban at %r.' % (url, ))
+    except rq.exceptions.MissingSchema:
+      raise AzkabanError('Invalid azkaban server url: %r.' % (url, ))
+    else:
+      return response
+
+def _extract_json(response):
+  """Extract json from Azkaban response, gracefully handling errors.
+
+  :param response: request response object
+
+  """
+  try:
+    json = response.json()
+  except ValueError:
+    # no json decoded probably
+    raise ValueError('No JSON decoded from response %r' % (response.text, ))
+  else:
+    if 'error' in json:
+      raise AzkabanError(json['error'])
+    elif json.get('status') == 'error':
+      raise AzkabanError(json['message'])
+    else:
+      return json
 
 def _parse_url(url):
   """Parse url.
@@ -94,7 +139,7 @@ class Session(object):
     """
     logger.debug('refreshing session')
     password = password or getpass('Azkaban password for %s: ' % (self, ))
-    res = extract_json(azkaban_request(
+    res = _extract_json(_azkaban_request(
       'POST',
       self.url,
       data={'action': 'login', 'username': self.user, 'password': password},
@@ -112,7 +157,7 @@ class Session(object):
     :param attempts: if current session ID is invalid, maximum number of
       attempts to refresh it
     :param use_cookies: include session_id in cookies instead of request data
-    :param **kwargs: keyword arguments passed to `azkaban.util.azkaban_request`
+    :param **kwargs: keyword arguments passed to `_azkaban_request`
 
     If the session expired, will prompt for a password to refresh.
 
@@ -124,7 +169,7 @@ class Session(object):
         kwargs.setdefault('cookies', {})['azkaban.browser.session.id'] = self.id
       else:
         kwargs.setdefault('data', {})['session.id'] = self.id
-      res = azkaban_request(method, full_url, **kwargs) if self.id else None
+      res = _azkaban_request(method, full_url, **kwargs) if self.id else None
       if (
         res is None or # explicit check because 500 responses evaluate to False
         '<!-- /.login -->' in res.text or # usual non API error response
@@ -148,7 +193,7 @@ class Session(object):
     :param exec_id: execution ID
 
     """
-    return extract_json(self._request(
+    return _extract_json(self._request(
       method='GET',
       endpoint='executor',
       params={
@@ -166,7 +211,7 @@ class Session(object):
     :param limit: size of log to download
 
     """
-    return extract_json(self._request(
+    return _extract_json(self._request(
       method='GET',
       endpoint='executor',
       params={
@@ -184,7 +229,7 @@ class Session(object):
     :param exec_id: execution ID
 
     """
-    res = extract_json(self._request(
+    res = _extract_json(self._request(
       method='GET',
       endpoint='executor',
       params={
@@ -203,7 +248,7 @@ class Session(object):
     :param description: project description
 
     """
-    return extract_json(self._request(
+    return _extract_json(self._request(
       method='POST',
       endpoint='manager',
       data={
@@ -263,7 +308,7 @@ class Session(object):
           '[%s]'
           % (','.join('"%s"' % (n, ) for n in all_names - run_names), )
         )
-    return extract_json(self._request(
+    return _extract_json(self._request(
       method='POST',
       endpoint='executor',
       use_cookies=False,
@@ -285,7 +330,7 @@ class Session(object):
     """
     if not exists(path):
       raise AzkabanError('Unable to find archive at %r.' % (path, ))
-    return extract_json(self._request(
+    return _extract_json(self._request(
       method='POST',
       endpoint='manager',
       use_cookies=False,
@@ -315,6 +360,68 @@ class Session(object):
       },
     )
     try:
-      return extract_json(raw_res)
+      return _extract_json(raw_res)
     except ValueError:
       raise AzkabanError('Flow %r not found.' % (flow, ))
+
+
+class Execution(object):
+
+  """Remote workflow execution.
+
+  :param session: `Session` instance
+  :param exec_id: execution ID
+
+  """
+
+  def __init__(self, session, exec_id):
+    self._session = session
+    self.exec_id = exec_id
+
+  @property
+  def status(self):
+    """Execution status."""
+    return self._session.get_execution_status(self.exec_id)
+
+  @property
+  def url(self):
+    """Execution URL."""
+    return '%s/executor?exec_id=%s' % (self._session.url, self.exec_id)
+
+  def cancel(self):
+    """Cancel execution."""
+    self._session.cancel_execution(self.exec_id)
+
+  def job_logs(self, job, delay=5):
+    """Job log generator.
+
+    :param job: job name
+    :param delay: time in seconds between each server poll
+
+    Yields line by line.
+
+    """
+    finishing = False
+    offset = 0
+    while True:
+      sleep(delay)
+      logs = self._session.get_job_logs(
+        exec_id=self.exec_id,
+        job=job,
+        offset=offset,
+      )
+      if logs['length']:
+        offset += logs['length']
+        lines = (e for e in logs['data'].split('\n') if e)
+        for line in lines:
+          yield line
+      elif finishing:
+        break
+      else:
+        running_jobs = set(
+          e['id']
+          for e in self.status['nodes']
+          if e['status'] == 'RUNNING'
+        )
+        if job not in running_jobs:
+          finishing = True

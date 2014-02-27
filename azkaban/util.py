@@ -10,10 +10,7 @@ from contextlib import contextmanager
 from functools import wraps
 from os import close, remove
 from os.path import exists, expanduser
-from requests import ConnectionError
-from requests.exceptions import MissingSchema
 from tempfile import mkstemp
-import requests as rq
 import sys
 
 
@@ -134,47 +131,3 @@ def human_readable(size):
     if size < 1024.0:
       return '%3.1f%s' % (size, suffix)
     size /= 1024.0
-
-def azkaban_request(method, url, **kwargs):
-  """Make request to azkaban server and catch common errors.
-
-  :param method: get, post, etc.
-  :param url: endpoint url
-  :param kwargs: arguments forwarded to the request handler
-
-  This function is meant to handle common errors and return a more helpful
-  message than the default one.
-
-  """
-  try:
-    handler = getattr(rq, method.lower())
-  except AttributeError:
-    raise ValueError('Invalid HTTP method: %r.' % (method, ))
-  else:
-    try:
-      response = handler(url, verify=False, **kwargs)
-    except ConnectionError:
-      raise AzkabanError('Unable to connect to azkaban at %r.' % (url, ))
-    except MissingSchema:
-      raise AzkabanError('Invalid azkaban server url: %r.' % (url, ))
-    else:
-      return response
-
-def extract_json(response):
-  """Extract json from Azkaban response, gracefully handling errors.
-
-  :param response: request response object
-
-  """
-  try:
-    json = response.json()
-  except ValueError:
-    # no json decoded probably
-    raise ValueError('No JSON decoded from response %r' % (response.text, ))
-  else:
-    if 'error' in json:
-      raise AzkabanError(json['error'])
-    elif json.get('status') == 'error':
-      raise AzkabanError(json['message'])
-    else:
-      return json

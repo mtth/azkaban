@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-"""Test Azkaban session module."""
+"""Test Azkaban remote module."""
 
 
 from azkaban.ext.pig import PigJob
 from azkaban.project import Project
 from azkaban.job import Job
-from azkaban.session import Session
+from azkaban.remote import Session
 from azkaban.util import AzkabanError, Config, temppath
 from ConfigParser import NoOptionError, NoSectionError
 from nose.tools import eq_, ok_, raises, nottest

@@ -47,10 +47,9 @@ from docopt import docopt
 from os import sep
 from os.path import abspath, basename
 from sys import stdout
-from time import sleep
 from ..job import Job
 from ..project import Project
-from ..session import Session
+from ..remote import Execution, Session
 from ..util import AzkabanError, Config, catch, temppath
 
 
@@ -93,6 +92,7 @@ class PigProject(Project):
 
   def __init__(self, name, paths, user, type='pig', jars=None, options=None):
     super(PigProject, self).__init__(name, register=False)
+    self.ordered_jobs = [basename(path) for path in paths]
     jars = jars or []
     opts = [
       {
@@ -104,31 +104,22 @@ class PigProject(Project):
     ]
     for jar in jars:
       self.add_file(abspath(jar))
-    for path, dep in zip(paths, [None] + paths):
-      dep_opts = {'dependencies': basename(dep)} if dep else {}
+    for path, dep in zip(paths, [None] + self.ordered_jobs):
+      dep_opts = {'dependencies': dep} if dep else {}
       self.add_job(basename(path), PigJob(abspath(path), dep_opts, *opts))
 
+  def logs(self, execution):
+    """Jobs logs. In order.
 
-def _get_status(session, exec_id):
-  """Get status of a PigProject execution, along with currently running job.
+    :param execution: `azkaban.remote.Execution`
 
-  :param session: `azkaban.session.Session`
-  :param exec_id: execution ID
+    """
+    for job in self.ordered_jobs:
+      for line in execution.job_logs(job):
+        yield line
+      if execution.status['status'] == 'FAILURE':
+        raise AzkabanError('Execution failed.')
 
-  This method is able to simply find which unique job is active because of
-  the linear structure of the workflow.
-
-  """
-  status = session.get_execution_status(exec_id)
-  active = [
-    e['id']
-    for e in status['nodes']
-    if e['status'] == 'RUNNING' or e['status'] == 'FAILED'
-  ]
-  return {
-    'flow_status': status['status'],
-    'active_job': active[0] if active else '',
-  }
 
 @catch(AzkabanError)
 def main():
@@ -161,51 +152,21 @@ def main():
       else:
         break
   res = session.run_workflow(project, basename(paths[-1]))
-  exec_id = res['execid']
+  exe = Execution(session, res['execid'])
   if args['--background']:
-    if len(paths) == 1:
-      stdout.write(
-        'Pig job running at %s/executor?execid=%s&job=%s\n'
-        % (session.url, exec_id, basename(paths[0]))
-      )
-    else:
-      stdout.write(
-        'Pig jobs running at %s/executor?execid=%s\n'
-        % (session.url, exec_id)
-      )
+    stdout.write('Execution running at %s\n' % (exe.url, ))
   else:
-    current_job = None
     try:
-      while True:
-        sleep(5)
-        status = _get_status(session, exec_id)
-        if status['active_job'] != current_job:
-          current_job = status['active_job']
-          offset = 0
-        if current_job:
-          logs = session.get_job_logs(
-            exec_id=exec_id,
-            job=current_job,
-            offset=offset,
-          )
-          stdout.write(logs['data'])
-          offset += logs['length']
-        if status['flow_status'] == 'SUCCEEDED':
-          stdout.write('\nExecution succeeded.\n')
-          break
-        elif status['flow_status'] != 'RUNNING':
-          raise AzkabanError('Execution failed.')
+      for line in project.logs(exe):
+        stdout.write('%s\n' % (line, ))
     except KeyboardInterrupt:
-      choice = raw_input('\nKill execution [yN]? ').lower()
+      choice = raw_input('\nCancel execution [yN]? ').lower()
       if choice and choice[0] == 'y':
         stdout.write('Killing... ')
-        session.cancel_execution(exec_id)
+        exe.cancel()
         stdout.write('Done.\n')
       else:
-        stdout.write(
-          'Execution still running at %s/executor?execid=%s\n'
-          % (session.url, exec_id)
-        )
+        stdout.write('Execution still running at %s\n' % (exe.url, ))
 
 if __name__ == '__main__':
   main()
