@@ -21,7 +21,7 @@ Two parts:
 """
 
 __all__ = ['Project', 'Job', 'PigJob']
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 try:
   from .ext.pig import PigJob

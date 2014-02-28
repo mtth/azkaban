@@ -158,7 +158,7 @@ def main():
   else:
     try:
       for line in project.logs(exe):
-        stdout.write('%s\n' % (line, ))
+        stdout.write('%s\n' % (line.encode('utf-8'), ))
     except KeyboardInterrupt:
       choice = raw_input('\nCancel execution [yN]? ').lower()
       if choice and choice[0] == 'y':

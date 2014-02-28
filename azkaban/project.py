@@ -4,10 +4,10 @@
 """Project definition module."""
 
 
-from traceback import format_exc
 from os import sep
 from os.path import (basename, dirname, exists, isabs, isdir, join, relpath,
   splitext)
+from traceback import format_exc
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
 from .util import AzkabanError, temppath
