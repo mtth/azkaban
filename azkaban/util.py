@@ -41,23 +41,27 @@ class Config(object):
     with open(self.path, 'w') as writer:
       self.parser.write(writer)
 
-  def get_default_option(self, command, name):
+  def get_option(self, command, name, default=None):
     """Get default option value for a command.
 
     :param command: command the option should be looked up for
     :param name: name of the option
+    :param default: default value to be returned if not found in the
+      configuration file. If not provided, will raise `AzkabanError`.
 
     """
     try:
       return self.parser.get(command, 'default.%s' % (name, ))
     except (NoOptionError, NoSectionError):
-      raise AzkabanError(
-        'In order to omit the `--%(name)s` option, '
-        'a default %(name)s must be defined in %(path)r.\n'
-        'This is done by adding a `default.%(name)s` option in the '
-        '`%(command)s` section.'
-        % {'command': command, 'name': name, 'path': self.path}
-      )
+      if default:
+        return default
+      else:
+        raise AzkabanError(
+          'No default %(name)s found in %(path)r for %(command)s.\n'
+          'You can specify one by adding a `default.%(name)s` option in the '
+          '`%(command)s` section.'
+          % {'command': command, 'name': name, 'path': self.path}
+        )
 
 
 @contextmanager

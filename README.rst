@@ -276,10 +276,10 @@ Pig
 
 Since pig jobs are so common, `azkaban` comes with an extension to:
 
-* run pig script directly from the command line (and view the output logs from 
-  your terminal): `azkabanpig`. Under the hood, this will package your script 
-  along with the appropriately generated job file and upload it to Azkaban. 
-  Running `azkabanpig --help` will display the list of available options 
+* run pig scripts directly from the command line (and view the output logs 
+  from your terminal): `azkabanpig`. Under the hood, this will package your 
+  script along with the appropriately generated job file and upload it to 
+  Azkaban. Running `azkabanpig --help` displays the list of available options 
   (using UDFs, substituting parameters, running several scripts in order, 
   etc.).
 
@@ -292,10 +292,7 @@ Since pig jobs are so common, `azkaban` comes with an extension to:
 
   from azkaban import PigJob
 
-  project.add_job('baz', PigJob('/.../baz.pig', {'dependencies': 'bar'}))
-
-Using a custom pig type is as simple as changing the `PigJob.type` class 
-variable.
+  project.add_job('baz', PigJob('baz.pig', {'dependencies': 'bar'}))
 
 
 .. _Azkaban: http://data.linkedin.com/opensource/azkaban

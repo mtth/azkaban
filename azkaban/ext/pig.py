@@ -18,8 +18,8 @@ Arguments:
 
 Options:
   -a ALIAS --alias=ALIAS        Cf. `azkaban --help`.
-  -b --background               Run job asynchronously. `azkabanpig` will
-                                launch the workflow and return.
+  -b --background               Run job asynchronously. AzkabanPig will launch
+                                the workflow and return.
   -h --help                     Show this message and exit.
   -j JAR --jar=JAR              Path to jar file. It will be available on the
                                 class path when the pig script is run, no need
@@ -34,8 +34,8 @@ Options:
 
 Examples:
   azkabanpig my_script.pig
-  azkabanpig -a foo first_script.pig second_script.pig
-  azkabanpig -url http://url.to.azkaban -o param.my_output=bar.dat foo.pig
+  azkabanpig -ba foo first_script.pig second_script.pig
+  azkabanpig -u http://url.to.azkaban -o param.my_output=bar.dat foo.pig
 
 AzkabanPig returns with exit code 1 if an error occurred and 0 otherwise.
 
@@ -55,31 +55,53 @@ from ..util import AzkabanError, Config, catch, temppath
 
 class PigJob(Job):
 
-  """Job class corresponding to pig jobs.
+  """Convenience job class for running pig scripts.
 
-  :param path: absolute path to pig script (this script will automatically be
-    added to the project archive)
+  :param path: path to pig script (this script will automatically be added to
+    the project archive when it is built)
   :param options: cf. `Job`
+
+  By default the job type used is `'pig'`. You can specify a custom job type in
+  the `azkabanpig` section of the `~/.azkabanrc` configuration file via the
+  `default.type` option.
+
+  This class allows you to specify JVM args as a dictionary by correctly
+  converting these to the format used by Azkaban when building the job options.
+  For example: `options = {'jvm.args': {'foo': 1, 'bar': 2}}` will be
+  converted to `jvm.args=-Dfoo=1 -Dbar=2`. Note that this enables JVM args to
+  behave like all other `Job` options when defined multiple times (the latest
+  value takes precedence).
 
   """
 
-  #: Job type used (change this to use a custom pig type).
-  type = 'pig'
-
   def __init__(self, path, *options):
     super(PigJob, self).__init__(
-      {'type': self.type, 'pig.script': path.lstrip(sep)},
+      {
+        'type': Config().get_option('azkabanpig', 'type', 'pig'),
+        'pig.script': path.lstrip(sep),
+      },
       *options
     )
     self.path = path
-    # TODO: jvm.args
+    self._format_jvm_args()
 
   def on_add(self, project, name):
     """This handler adds the corresponding script file to the project."""
     project.add_file(self.path)
 
+  def _format_jvm_args(self):
+    """Format JVM args according to Azkaban job options format."""
+    prefix = 'jvm.args.'
+    opts = []
+    for key, value in self.options.items():
+      if key.startswith(prefix):
+        opts.append((key.replace(prefix, ''), value))
+        self.options.pop(key)
+    if opts:
+      self.options['jvm.args'] = ' '.join('-D%s=%s' % a for a in sorted(opts))
 
-class PigProject(Project):
+
+class _PigProject(Project):
 
   """Project to run pig jobs from the command line.
 
@@ -91,23 +113,29 @@ class PigProject(Project):
 
   """
 
-  def __init__(self, name, paths, user, type='pig', jars=None, options=None):
-    super(PigProject, self).__init__(name, register=False)
+  def __init__(self, name, paths, user, type=None, jars=None, options=None):
+    super(_PigProject, self).__init__(name, register=False)
     self.ordered_jobs = [basename(path) for path in paths]
     jars = jars or []
-    opts = [
-      {
-        'type': type,
-        'user.to.proxy': user,
-        'pig.additional.jars': ','.join(abspath(j).lstrip(sep) for j in jars),
-      },
-      options or {}
-    ]
+    default_options = {
+      'user.to.proxy': user,
+      'pig.additional.jars': ','.join(abspath(j).lstrip(sep) for j in jars),
+    }
+    if type:
+      default_options['type'] = type
     for jar in jars:
       self.add_file(abspath(jar))
     for path, dep in zip(paths, [None] + self.ordered_jobs):
-      dep_opts = {'dependencies': dep} if dep else {}
-      self.add_job(basename(path), PigJob(abspath(path), dep_opts, *opts))
+      dependency_options = {'dependencies': dep} if dep else {}
+      self.add_job(
+        basename(path),
+        PigJob(
+          abspath(path),
+          default_options,
+          dependency_options,
+          options or {},
+        )
+      )
 
   def logs(self, execution):
     """Jobs logs. In order.
@@ -126,20 +154,17 @@ class PigProject(Project):
 def main():
   """AzkabanPig entry point."""
   args = docopt(__doc__)
-  config = Config()
   paths = args['PATH']
-  pj = args['--project'] or config.get_default_option('azkabanpig', 'project')
-  tpe = args['--type'] or config.get_default_option('azkabanpig', 'type')
   session = Session(args['--url'], args['--alias'])
   try:
     job_options = dict(opt.split('=', 1) for opt in args['--option'])
   except ValueError:
     raise AzkabanError('Invalid options: %r' % (' '.join(args['OPTION']), ))
-  project = PigProject(
-    name=pj,
+  project = _PigProject(
+    name=args['--project'] or Config().get_option('azkabanpig', 'project'),
     paths=paths,
     user=session.user,
-    type=tpe,
+    type=args['--type'],
     jars=args['--jar'],
     options=job_options,
   )

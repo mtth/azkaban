@@ -118,7 +118,7 @@ class Session(object):
   def __init__(self, url=None, alias=None):
     self.config = Config()
     if not url:
-      alias = alias or self.config.get_default_option('azkaban', 'alias')
+      alias = alias or self.config.get_option('azkaban', 'alias')
       url = _resolve_alias(self.config, alias)
     self.user, self.url = _parse_url(url)
     self.id = _get_session_id(self.config, str(self).replace(':', '.'))

@@ -5,7 +5,7 @@
 
 from azkaban.ext.pig import *
 from azkaban.project import Project
-from azkaban.util import AzkabanError, temppath
+from azkaban.util import AzkabanError, Config, temppath
 from nose.tools import eq_, ok_, raises, nottest
 
 
@@ -24,13 +24,11 @@ class TestPigJob(object):
             'a=3\nb=4\npig.script=%s\ntype=noop\n' % (path.lstrip('/'), )
           )
 
-  def test_type(self):
-    class OtherPigJob(PigJob):
-      type = 'foo'
+  def test_override_type(self):
     with temppath() as path:
       with open(path, 'w') as writer:
         writer.write('-- pig script')
-      job = OtherPigJob(path, {'type': 'bar'})
+      job = PigJob(path, {'type': 'bar'})
       with temppath() as tpath:
         job.build(tpath)
         with open(tpath) as reader:
@@ -46,3 +44,18 @@ class TestPigJob(object):
         writer.write('-- pig script')
       project.add_job('foo', PigJob(path))
       eq_(project._files, {path: None})
+
+  def test_format_jvm_args(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
+        writer.write('-- pig script')
+      job = PigJob(path, {'jvm.args': {'a': 2, 'b': 2}}, {'jvm.args.a': 3})
+      with temppath() as tpath:
+        job.build(tpath)
+        with open(tpath) as reader:
+          eq_(
+            reader.read(),
+            'jvm.args=-Da=3 -Db=2\npig.script=%s\ntype=%s\n' % (
+              path.lstrip('/'), Config().get_option('azkabanpig', 'type')
+            )
+          )

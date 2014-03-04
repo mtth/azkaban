@@ -56,7 +56,7 @@ class TestConfig(object):
       with open(path, 'w') as writer:
         writer.write('[cmd]\ndefault.opt = foo\ndefault.bar = hi\n')
       config = Config(path)
-      eq_(config.get_default_option('cmd', 'opt'), 'foo')
+      eq_(config.get_option('cmd', 'opt'), 'foo')
 
   @raises(AzkabanError)
   def test_get_default_option_when_option_is_missing(self):
@@ -64,7 +64,7 @@ class TestConfig(object):
       with open(path, 'w') as writer:
         writer.write('[cmd]\ndefault.opt = foo\ndefault.bar = hi\n')
       config = Config(path)
-      config.get_default_option('cmd', 'opt2')
+      config.get_option('cmd', 'opt2')
 
   @raises(AzkabanError)
   def test_get_default_option_when_section_is_missing(self):
@@ -72,4 +72,4 @@ class TestConfig(object):
       with open(path, 'w') as writer:
         writer.write('[cmd]\ndefault.opt = foo\ndefault.bar = hi\n')
       config = Config(path)
-      config.get_default_option('cmd2', 'opt2')
+      config.get_option('cmd2', 'opt2')
