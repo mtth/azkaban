@@ -72,6 +72,7 @@ class PigJob(Job):
       *options
     )
     self.path = path
+    # TODO: jvm.args
 
   def on_add(self, project, name):
     """This handler adds the corresponding script file to the project."""
