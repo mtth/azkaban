@@ -78,7 +78,7 @@ class PigJob(Job):
     super(PigJob, self).__init__(
       {
         'type': Config().get_option('azkabanpig', 'type', 'pig'),
-        'pig.script': path.lstrip(sep),
+        'pig.script': abspath(path).lstrip(sep),
       },
       *options
     )
