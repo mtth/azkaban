@@ -5,8 +5,8 @@
 
 
 from os import sep
-from os.path import (basename, dirname, exists, isabs, isdir, join, relpath,
-  splitext)
+from os.path import (abspath, basename, dirname, exists, isabs, isdir, join,
+  relpath, splitext)
 from traceback import format_exc
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
@@ -30,11 +30,13 @@ class Project(object):
 
   """
 
+  root = None
   _registry = WeakValueDictionary()
 
   def __init__(self, name, root=None, register=True):
     self.name = name
-    self.root = root if not root or isdir(root) else dirname(root)
+    if root:
+      self.root = abspath(root if isdir(root) else dirname(root))
     if register:
       self._registry[name] = self
     self._jobs = {}
