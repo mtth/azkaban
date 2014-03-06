@@ -85,6 +85,8 @@ def _get_project_name(project_arg):
   :param project_arg: `--project` argument.
 
   """
+  if not project_arg:
+    project_arg = Config().get_option('azkaban', 'project', 'jobs.py')
   parts = project_arg.split(':', 1)
   if len(parts) == 1:
     if exists(parts[0]):
@@ -100,21 +102,24 @@ def _load_project(project_arg):
   :param project_arg: `--project` argument.
 
   """
-  if ':' in project_arg:
+  default_script = Config().get_option('azkaban', 'project', 'jobs.py')
+  if not project_arg:
+    script = default_script
+    name = None
+  elif ':' in project_arg:
     script, name = project_arg.split(':', 1)
   elif exists(project_arg):
     script = project_arg
     name = None
   else:
-    script = Config().get_option('azkaban', 'project', 'jobs.py')
-    if not exists(script):
-      raise AzkabanError(
-        'No project configuration file found at default location %r.\n'
-        'Specify a path directly using the `--project` option or via the\n'
-        '`default.project` option in the `azkaban` section of your azkabanrc.'
-        % (script, )
-      )
+    script = default_script
     name = project_arg
+  if not exists(script):
+    raise AzkabanError(
+      'This command requires a project configuration file which was not found '
+      'at\n%slocation %r. Specify another path using the `--project` option.'
+      % ('default ' if script == default_script else '', script)
+    )
   return Project.load(script, name)
 
 def build_project(project, zip, url, alias, replace, create):
