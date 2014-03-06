@@ -27,14 +27,13 @@ class Config(object):
   """Configuration class."""
 
   def __init__(self, path=expanduser('~/.azkabanrc')):
-    if not exists(path):
-      raise AzkabanError('No configuration file found at %r.', path)
     self.parser = RawConfigParser()
     self.path = path
-    try:
-      self.parser.read(self.path)
-    except ParsingError:
-      raise AzkabanError('Invalid configuration file %r.', path)
+    if exists(path):
+      try:
+        self.parser.read(self.path)
+      except ParsingError:
+        raise AzkabanError('Invalid configuration file %r.', path)
 
   def save(self):
     """Save configuration parser back to file."""

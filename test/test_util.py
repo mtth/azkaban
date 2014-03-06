@@ -24,10 +24,6 @@ class TestFlatten(object):
 class TestConfig(object):
 
   @raises(AzkabanError)
-  def test_missing(self):
-    Config('some/inexistent/path')
-
-  @raises(AzkabanError)
   def test_invalid_file(self):
     with temppath() as path:
       with open(path, 'w') as writer:

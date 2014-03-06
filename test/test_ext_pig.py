@@ -56,6 +56,6 @@ class TestPigJob(object):
           eq_(
             reader.read(),
             'jvm.args=-Da=3 -Db=2\npig.script=%s\ntype=%s\n' % (
-              path.lstrip('/'), Config().get_option('azkabanpig', 'type')
+              path.lstrip('/'), Config().get_option('azkabanpig', 'type', 'pig')
             )
           )
