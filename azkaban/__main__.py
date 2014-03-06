@@ -38,10 +38,10 @@ Options:
                                 displayed next to each job. E.g. `-o type,foo`.
                                 The resulting output will be tab separated.
   -p PROJECT --project=PROJECT  Azkaban project. Can either be a project name
-                                or a path to file defining an `azkaban.Project`
-                                instance. Commands which are followed by an
-                                asterisk will only work when passed a path to a
-                                configuration file. [default: jobs.py]
+                                or a path to a python module/package defining
+                                an `azkaban.Project` instance. Commands which
+                                are followed by an asterisk will only work in
+                                the latter case.
   -r --replace                  Overwrite any existing file.
   -s --skip                     Skip if workflow is already running.
   -u URL --url=URL              Azkaban endpoint (with protocol, and optionally
@@ -60,7 +60,7 @@ Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 from azkaban import __version__
 from azkaban.project import Project
 from azkaban.remote import Session
-from azkaban.util import AzkabanError, catch, human_readable, temppath
+from azkaban.util import AzkabanError, Config, catch, human_readable, temppath
 from docopt import docopt
 from os.path import exists, getsize
 from sys import stdout
@@ -69,8 +69,8 @@ from sys import stdout
 def _forward(args, names):
   """Forward subset of arguments from initial dictionary.
 
-  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
-  :param names: list of names that will be included
+  :param args: Dictionary of parsed arguments (output of `docopt.docopt`).
+  :param names: List of names that will be included.
 
   """
   names = set(names)
@@ -82,7 +82,7 @@ def _forward(args, names):
 def _get_project_name(project_arg):
   """Return project name.
 
-  :param project_arg: `--project` argument
+  :param project_arg: `--project` argument.
 
   """
   parts = project_arg.split(':', 1)
@@ -97,8 +97,7 @@ def _get_project_name(project_arg):
 def _load_project(project_arg):
   """Resolve project from CLI argument.
 
-  :param project_arg: `--project` argument, assumed to be a path to a file
-    (or to jobs.py if omitted)
+  :param project_arg: `--project` argument.
 
   """
   if ':' in project_arg:
@@ -107,18 +106,19 @@ def _load_project(project_arg):
     script = project_arg
     name = None
   else:
-    script = 'jobs.py'
+    script = Config().get_option('azkaban', 'project', 'jobs.py')
+    if not exists(script):
+      raise AzkabanError(
+        'No project configuration file found at default location %r.\n'
+        'Specify a path directly using the `--project` option or via the\n'
+        '`default.project` option in the `azkaban` section of your azkabanrc.'
+        % (script, )
+      )
     name = project_arg
   return Project.load(script, name)
 
 def build_project(project, zip, url, alias, replace, create):
-  """Build project.
-
-  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
-
-  Argument name forces `zip` redefinition here. Oh well.
-
-  """
+  """Build project."""
   if zip:
     project.build(zip, overwrite=replace)
     stdout.write(
@@ -154,11 +154,7 @@ def build_project(project, zip, url, alias, replace, create):
       )
 
 def create_project(url, alias):
-  """Create new project on remote Azkaban server.
-
-  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
-
-  """
+  """Create new project on remote Azkaban server."""
   session = Session(url, alias)
   name = raw_input('Project name: ').strip()
   description = raw_input('Project description [%s]: ' % (name, ))
@@ -170,22 +166,14 @@ def create_project(url, alias):
   )
 
 def delete_project(url, alias):
-  """Delete a project on remote Azkaban server.
-
-  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
-
-  """
+  """Delete a project on remote Azkaban server."""
   session = Session(url, alias)
   project = raw_input('Project name: ')
   session.delete_project(project)
   stdout.write('Project %s successfully deleted.\n' % (project, ))
 
 def view_info(project, files, options, job):
-  """List jobs in project.
-
-  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
-
-  """
+  """List jobs in project."""
   if job:
     job_name = job[0]
     if job_name in project.jobs:
@@ -207,11 +195,7 @@ def view_info(project, files, options, job):
         stdout.write('%s\n' % (name, ))
 
 def run_flow(project_name, flow, job, url, alias, skip):
-  """Run workflow.
-
-  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
-
-  """
+  """Run workflow."""
   session = Session(url, alias)
   res = session.run_workflow(project_name, flow, job, skip)
   exec_id = res['execid']
@@ -223,11 +207,7 @@ def run_flow(project_name, flow, job, url, alias, skip):
   )
 
 def upload_project(project_name, zip, url, alias, create):
-  """Upload project.
-
-  :param args: dictionary of parsed arguments (output of `docopt.docopt`)
-
-  """
+  """Upload project."""
   session = Session(url, alias)
   while True:
     try:
@@ -268,7 +248,8 @@ def main():
   elif args['info']:
     view_info(
       _load_project(args['--project']),
-    **_forward(args, ['--files', '--options', 'JOB']))
+      **_forward(args, ['--files', '--options', 'JOB'])
+    )
   elif args['run']:
     run_flow(
       _get_project_name(args['--project']),

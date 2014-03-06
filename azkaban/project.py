@@ -179,13 +179,13 @@ class Project(object):
       (no/multiple projects found), an error is thrown.
 
     """
-    sys.path.insert(0, dirname(script))
-    module_name = splitext(basename(script.rstrip(sep)))[0]
+    sys.path.insert(0, dirname(path))
+    module_name = splitext(basename(path.rstrip(sep)))[0]
     try:
       __import__(module_name)
     except ImportError:
       raise AzkabanError(
-        'Unable to import script %r.\n%s' % (script, format_exc())
+        'Unable to import script %r.\n%s' % (path, format_exc())
         )
     else:
       if name:
@@ -195,16 +195,16 @@ class Project(object):
           raise AzkabanError(
             'Unable to find project with name %r in script %r.\n'
             'Available projects: %s.'
-            % (name, script, ', '.join(cls._registry))
+            % (name, path, ', '.join(cls._registry))
           )
       else:
         if len(cls._registry) == 1:
           return cls._registry.popitem()[1]
         elif not cls._registry:
-          raise AzkabanError('No project found in %r.' % (script, ))
+          raise AzkabanError('No project found in %r.' % (path, ))
         else:
           raise AzkabanError(
             'Multiple projects found in %r: %s.\n'
             'Disambiguate using --project=%s:project_name.'
-            % (script, ', '.join(cls._registry), script)
+            % (path, ', '.join(cls._registry), path)
           )
