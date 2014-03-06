@@ -113,7 +113,7 @@ class Project(object):
       self._jobs[name] = job
       job.on_add(self, name)
 
-  def merge_into(self, project, relative=False):
+  def merge_into(self, project, relative=False, unregister=False):
     """Merge one project with another.
 
     :param project: Target project to merge into.
@@ -121,6 +121,7 @@ class Project(object):
       project's root will retain their relative paths. The default behavior is
       to always keep the same files when merging (even if the new project's
       root is different).
+    :param unregister: Unregister project after merging it.
 
     The current project remains unchanged while the target project gains all
     the current project's jobs and files. Note that if the `relative` option
@@ -128,8 +129,8 @@ class Project(object):
 
     """
     logger.debug('merging into project %r', project.name)
+    root = project.root
     if not relative:
-      root = project.root
       project.root = self.root
     try:
       for name, job in self._jobs.items():
@@ -137,8 +138,10 @@ class Project(object):
       for path, archive_path in self._files.items():
         project.add_file(path, archive_path)
     finally:
-      if relative:
+      if not relative:
         project.root = root
+    if unregister:
+      self._registry.pop(self.name)
 
   def build(self, path, overwrite=False):
     """Create the project archive.
