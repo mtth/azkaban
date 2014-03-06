@@ -22,11 +22,11 @@ class Project(object):
 
   """Azkaban project.
 
-  :param name: name of the project
-  :param register: add project to registry. setting this to false will make it
-    invisible to the CLI
-  :param root: optional path to a root file or directory used to enable adding
-    files with relative paths (typically used with root=__file__)
+  :param name: Name of the project.
+  :param register: Add project to registry. Setting this to `False` will make
+    it invisible to the CLI.
+  :param root: Path to a root file or directory used to enable adding files
+    using relative paths (typically used with `root=__file__`).
 
   """
 
@@ -69,11 +69,13 @@ class Project(object):
   def add_file(self, path, archive_path=None):
     """Include a file in the project archive.
 
-    :param path: absolute path to file
-    :param archive_path: path to file in archive (defaults to same as `path`)
+    :param path: Path to file.
+    :param archive_path: Path to file in archive (defaults to same as `path`).
 
-    This method requires the path to be absolute to avoid having files in the
-    archive with lower level destinations than the base root directory.
+    If the current project has its `root` parameter specified, this method will
+    allow relative paths (and join those with the project's root). Otherwise,
+    it will throw an error. This is done to avoid having files in the archive
+    with lower level destinations than the base root directory.
 
     """
     logger.debug('adding file %r as %r', path, archive_path or path)
@@ -96,8 +98,8 @@ class Project(object):
   def add_job(self, name, job):
     """Include a job in the project.
 
-    :param name: name assigned to job (must be unique)
-    :param job: `Job` subclass
+    :param name: Name assigned to job (must be unique).
+    :param job: `Job` subclass.
 
     This method triggers the `on_add` method on the added job (passing the
     project and name as arguments). The handler will be called right after the
@@ -111,25 +113,38 @@ class Project(object):
       self._jobs[name] = job
       job.on_add(self, name)
 
-  def merge_into(self, project):
+  def merge_into(self, project, relative=False):
     """Merge one project with another.
 
-    :param project: project to merge with this project
+    :param project: Target project to merge into.
+    :param relative: If set to `True`, files added relative to the current
+      project's root will retain their relative paths. The default behavior is
+      to always keep the same files when merging (even if the new project's
+      root is different).
 
-    This method does an in place merge of the current project with another.
-    The merged project will maintain the current project's name.
+    The current project remains unchanged while the target project gains all
+    the current project's jobs and files. Note that if the `relative` option
+    is set to `True`, files can end up having different absolute paths.
+
     """
     logger.debug('merging into project %r', project.name)
-    for name, job in self._jobs.items():
-      project.add_job(name, job)
-    for path, archive_path in self._files.items():
-      project.add_file(path, archive_path)
+    if relative:
+      root = project.root
+      project.root = self.root
+    try:
+      for name, job in self._jobs.items():
+        project.add_job(name, job)
+      for path, archive_path in self._files.items():
+        project.add_file(path, archive_path)
+    finally:
+      if relative:
+        project.root = root
 
   def build(self, path, overwrite=False):
     """Create the project archive.
 
-    :param path: destination path
-    :param overwrite: don't throw an error if a file already exists at `path`
+    :param path: Destination path.
+    :param overwrite: Don't throw an error if a file already exists at `path`.
 
     Triggers the `on_build` method on each job inside the project (passing
     itself and the job's name as two argument). This method will be called
@@ -155,15 +170,13 @@ class Project(object):
       writer.close()
 
   @classmethod
-  def load_from_script(cls, script, name=None):
-    """Get project from script.
+  def load(cls, path, name=None):
+    """Load project from script.
 
-    :param script: string representing a python module
-    :param name: project name
-
-    If `name` is unspecified:
-    * if a single project is found by loading `script` that project is returned.
-    * in any other case, an error is thrown.
+    :param path: Path to python module or package.
+    :param name: Project name. If not specified and a single project is found
+      while loading the script, that project is returned. In any other case
+      (no/multiple projects found), an error is thrown.
 
     """
     sys.path.insert(0, dirname(script))

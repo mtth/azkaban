@@ -88,11 +88,11 @@ def _get_project_name(project_arg):
   parts = project_arg.split(':', 1)
   if len(parts) == 1:
     if exists(parts[0]):
-      return Project.load_from_script(parts[0]).name
+      return Project.load(parts[0]).name
     else:
       return parts[0]
   else:
-    return Project.load_from_script(*parts).name
+    return Project.load(*parts).name
 
 def _load_project(project_arg):
   """Resolve project from CLI argument.
@@ -109,7 +109,7 @@ def _load_project(project_arg):
   else:
     script = 'jobs.py'
     name = project_arg
-  return Project.load_from_script(script, name)
+  return Project.load(script, name)
 
 def build_project(project, zip, url, alias, replace, create):
   """Build project.
