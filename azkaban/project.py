@@ -128,7 +128,7 @@ class Project(object):
 
     """
     logger.debug('merging into project %r', project.name)
-    if relative:
+    if not relative:
       root = project.root
       project.root = self.root
     try:
