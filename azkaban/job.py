@@ -13,12 +13,12 @@ class Job(object):
 
   :param options: tuple of dictionaries. The final job options are built from
     this tuple by keeping the latest definition of each option. Furthermore, by
-    default, any nested dictionary will be flattened (combining keys with '.').
-    Both these features can be changed by simply overriding the job
+    default, any nested dictionary will be flattened (combining keys with
+    `'.'`). Both these features can be changed by simply overriding the job
     constructor.
 
-  To enable more functionality, subclass and override the `Job.on_add` and
-  `Job.on_build` methods.
+  To enable more functionality, subclass and override the :meth:`on_add` and
+  :meth:`on_build` methods.
 
   """
 

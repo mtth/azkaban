@@ -67,10 +67,10 @@ class PigJob(Job):
 
   This class allows you to specify JVM args as a dictionary by correctly
   converting these to the format used by Azkaban when building the job options.
-  For example: `options = {'jvm.args': {'foo': 1, 'bar': 2}}` will be
-  converted to `jvm.args=-Dfoo=1 -Dbar=2`. Note that this enables JVM args to
-  behave like all other `Job` options when defined multiple times (the latest
-  value takes precedence).
+  For example: `{'jvm.args': {'foo': 1, 'bar': 2}}` will be converted to
+  `jvm.args=-Dfoo=1 -Dbar=2`. Note that this enables JVM args to behave like
+  all other `Job` options when defined multiple times (the latest value takes
+  precedence).
 
   """
 
