@@ -1,8 +1,8 @@
 .. default-role:: code
 
 
-Azkaban
-=======
+AzkabanCLI
+==========
 
 A lightweight Azkaban_ client providing:
 

@@ -4,7 +4,27 @@
    contain the root `toctree` directive.
 
 
-.. include:: ../README.rst
+AzkabanCLI
+==========
+
+A lightweight Azkaban_ client providing:
+
+* A `command line interface`_ to run jobs, upload projects, and more.
+
+  .. code-block:: bash
+
+    $ azkaban upload my_project.zip
+    Project my_project successfully uploaded (id: 1, size: 205kB, version: 1).
+    Details at https://azkaban.server.url/manager?project=my_project
+
+* A convenient and extensible way to build `project configuration files`_.
+
+  .. code-block:: python
+
+    from azkaban import Job, Project
+
+    project = Project('my_project')
+    project.add_job('hi', Job({'type': 'command', 'command': 'echo "hi!"'}))
 
 
 Table of contents
@@ -13,6 +33,7 @@ Table of contents
 .. toctree::
    :maxdepth: 1
 
+   readme
    api
    extensions
 
