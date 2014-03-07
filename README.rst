@@ -21,10 +21,7 @@ A lightweight Azkaban_ client providing:
     from azkaban import Job, Project
 
     project = Project('my_project')
-    project.add_job(
-      'hello',
-      Job({'type': 'command', 'command': 'echo "hello, azkaban"'})
-    )
+    project.add_job('hi', Job({'type': 'command', 'command': 'echo "hi!"'}))
 
 
 Installation

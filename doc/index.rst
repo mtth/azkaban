@@ -8,19 +8,19 @@
 
 
 Table of contents
-=================
+-----------------
 
 .. toctree::
    :maxdepth: 1
 
    index
    api
+   extensions
 
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
