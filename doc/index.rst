@@ -9,7 +9,7 @@ AzkabanCLI
 
 A lightweight Azkaban_ client providing:
 
-* A `command line interface`_ to run jobs, upload projects, and more.
+* A command line interface to run jobs, upload projects, and more.
 
   .. code-block:: bash
 
@@ -17,7 +17,7 @@ A lightweight Azkaban_ client providing:
     Project my_project successfully uploaded (id: 1, size: 205kB, version: 1).
     Details at https://azkaban.server.url/manager?project=my_project
 
-* A convenient and extensible way to build `project configuration files`_.
+* A convenient and extensible way to build project configuration files.
 
   .. code-block:: python
 
@@ -44,3 +44,6 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+
+.. _Azkaban: http://data.linkedin.com/opensource/azkaban

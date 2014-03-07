@@ -2,7 +2,7 @@
 
 
 AzkabanCLI
-==========
+----------
 
 A lightweight Azkaban_ client providing:
 
