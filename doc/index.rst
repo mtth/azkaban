@@ -14,6 +14,7 @@ A lightweight Azkaban_ client providing:
   .. code-block:: bash
 
     $ azkaban upload my_project.zip
+
     Project my_project successfully uploaded (id: 1, size: 205kB, version: 1).
     Details at https://azkaban.server.url/manager?project=my_project
 
@@ -24,18 +25,19 @@ A lightweight Azkaban_ client providing:
     from azkaban import Job, Project
 
     project = Project('my_project')
-    project.add_job('hi', Job({'type': 'command', 'command': 'echo "hi!"'}))
+    project.add_file('hey.txt')
+    project.add_job('hi', Job({'type': 'command', 'command': 'cat hey.txt'}))
 
 
 Table of contents
 -----------------
 
 .. toctree::
-   :maxdepth: 1
+  :maxdepth: 1
 
-   readme
-   api
-   extensions
+  quickstart
+  api
+  extensions
 
 
 Indices and tables
