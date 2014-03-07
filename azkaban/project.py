@@ -49,7 +49,8 @@ class Project(object):
   def files(self):
     """Returns a list of files that will be included in the project archive.
 
-    This property should not be used to add files. Use `add_files` instead.
+    This property should not be used to add files. Use :meth:`add_file`
+    instead.
 
     """
     return [relpath(e) for e in self._files]
@@ -58,7 +59,7 @@ class Project(object):
   def jobs(self):
     """Returns a dictionary with each job options.
 
-    This property should not be used to add jobs. Use `add_job` instead.
+    This property should not be used to add jobs. Use :meth:`add_job` instead.
 
     """
     return dict(
@@ -101,9 +102,9 @@ class Project(object):
     :param name: Name assigned to job (must be unique).
     :param job: `Job` subclass.
 
-    This method triggers the `Job.on_add` method on the added job (passing the
-    project and name as arguments). The handler will be called right after the
-    job is added.
+    This method triggers the :meth:`Job.on_add` method on the added job
+    (passing the project and name as arguments). The handler will be called
+    right after the job is added.
 
     """
     logger.debug('adding job %r', name)
