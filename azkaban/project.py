@@ -101,7 +101,7 @@ class Project(object):
     :param name: Name assigned to job (must be unique).
     :param job: `Job` subclass.
 
-    This method triggers the `on_add` method on the added job (passing the
+    This method triggers the `Job.on_add` method on the added job (passing the
     project and name as arguments). The handler will be called right after the
     job is added.
 

@@ -17,8 +17,8 @@ class Job(object):
     Both these features can be changed by simply overriding the job
     constructor.
 
-  To enable more functionality, subclass and override the `on_add` and
-  `on_build` methods.
+  To enable more functionality, subclass and override the `Job.on_add` and
+  `Job.on_build` methods.
 
   """
 

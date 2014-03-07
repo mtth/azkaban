@@ -1,3 +1,6 @@
+.. default-role:: code
+
+
 Extensions API
 ==============
 
