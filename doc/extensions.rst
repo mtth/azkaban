@@ -1,8 +1,8 @@
 .. default-role:: code
 
 
-Extensions API
-==============
+Extensions
+==========
 
 Pig
 ---
