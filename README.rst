@@ -1,8 +1,10 @@
 .. default-role:: code
 
-
 AzkabanCLI
 ----------
+
+.. image:: https://travis-ci.org/mtth/azkaban.png?branch=master
+  :target: https://travis-ci.org/mtth/azkaban
 
 A lightweight Azkaban_ client providing:
 
