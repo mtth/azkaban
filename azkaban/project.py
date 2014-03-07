@@ -150,7 +150,7 @@ class Project(object):
     :param path: Destination path.
     :param overwrite: Don't throw an error if a file already exists at `path`.
 
-    Triggers the :meth:`azkaban.job.Jobon_build` method on each job inside the
+    Triggers the :meth:`azkaban.job.Job.on_build` method on each job inside the
     project (passing itself and the job's name as two argument). This method
     will be called right before the job file is generated.
 
