@@ -3,56 +3,14 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Azkaban CLI API
-===============
 
 .. toctree::
    :maxdepth: 1
 
-
-azkaban.job module
-------------------
-
-.. automodule:: azkaban.job
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-azkaban.project module
-----------------------
-
-.. automodule:: azkaban.project
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-azkaban.remote module
----------------------
-
-.. automodule:: azkaban.remote
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-azkaban.util module
--------------------
-
-.. automodule:: azkaban.util
-    :members:
-    :undoc-members:
-    :show-inheritance:
+   api
 
 
-Extensions API
-==============
-
-azkaban.ext.pig module
-----------------------
-
-.. autoclass:: azkaban.ext.pig.PigJob
-    :members:
-    :undoc-members:
-    :show-inheritance:
+.. include:: ../README.rst
 
 
 Indices and tables
