@@ -13,7 +13,6 @@ Table of contents
 .. toctree::
    :maxdepth: 1
 
-   index
    api
    extensions
 
