@@ -51,7 +51,8 @@ class Config(object):
     :param command: Command the option should be looked up for.
     :param name: Name of the option.
     :param default: Default value to be returned if not found in the
-      configuration file. If not provided, will raise `AzkabanError`.
+      configuration file. If not provided, will raise
+      :class:`~azkaban.util.AzkabanError`.
 
     """
     try:

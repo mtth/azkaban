@@ -100,7 +100,7 @@ class Project(object):
     """Include a job in the project.
 
     :param name: Name assigned to job (must be unique).
-    :param job: :class:`~azkaban.job.Job` subclass.
+    :param job: :class:`~azkaban.job.Job` instance.
 
     This method triggers the :meth:`~azkaban.job.Job.on_add` method on the
     added job (passing the project and name as arguments). The handler will be

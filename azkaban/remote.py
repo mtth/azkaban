@@ -261,7 +261,7 @@ class Session(object):
   def delete_project(self, name):
     """Delete a project on Azkaban.
 
-    :param session: `azkaban.util.Session` object
+    :param session: :class:`~azkaban.remote.Session` object
 
     """
     res = self._request(
@@ -369,7 +369,7 @@ class Execution(object):
 
   """Remote workflow execution.
 
-  :param session: `Session` instance
+  :param session: :class:`~azkaban.remote.Session` instance
   :param exec_id: execution ID
 
   """

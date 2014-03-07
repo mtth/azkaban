@@ -41,7 +41,7 @@ class Job(object):
   def on_add(self, project, name):
     """Handler called when the job is added to a project.
 
-    :param project: project instance
+    :param project: :class:`~azkaban.project.Project` instance
     :param name: name corresponding to this job in the project.
 
     The default implementation does nothing.
@@ -52,7 +52,7 @@ class Job(object):
   def on_build(self, project, name):
     """Handler called when a project including this job is built.
 
-    :param project: project instance
+    :param project: :class:`~azkaban.project.Project` instance
     :param name: name corresponding to this job in the project.
 
     The default implementation does nothing.
