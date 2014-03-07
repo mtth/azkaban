@@ -100,11 +100,11 @@ class Project(object):
     """Include a job in the project.
 
     :param name: Name assigned to job (must be unique).
-    :param job: `Job` subclass.
+    :param job: :class:`~azkaban.job.Job` subclass.
 
-    This method triggers the :meth:`azkaban.job.Job.on_add` method on the added
-    job (passing the project and name as arguments). The handler will be called
-    right after the job is added.
+    This method triggers the :meth:`~azkaban.job.Job.on_add` method on the
+    added job (passing the project and name as arguments). The handler will be
+    called right after the job is added.
 
     """
     logger.debug('adding job %r', name)
@@ -117,7 +117,7 @@ class Project(object):
   def merge_into(self, project, relative=False, unregister=False):
     """Merge one project with another.
 
-    :param project: Target project to merge into.
+    :param project: Target :class:`Project` to merge into.
     :param relative: If set to `True`, files added relative to the current
       project's root will retain their relative paths. The default behavior is
       to always keep the same files when merging (even if the new project's
@@ -150,7 +150,7 @@ class Project(object):
     :param path: Destination path.
     :param overwrite: Don't throw an error if a file already exists at `path`.
 
-    Triggers the :meth:`azkaban.job.Job.on_build` method on each job inside the
+    Triggers the :meth:`~azkaban.job.Job.on_build` method on each job inside the
     project (passing itself and the job's name as two argument). This method
     will be called right before the job file is generated.
 
