@@ -102,8 +102,8 @@ class Project(object):
     :param name: Name assigned to job (must be unique).
     :param job: `Job` subclass.
 
-    This method triggers the :meth:`Job.on_add` method on the added job
-    (passing the project and name as arguments). The handler will be called
+    This method triggers the :meth:`azkaban.job.Job.on_add` method on the added
+    job (passing the project and name as arguments). The handler will be called
     right after the job is added.
 
     """
@@ -150,9 +150,9 @@ class Project(object):
     :param path: Destination path.
     :param overwrite: Don't throw an error if a file already exists at `path`.
 
-    Triggers the `on_build` method on each job inside the project (passing
-    itself and the job's name as two argument). This method will be called
-    right before the job file is generated.
+    Triggers the :meth:`azkaban.job.Jobon_build` method on each job inside the
+    project (passing itself and the job's name as two argument). This method
+    will be called right before the job file is generated.
 
     """
     logger.debug('building project')
