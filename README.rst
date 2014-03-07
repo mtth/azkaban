@@ -8,7 +8,7 @@ A lightweight Azkaban_ client providing:
 
 * A `command line interface`_ to run jobs, upload projects, and more.
 
-  .. code:: bash
+  .. code-block:: bash
 
     $ azkaban upload my_project.zip
     Project my_project successfully uploaded (id: 1, size: 205kB, version: 1).
@@ -16,7 +16,7 @@ A lightweight Azkaban_ client providing:
 
 * A convenient and extensible way to build `project configuration files`_.
 
-  .. code:: python
+  .. code-block:: python
 
     from azkaban import Job, Project
 
@@ -32,7 +32,7 @@ Installation
 
 Using pip_:
 
-.. code:: bash
+.. code-block:: bash
 
   $ pip install azkaban
 
@@ -85,14 +85,14 @@ URLs and aliases
 The previous commands all take a `--url`, option used to specify where to find 
 the Azkaban server (and which user to connect as).
 
-.. code:: bash
+.. code-block:: bash
 
   $ azkaban create -u http://url.to.foo.server:port
 
 In order to avoid having to input the entire URL every time, it is possible to 
 defines aliases in `~/.azkabanrc`:
 
-.. code:: cfg
+.. code-block:: cfg
 
   [alias]
   foo = http://url.to.foo.server:port
@@ -105,7 +105,7 @@ option followed by their corresponding alias. Since we also specified a
 default alias, it is also possible to omit the option altogether. As a result,
 the commands below are all equivalent:
 
-.. code:: bash
+.. code-block:: bash
 
   $ azkaban create -u http://url.to.foo.server:port
   $ azkaban create -a foo
@@ -142,7 +142,7 @@ the command line tool will look for), although any name would work. Below is a
 simple example of how we could define a project with a single job and static 
 file:
 
-.. code:: python
+.. code-block:: python
 
   from azkaban import Job, Project
 
@@ -175,7 +175,7 @@ over earlier ones.
 
 We can use this to efficiently share default options among jobs, for example:
 
-.. code:: python
+.. code-block:: python
 
   defaults = {'user.to.proxy': 'boo', 'retries': 0}
 
@@ -192,7 +192,7 @@ set. Note also that the last job overrides the `retries` property.
 Alternatively, if we really don't want to pass the defaults dictionary around, 
 we can create a new `Job` subclass to do it for us:
 
-.. code:: python
+.. code-block:: python
 
   class BooJob(Job):
 
@@ -208,7 +208,7 @@ Nested options
 
 Nested dictionaries can be used to group options concisely:
 
-.. code:: python
+.. code-block:: python
 
   # e.g. this job
   Job({
@@ -231,7 +231,7 @@ If you have multiple projects, you can merge them together to create a single
 project. The merge is done in place on the project the method is called on. 
 The first project will retain its original name.
 
-.. code:: python
+.. code-block:: python
 
   from azkaban import Job, Project
 
@@ -288,7 +288,7 @@ Since pig jobs are so common, `azkaban` comes with an extension to:
   argument, optionally followed by job options. It then automatically sets the 
   job type and adds the corresponding script file to the project.
 
-.. code:: python
+.. code-block:: python
 
   from azkaban import PigJob
 
