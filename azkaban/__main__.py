@@ -138,7 +138,7 @@ def build_project(project, zip, url, alias, replace, create):
         try:
           res = session.upload_project(project.name, zip)
         except AzkabanError as err:
-          if create and err.message.endswith("doesn't exist."):
+          if create and str(err).endswith("doesn't exist."):
             session.create_project(project.name, project.name)
           else:
             raise err

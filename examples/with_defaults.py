@@ -3,7 +3,6 @@
 
 """Azkaban project configuration script."""
 
-
 from azkaban import Job, PigJob, Project
 from getpass import getuser
 
