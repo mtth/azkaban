@@ -3,8 +3,8 @@
 
 """Azkaban example project configuration script.
 
-Let us assume we have a flow with many pig scripts to run, which share many
-options. This example shows a way to concisely generate the project.
+Let us assume we have a flow with pig scripts to run, which share many
+options. This example shows a way to concisely build the project.
 
 """
 
@@ -12,7 +12,7 @@ from azkaban import Job, PigJob, Project
 from getpass import getuser
 
 
-project = Project('bar', root=__file__)
+project = Project('for_loop_example', root=__file__)
 
 defaults = {
   'user.to.proxy': getuser(),
@@ -26,8 +26,8 @@ defaults = {
 pig_options = {
   'first.pig': {},
   'second.pig': {'dependencies': 'first.pig'},
-  'third.pig': {'pig.param': {'foo': 48}},
-  'fourth.pig': {'dependencies': 'first.pig,third.pig'},
+  'third.pig': {'pig.param': {'foo': 48, 'bar': 'abc'}},
+  'fourth.pig': {'dependencies': 'second.pig,third.pig'},
 }
 
 for path, options in pig_options.items():

@@ -32,7 +32,7 @@ A lightweight Azkaban_ client providing:
 Documentation
 -------------
 
-The full documentation can be found here_.
+The full documentation can be found here_ along with a few examples_.
 
 
 Installation
@@ -48,3 +48,4 @@ Using pip_:
 .. _Azkaban: http://data.linkedin.com/opensource/azkaban
 .. _pip: http://www.pip-installer.org/en/latest/
 .. _here: http://azkabancli.readthedocs.org/
+.. _examples: https://github.com/mtth/azkaban/tree/master/examples
