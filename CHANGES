@@ -14,6 +14,7 @@ Breaking changes:
   archive path will be path relative to the project root. Adding files
   above the project root without specifying an archive path will now raise
   an error.
+* Merging projects is now only allowed for projects with the same root.
 
 
 Version 0.3.0 (02/16/2014)
