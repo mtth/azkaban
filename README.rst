@@ -13,8 +13,11 @@ A lightweight Azkaban_ client providing:
 * A convenient and extensible way for building projects.
 
 
-Sample configuration file
--------------------------
+Sample
+------
+
+Below is a simple configuration file for a project containing a workflow with 
+four pig scripts.
 
 .. code-block:: python
 
@@ -44,6 +47,7 @@ Sample configuration file
     project.add_job(path, PigJob(path, default_options, options))
 
 More examples_ are also available.
+
 
 Documentation
 -------------

@@ -28,6 +28,10 @@ class Project(object):
   :param root: Path to a root file or directory used to enable adding files
     using relative paths (typically used with `root=__file__`).
 
+  The `properties` attribute of a project is a dictionary which can be used to
+  pass Azkaban options which will then be available to all jobs in the project.
+  This can be used for example to set project wide defaults.
+
   """
 
   root = None
@@ -41,9 +45,6 @@ class Project(object):
       self._registry[name] = self
     self._jobs = {}
     self._files = {}
-
-    #: Dictionary of Azkaban options which will be available to all jobs in
-    #: this project. This can be used for example to set project wide defaults.
     self.properties = {}
 
   def __str__(self):
