@@ -10,29 +10,45 @@ AzkabanCLI |build_image|
 A lightweight Azkaban_ client providing:
 
 * A command line interface to run workflows, upload projects, etc.
+* A convenient and extensible way for building projects.
 
-  .. code-block:: bash
 
-    $ azkaban upload my_project.zip
+Sample configuration file
+-------------------------
 
-    Project my_project successfully uploaded (id: 1, size: 205kB, version: 1).
-    Details at https://azkaban.server.url/manager?project=my_project
+.. code-block:: python
 
-* A convenient and extensible way for building projects:
+  from azkaban import PigJob, Project
+  from getpass import getuser
 
-  .. code-block:: python
+  project = Project('sample', root=__file__)
 
-    from azkaban import Job, Project
+  # default options for all scripts
+  default_options = {
+    'user.to.proxy': getuser(),
+    'mapred': {
+      'max.split.size': 2684354560,
+      'min.split.size': 2684354560,
+    },
+  }
 
-    project = Project('my_project')
-    project.add_file('hey.txt')
-    project.add_job('hi', Job({'type': 'command', 'command': 'cat hey.txt'}))
+  # dictionary of pig script options, keyed on the pig script path
+  pig_job_options = {
+    'first.pig': {},
+    'second.pig': {'dependencies': 'first.pig'},
+    'third.pig': {'param': {'foo': 48, 'bar': 'abc'}},
+    'fourth.pig': {'dependencies': 'second.pig,third.pig'},
+  }
 
+  for path, options in pig_job_options.items():
+    project.add_job(path, PigJob(path, default_options, options))
+
+More examples_ are also available.
 
 Documentation
 -------------
 
-The full documentation can be found here_ along with a few examples_.
+The full documentation can be found here_.
 
 
 Installation

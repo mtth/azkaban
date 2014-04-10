@@ -34,9 +34,6 @@ class Project(object):
   _registry = WeakValueDictionary()
 
   def __init__(self, name, root=None, register=True):
-    #: Dictionary of Azkaban options which will be available to all jobs in
-    #: this project. This can be used for example to set project wide defaults.
-    self.properties = {}
     self.name = name
     if root:
       self.root = abspath(root if isdir(root) else dirname(root))
@@ -44,6 +41,10 @@ class Project(object):
       self._registry[name] = self
     self._jobs = {}
     self._files = {}
+
+    #: Dictionary of Azkaban options which will be available to all jobs in
+    #: this project. This can be used for example to set project wide defaults.
+    self.properties = {}
 
   def __str__(self):
     return self.name
