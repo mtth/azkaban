@@ -78,7 +78,7 @@ class PigJob(Job):
     super(PigJob, self).__init__(
       {
         'type': Config().get_option('azkabanpig', 'type', 'pig'),
-        'pig.script': abspath(path).lstrip(sep),
+        'pig.script': path.lstrip('/'),
       },
       *options
     )
@@ -87,7 +87,7 @@ class PigJob(Job):
 
   def on_add(self, project, name):
     """This handler adds the corresponding script file to the project."""
-    project.add_file(self.path)
+    project.add_file(self.path, self.path)
 
   def _format_jvm_args(self):
     """Format JVM args according to Azkaban job options format."""
