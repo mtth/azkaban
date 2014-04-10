@@ -6,11 +6,11 @@
 
 from os import sep
 from os.path import (abspath, basename, dirname, exists, isabs, isdir, join,
-  relpath, splitext)
+  realpath, relpath, splitext)
 from traceback import format_exc
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
-from .util import AzkabanError, temppath
+from .util import AzkabanError, temppath, write_properties
 import logging
 import sys
 
@@ -34,6 +34,9 @@ class Project(object):
   _registry = WeakValueDictionary()
 
   def __init__(self, name, root=None, register=True):
+    #: Dictionary of Azkaban options which will be available to all jobs in
+    #: this project. This can be used for example to set project wide defaults.
+    self.properties = {}
     self.name = name
     if root:
       self.root = abspath(root if isdir(root) else dirname(root))
@@ -53,7 +56,7 @@ class Project(object):
     instead.
 
     """
-    return [relpath(e) for e in self._files]
+    return self._files.values()
 
   @property
   def jobs(self):
@@ -67,34 +70,54 @@ class Project(object):
       for name, job in self._jobs.items()
     )
 
-  def add_file(self, path, archive_path=None):
+  def add_file(self, path, archive_path=None, overwrite=False):
     """Include a file in the project archive.
 
-    :param path: Path to file.
+    :param path: Path to file. If no project `root` exists, only absolute paths
+      are allowed. Otherwise, this path can also be relative to said `root`.
     :param archive_path: Path to file in archive (defaults to same as `path`).
+    :param overwrite: Allow overwriting any previously existing file in this
+      archive path.
 
     If the current project has its `root` parameter specified, this method will
-    allow relative paths (and join those with the project's root). Otherwise,
-    it will throw an error. This is done to avoid having files in the archive
-    with lower level destinations than the base root directory.
+    allow relative paths (and join those with the project's `root`), otherwise
+    it will throw an error. Furthermore, when a project `root` exists, adding
+    files above it without specifying an `archive_path` will raise an error.
+    This is done to avoid having files in the archive with lower level
+    destinations than the base root directory.
 
     """
-    logger.debug('adding file %r as %r', path, archive_path or path)
+    logger.debug('adding file %r with archive path %r', path, archive_path)
     if not isabs(path):
-      if self.root:
-        path = join(self.root, path)
-      else:
+      if not self.root:
         raise AzkabanError(
           'Relative path not allowed without specifying a project root: %r.'
           % (path, )
         )
-    if path in self._files:
-      if self._files[path] != archive_path:
-        raise AzkabanError('Inconsistent duplicate file: %r.' % (path, ))
-    else:
-      if not exists(path):
-        raise AzkabanError('File not found: %r.' % (path, ))
-      self._files[path] = archive_path
+      path = join(self.root, path)
+    # disambiguate (symlinks, pardirs, etc.)
+    path = realpath(path)
+    if not archive_path:
+      if self.root:
+        if not path.startswith(self.root):
+          raise AzkabanError(
+            'Cannot add a file outside of the project root directory without\n'
+            'specifying an archive path: %r' % (path, )
+          )
+        archive_path = relpath(path, self.root)
+      else:
+        archive_path = path
+    # leading separator meaningless inside archive (trimmed automatically)
+    archive_path = archive_path.lstrip('/')
+    if (
+      archive_path in self._files and
+      self._files[archive_path] != path and
+      not overwrite
+    ):
+      raise AzkabanError('Inconsistent duplicate file: %r.' % (path, ))
+    if not exists(path):
+      raise AzkabanError('File not found: %r.' % (path, ))
+    self._files[archive_path] = path
 
   def add_job(self, name, job):
     """Include a job in the project.
@@ -114,33 +137,27 @@ class Project(object):
       self._jobs[name] = job
       job.on_add(self, name)
 
-  def merge_into(self, project, relative=False, unregister=False):
+  def merge_into(self, project, unregister=False):
     """Merge one project with another.
 
     :param project: Target :class:`Project` to merge into.
-    :param relative: If set to `True`, files added relative to the current
-      project's root will retain their relative paths. The default behavior is
-      to always keep the same files when merging (even if the new project's
-      root is different).
     :param unregister: Unregister project after merging it.
 
     The current project remains unchanged while the target project gains all
-    the current project's jobs and files. Note that if the `relative` option
-    is set to `True`, files can end up having different absolute paths.
+    the current project's jobs and files. Note that only project with the same
+    `root` can be merged.
 
     """
     logger.debug('merging into project %r', project.name)
-    root = project.root
-    if not relative:
-      project.root = self.root
-    try:
-      for name, job in self._jobs.items():
-        project.add_job(name, job)
-      for path, archive_path in self._files.items():
-        project.add_file(path, archive_path)
-    finally:
-      if not relative:
-        project.root = root
+    if self.root != project.root:
+      raise AzkabanError(
+        'Cannot merge projects with different roots: %r and %r',
+        self.root, project.root,
+      )
+    for name, job in self._jobs.items():
+      project.add_job(name, job)
+    for archive_path, path in self._files.items():
+      project.add_file(path, archive_path)
     if unregister:
       self._registry.pop(self.name)
 
@@ -163,13 +180,17 @@ class Project(object):
       raise AzkabanError('Building empty project.')
     writer = ZipFile(path, 'w')
     try:
+      if self.properties:
+        with temppath() as fpath:
+          write_properties(self.properties, fpath)
+          writer.write(fpath, 'project.properties')
       for name, job in self._jobs.items():
         job.on_build(self, name)
         with temppath() as fpath:
           job.build(fpath)
           writer.write(fpath, '%s.job' % (name, ))
-      for fpath, apath in self._files.items():
-        writer.write(fpath, apath)
+      for archive_path, path in self._files.items():
+        writer.write(path, archive_path)
     finally:
       writer.close()
 

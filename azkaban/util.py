@@ -140,3 +140,15 @@ def human_readable(size):
     if size < 1024.0:
       return '%3.1f%s' % (size, suffix)
     size /= 1024.0
+
+def write_properties(options, path):
+  """Write options to properties file.
+
+  :param options: Dictionary of options.
+  :param path: Path to file. Note that no existence check is done. Any existing
+    file will be overwritten.
+
+  """
+  with open(path, 'w') as writer:
+    for key, value in sorted(options.items()):
+      writer.write('%s=%s\n' % (key, value))

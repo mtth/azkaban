@@ -4,7 +4,7 @@
 """Job definition module."""
 
 
-from .util import flatten
+from .util import flatten, write_properties
 
 
 class Job(object):
@@ -34,9 +34,7 @@ class Job(object):
       be overwritten.
 
     """
-    with open(path, 'w') as writer:
-      for key, value in sorted(self.options.items()):
-        writer.write('%s=%s\n' % (key, value))
+    write_properties(self.options, path)
 
   def on_add(self, project, name):
     """Handler called when the job is added to a project.

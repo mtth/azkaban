@@ -1,6 +1,21 @@
 Azkaban
 =======
 
+
+Version 0.4.0 (04/10/2014)
+--------------------------
+
+* Added project `properties` to set project level default parameters.
+* Added `overwrite` option to `Project.add_file` method.
+
+Breaking changes:
+
+* When adding files to a project where a `root` was specified, the default
+  archive path will be path relative to the project root. Adding files
+  above the project root without specifying an archive path will now raise
+  an error.
+
+
 Version 0.3.0 (02/16/2014)
 --------------------------
 

@@ -7,7 +7,7 @@
 from azkaban.ext.pig import PigJob
 from azkaban.project import Project
 from azkaban.job import Job
-from azkaban.remote import Session
+from azkaban.remote import Execution, Session
 from azkaban.util import AzkabanError, Config, temppath
 from ConfigParser import NoOptionError, NoSectionError
 from nose.tools import eq_, ok_, raises, nottest
@@ -261,3 +261,37 @@ class TestRun(_TestSession):
       self.project.build(path)
       self.session.upload_project(self.project, path)
     self.session.run_workflow(self.project, 'bar', jobs=['foo'])
+
+
+class TestProperties(_TestSession):
+
+  project_name = 'azkabancli_test_properties'
+
+  def test_properties(self):
+    message = 'This is definitely a unique message.'
+    self.project.properties = {'msg': message}
+    self.project.add_job(
+      'foo',
+      Job({'type': 'command', 'command': 'echo ${msg}'}),
+    )
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+      exe = self.session.run_workflow(self.project.name, 'foo')
+      sleep(1)
+      ok_(message in self.session.get_job_logs(exe['execid'], 'foo')['data'])
+
+  def test_properties_override(self):
+    message = 'This is definitely a unique message.'
+    override = 'This is even more definitely a unique message.'
+    self.project.properties = {'msg': message}
+    self.project.add_job(
+      'foo',
+      Job({'type': 'command', 'command': 'echo ${msg}', 'msg': override}),
+    )
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+      exe = self.session.run_workflow(self.project.name, 'foo')
+      sleep(1)
+      ok_(override in self.session.get_job_logs(exe['execid'], 'foo')['data'])

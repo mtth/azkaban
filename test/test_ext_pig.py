@@ -46,7 +46,7 @@ class TestPigJob(object):
       with open(path, 'w') as writer:
         writer.write('-- pig script')
       project.add_job('foo', PigJob(path))
-      eq_(project._files, {path: path})
+      eq_(project._files, {path.lstrip('/'): path})
 
   def test_format_jvm_args(self):
     with temppath() as path:
@@ -70,7 +70,7 @@ class TestPigJob(object):
         writer.write('-- pig script')
       # forcing type to override potential configuration option
       project.add_job('foo', PigJob(path, {'type': 'pig'}))
-      eq_(project._files, {path: path})
+      eq_(project._files, {path.lstrip('/'): path})
       with temppath() as zpath:
         project.build(zpath)
         reader = ZipFile(zpath)
@@ -102,7 +102,7 @@ class TestPigJob(object):
       # forcing type to override potential configuration option
       rpath = relpath(path, root)
       project.add_job('foo', PigJob(rpath, {'type': 'pig'}))
-      eq_(project._files, {path: rpath})
+      eq_(project._files, {rpath: path})
       with temppath() as zpath:
         project.build(zpath)
         reader = ZipFile(zpath)
