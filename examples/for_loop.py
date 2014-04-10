@@ -8,13 +8,13 @@ options. This example shows a way to concisely build the project.
 
 """
 
-from azkaban import Job, PigJob, Project
+from azkaban import PigJob, Project
 from getpass import getuser
 
 
 project = Project('for_loop_example', root=__file__)
 
-defaults = {
+default_options = {
   'user.to.proxy': getuser(),
   'mapred': {
     'max.split.size': 2684354560,
@@ -26,9 +26,9 @@ defaults = {
 pig_options = {
   'first.pig': {},
   'second.pig': {'dependencies': 'first.pig'},
-  'third.pig': {'pig.param': {'foo': 48, 'bar': 'abc'}},
+  'third.pig': {'param': {'foo': 48, 'bar': 'abc'}},
   'fourth.pig': {'dependencies': 'second.pig,third.pig'},
 }
 
 for path, options in pig_options.items():
-  project.add_job(path, PigJob(path, defaults, options))
+  project.add_job(path, PigJob(path, default_options, options))
