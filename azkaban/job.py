@@ -18,7 +18,8 @@ class Job(object):
     constructor.
 
   To enable more functionality, subclass and override the :meth:`on_add` and
-  :meth:`on_build` methods.
+  :meth:`on_build` methods. The :meth:`_join_option` and :meth:`_join_prefix`
+  methods are also provided as helpers to write custom jobs.
 
   """
 
@@ -57,3 +58,61 @@ class Job(object):
 
     """
     pass
+
+  def _join_option(self, option, sep, formatter='%s'):
+    """Helper method to join iterable options into a string.
+
+    :param key: Option key. If the option doesn't exist, this method does
+      nothing.
+    :param sep: Separator used to concatenate the string.
+    :param formatter: Pattern used to format the option values.
+
+    Example usage:
+
+    .. code-block:: python
+
+      class MyJob(Job):
+
+        def __init__(self, *options):
+          super(MyJob, self).__init__(*options)
+          self._join_option('dependencies', ',')
+
+      # we can now use lists to define job dependencies
+      job = MyJob({'type': 'noop', 'dependencies': ['bar', 'foo']})
+
+    """
+    values = self.options.get(option, None)
+    if values:
+      self.options[option] = sep.join(formatter % (v, ) for v in values)
+
+  def _join_prefix(self, prefix, sep, formatter):
+    """Helper method to join options starting with a prefix into a string.
+
+    :param prefix: Option prefix.
+    :param sep: Separator used to concatenate the string.
+    :param formatter: String formatter. It is formatted using the tuple
+      `(suffix, value)` where `suffix` is the part of `key` after `prefix`.
+
+    Example usage:
+
+    .. code-block:: python
+
+      class MyJob(Job):
+
+        def __init__(self, *options):
+          super(MyJob, self).__init__(*options)
+          self._join_prefix('jvm.args', ' ', '-D%s=%s')
+
+      # we can now define JVM args using nested dictionaries
+      job = MyJob({'type': 'java', 'jvm.args': {'foo': 48, 'bar': 23}})
+
+    """
+    prefix = prefix.rstrip('.')
+    opts = []
+    for key in self.options.keys(): # copy keys to modify dict in loop
+      if key.startswith(prefix):
+        opts.append(
+          (key.replace('%s.' % (prefix, ), ''), self.options.pop(key))
+        )
+    if opts:
+      self.options[prefix] = sep.join(formatter % a for a in sorted(opts))

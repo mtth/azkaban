@@ -16,6 +16,7 @@ azkaban.job
 
 .. automodule:: azkaban.job
     :members:
+    :private-members:
     :show-inheritance:
 
 azkaban.remote

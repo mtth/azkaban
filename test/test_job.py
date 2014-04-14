@@ -34,3 +34,24 @@ class TestJob(object):
       job.build(path)
       with open(path) as reader:
         eq_(reader.read(), 'a=2\ndependencies=bar,foo\n')
+
+  def test_join_options(self):
+    job = Job({'bar': range(3)})
+    job._join_option('bar', ',')
+    eq_(job.options['bar'], '0,1,2')
+
+  def test_join_options_with_custom_formatter(self):
+    job = Job({'bar': range(3)})
+    job._join_option('bar', ' ', '(%s)')
+    eq_(job.options['bar'], '(0) (1) (2)')
+
+  def test_join_missing_option(self):
+    job = Job({'bar': '1'})
+    job._join_option('baz', ' ', '(%s)')
+    eq_(job.options['bar'], '1')
+    ok_(not 'baz' in job.options)
+
+  def test_join_prefix(self):
+    job = Job({'bar': {'a': 1, 'b.c': 'foo'}})
+    job._join_prefix('bar', ',', '%s-%s')
+    eq_(job.options['bar'], 'a-1,b.c-foo')

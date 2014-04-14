@@ -83,22 +83,11 @@ class PigJob(Job):
       *options
     )
     self.path = path
-    self._format_jvm_args()
+    self._join_prefix('jvm.args', ' ', '-D%s=%s')
 
   def on_add(self, project, name):
     """This handler adds the corresponding script file to the project."""
     project.add_file(self.path, self.path)
-
-  def _format_jvm_args(self):
-    """Format JVM args according to Azkaban job options format."""
-    prefix = 'jvm.args.'
-    opts = []
-    for key, value in self.options.items():
-      if key.startswith(prefix):
-        opts.append((key.replace(prefix, ''), value))
-        self.options.pop(key)
-    if opts:
-      self.options['jvm.args'] = ' '.join('-D%s=%s' % a for a in sorted(opts))
 
 
 class _PigProject(Project):
