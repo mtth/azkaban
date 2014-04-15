@@ -91,9 +91,18 @@ class TestProjectAddJob(_TestProject):
       test = None
       def on_add(self, project, name):
         self.test = (project.name, name)
+        return True
     job = OtherJob()
     self.project.add_job('bar', job)
     eq_(job.test, ('foo', 'bar'))
+    ok_('bar' in self.project.jobs)
+
+  def test_add_job_with_handler_returning_false(self):
+    class OtherJob(Job):
+      def on_add(self, project, name):
+        return False
+    self.project.add_job('bar', OtherJob())
+    ok_('bar' not in self.project.jobs)
 
   @raises(AzkabanError)
   def test_add_duplicate_job(self):
@@ -135,6 +144,7 @@ class TestProjectBuild(_TestProject):
       test = None
       def on_build(self, project, name):
         self.test = (project.name, name)
+        return True
     job = OtherJob({'a': 2})
     self.project.add_job('bar', job)
     with temppath() as path:
@@ -146,6 +156,23 @@ class TestProjectBuild(_TestProject):
         eq_(reader.read('bar.job'), 'a=2\n')
       finally:
         reader.close()
+
+  def test_build_single_job_with_handler_returning_false(self):
+    class OtherJob(Job):
+      test = None
+      def on_build(self, project, name):
+        return False
+    self.project.add_job('bar', OtherJob())
+    self.project.add_job('foo', Job())
+    with temppath() as path:
+      self.project.build(path)
+      reader =  ZipFile(path)
+      try:
+        ok_('bar.job' not in reader.namelist())
+        ok_('foo.job' in reader.namelist())
+      finally:
+        reader.close()
+
 
   def test_build_with_file(self):
     self.project.add_file(__file__.rstrip('c'), 'this.py')

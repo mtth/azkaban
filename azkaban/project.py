@@ -140,12 +140,13 @@ class Project(object):
     called right after the job is added.
 
     """
-    logger.debug('adding job %r', name)
-    if name in self._jobs:
-      raise AzkabanError('Duplicate job name: %r.' % (name, ))
-    else:
+    if job.on_add(self, name):
+      logger.debug('adding job %r', name)
+      if name in self._jobs:
+        raise AzkabanError('Duplicate job name: %r.' % (name, ))
       self._jobs[name] = job
-      job.on_add(self, name)
+    else:
+      logger.debug('skipping adding job %r', name)
 
   def merge_into(self, project, unregister=False):
     """Merge one project with another.
@@ -195,10 +196,12 @@ class Project(object):
           write_properties(self.properties, fpath)
           writer.write(fpath, 'project.properties')
       for name, job in self._jobs.items():
-        job.on_build(self, name)
-        with temppath() as fpath:
-          job.build(fpath)
-          writer.write(fpath, '%s.job' % (name, ))
+        if job.on_build(self, name):
+          with temppath() as fpath:
+            job.build(fpath)
+            writer.write(fpath, '%s.job' % (name, ))
+        else:
+          logger.debug('skipping building job %r', name)
       for archive_path, path in self._files.items():
         writer.write(path, archive_path)
     finally:

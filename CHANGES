@@ -1,6 +1,18 @@
 Azkaban
 =======
 
+Version 0.5.0 (04/15/2014)
+--------------------------
+
+* Added `Job.join_options` and `Job.join_prefix` helper methods.
+* `azkaban --files` now also outputs the target filepaths.
+
+Breaking changes:
+
+* The return value of the `Job.on_add` and `Job.on_build` handlers now
+  respectively determines whether the job will be added or built. The
+  default implementations accordingly now return `True`.
+
 
 Version 0.4.0 (04/10/2014)
 --------------------------

@@ -43,10 +43,11 @@ class Job(object):
     :param project: :class:`~azkaban.project.Project` instance
     :param name: name corresponding to this job in the project.
 
-    The default implementation does nothing.
+    The return value of this handler controls whether the job is added to the
+    project. The default implementation simply returns `True`.
 
     """
-    pass
+    return True
 
   def on_build(self, project, name):
     """Handler called when a project including this job is built.
@@ -54,10 +55,12 @@ class Job(object):
     :param project: :class:`~azkaban.project.Project` instance
     :param name: name corresponding to this job in the project.
 
-    The default implementation does nothing.
+    The return value of this handler controls whether the job is built, i.e.
+    whether its job file will be added to the project archive. The default
+    implementation simply returns `True`.
 
     """
-    pass
+    return True
 
   def join_option(self, option, sep, formatter='%s'):
     """Helper method to join iterable options into a string.
