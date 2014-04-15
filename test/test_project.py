@@ -17,7 +17,7 @@ from zipfile import ZipFile
 
 
 # filepaths for testing
-FILE_PATHS = [__file__, abspath(join(dirname(__file__), pardir, 'README.rst'))]
+FILEPATHS = [__file__, abspath(join(dirname(__file__), pardir, 'README.rst'))]
 
 
 class _TestProject(object):
@@ -46,7 +46,7 @@ class TestProjectAddFile(_TestProject):
   @raises(AzkabanError)
   def test_add_relative_file_outside_root(self):
     project = Project('foo', root=__file__)
-    project.add_file(FILE_PATHS[1])
+    project.add_file(FILEPATHS[1])
 
   @raises(AzkabanError)
   def test_missing_file(self):
@@ -62,20 +62,29 @@ class TestProjectAddFile(_TestProject):
     eq_(self.project._files, {__file__.lstrip('/'): __file__})
 
   def test_add_duplicate_file_with_archive_path(self):
-    self.project.add_file(FILE_PATHS[0], 'foo')
-    self.project.add_file(FILE_PATHS[0], 'foo')
+    self.project.add_file(FILEPATHS[0], 'foo')
+    self.project.add_file(FILEPATHS[0], 'foo')
     eq_(self.project._files, {'foo': __file__})
 
   @raises(AzkabanError)
   def test_add_inconsistent_duplicate_file(self):
-    self.project.add_file(FILE_PATHS[0], 'foo')
-    self.project.add_file(FILE_PATHS[1], 'foo')
+    self.project.add_file(FILEPATHS[0], 'foo')
+    self.project.add_file(FILEPATHS[1], 'foo')
 
   def test_add_inconsistent_duplicate_file_with_overwrite(self):
-    self.project.add_file(FILE_PATHS[0], 'foo')
-    self.project.add_file(FILE_PATHS[1], 'foo', overwrite=True)
-    path = abspath(FILE_PATHS[1])
+    self.project.add_file(FILEPATHS[0], 'foo')
+    self.project.add_file(FILEPATHS[1], 'foo', overwrite=True)
+    path = abspath(FILEPATHS[1])
     eq_(self.project._files, {'foo': path})
+
+  def test_files(self):
+    self.project.add_file(FILEPATHS[0], 'foo')
+    self.project.add_file(FILEPATHS[1])
+    files = [(FILEPATHS[0], 'foo'), (FILEPATHS[1], FILEPATHS[1].lstrip('/'))]
+    eq_(self.project.files, files)
+
+
+class TestProjectAddJob(_TestProject):
 
   def test_add_job(self):
     class OtherJob(Job):
@@ -97,15 +106,15 @@ class TestProjectMerge(_TestProject):
   def test_merge_project(self):
     job_bar = Job()
     self.project.add_job('bar', job_bar)
-    self.project.add_file(FILE_PATHS[0], 'bar')
+    self.project.add_file(FILEPATHS[0], 'bar')
     project2 = Project('qux')
     job_baz = Job()
     project2.add_job('baz', job_baz)
-    project2.add_file(FILE_PATHS[1], 'baz')
+    project2.add_file(FILEPATHS[1], 'baz')
     project2.merge_into(self.project)
     eq_(self.project.name, 'foo')
     eq_(self.project._jobs, {'bar': job_bar, 'baz': job_baz})
-    eq_(self.project._files, {'bar': FILE_PATHS[0], 'baz': FILE_PATHS[1]})
+    eq_(self.project._files, {'bar': FILEPATHS[0], 'baz': FILEPATHS[1]})
 
   @raises(AzkabanError)
   def test_merge_project_with_different_roots(self):

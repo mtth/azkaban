@@ -52,19 +52,27 @@ class Project(object):
 
   @property
   def files(self):
-    """Returns a list of files that will be included in the project archive.
+    """Returns a list of tuples of files included in the project archive.
 
-    This property should not be used to add files. Use :meth:`add_file`
-    instead.
+    The first element of each tuple is the absolute local path to the file, the
+    second the path of the file in the archive.
+
+    .. note::
+
+      This property should not be used to add files. Use :meth:`add_file`
+      instead.
 
     """
-    return self._files.values()
+    return [(e[1], e[0]) for e in self._files.items()]
 
   @property
   def jobs(self):
     """Returns a dictionary with each job options.
 
-    This property should not be used to add jobs. Use :meth:`add_job` instead.
+    .. note::
+
+      This property should not be used to add jobs. Use :meth:`add_job`
+      instead.
 
     """
     return dict(
@@ -146,7 +154,7 @@ class Project(object):
     :param unregister: Unregister project after merging it.
 
     The current project remains unchanged while the target project gains all
-    the current project's jobs and files. Note that only project with the same
+    the current project's jobs and files. Note that only projects with the same
     `root` can be merged.
 
     """

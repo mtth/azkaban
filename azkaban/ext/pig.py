@@ -83,7 +83,7 @@ class PigJob(Job):
       *options
     )
     self.path = path
-    self._join_prefix('jvm.args', ' ', '-D%s=%s')
+    self.join_prefix('jvm.args', ' ', '-D%s=%s')
 
   def on_add(self, project, name):
     """This handler adds the corresponding script file to the project."""

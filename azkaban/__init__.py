@@ -1,27 +1,10 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-"""Azkaban python library.
-
-Two parts:
-
-* Azkaban CLI: a lightweight command line interface for Azkaban.
-
-* Azkaban module: a simple way to define jobs.
-
-  Sample usage:
-
-    from azkaban import Job, Project
-
-    project = Project('foo')
-
-    project.add_job('bar', Job())
-    project.add_file('/some/file.path')
-
-"""
+"""Azkaban python library."""
 
 __all__ = ['Project', 'Job', 'PigJob']
-__version__ = '0.4.1'
+__version__ = '0.4.2'
 
 try:
   from .ext.pig import PigJob

@@ -32,7 +32,9 @@ Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
                                 to reuse session IDs for later connections.
   -c --create                   Create the project if it does not exist.
-  -f --files                    List project files instead of jobs.
+  -f --files                    List project files instead of jobs. The first
+                                column is the local path of the file, the
+                                second the path of the file in the archive.
   -h --help                     Show this message and exit.
   -o OPTIONS --options=OPTIONS  Comma separated list of options that will be
                                 displayed next to each job. E.g. `-o type,foo`.
@@ -62,7 +64,7 @@ from azkaban.project import Project
 from azkaban.remote import Session
 from azkaban.util import AzkabanError, Config, catch, human_readable, temppath
 from docopt import docopt
-from os.path import exists, getsize
+from os.path import exists, getsize, relpath
 from sys import stdout
 
 
@@ -187,8 +189,8 @@ def view_info(project, files, options, job):
     else:
       raise AzkabanError('Job %r not found.' % (job_name, ))
   elif files:
-    for path in sorted(project.files):
-      stdout.write('%s\n' % (path, ))
+    for path, archive_path in sorted(project.files):
+      stdout.write('%s\t%s\n' % (relpath(path), archive_path))
   else:
     if options:
       option_names = options.split(',')

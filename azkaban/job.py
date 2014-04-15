@@ -18,7 +18,7 @@ class Job(object):
     constructor.
 
   To enable more functionality, subclass and override the :meth:`on_add` and
-  :meth:`on_build` methods. The :meth:`_join_option` and :meth:`_join_prefix`
+  :meth:`on_build` methods. The :meth:`join_option` and :meth:`join_prefix`
   methods are also provided as helpers to write custom jobs.
 
   """
@@ -59,7 +59,7 @@ class Job(object):
     """
     pass
 
-  def _join_option(self, option, sep, formatter='%s'):
+  def join_option(self, option, sep, formatter='%s'):
     """Helper method to join iterable options into a string.
 
     :param key: Option key. If the option doesn't exist, this method does
@@ -75,7 +75,7 @@ class Job(object):
 
         def __init__(self, *options):
           super(MyJob, self).__init__(*options)
-          self._join_option('dependencies', ',')
+          self.join_option('dependencies', ',')
 
       # we can now use lists to define job dependencies
       job = MyJob({'type': 'noop', 'dependencies': ['bar', 'foo']})
@@ -85,7 +85,7 @@ class Job(object):
     if values:
       self.options[option] = sep.join(formatter % (v, ) for v in values)
 
-  def _join_prefix(self, prefix, sep, formatter):
+  def join_prefix(self, prefix, sep, formatter):
     """Helper method to join options starting with a prefix into a string.
 
     :param prefix: Option prefix.
@@ -101,7 +101,7 @@ class Job(object):
 
         def __init__(self, *options):
           super(MyJob, self).__init__(*options)
-          self._join_prefix('jvm.args', ' ', '-D%s=%s')
+          self.join_prefix('jvm.args', ' ', '-D%s=%s')
 
       # we can now define JVM args using nested dictionaries
       job = MyJob({'type': 'java', 'jvm.args': {'foo': 48, 'bar': 23}})
