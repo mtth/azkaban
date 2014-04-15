@@ -80,8 +80,8 @@ class TestProjectAddFile(_TestProject):
   def test_files(self):
     self.project.add_file(FILEPATHS[0], 'foo')
     self.project.add_file(FILEPATHS[1])
-    files = [(FILEPATHS[0], 'foo'), (FILEPATHS[1], FILEPATHS[1].lstrip('/'))]
-    eq_(self.project.files, files)
+    files = [(FILEPATHS[1], FILEPATHS[1].lstrip('/')), (FILEPATHS[0], 'foo')]
+    eq_(sorted(self.project.files), files)
 
 
 class TestProjectAddJob(_TestProject):
