@@ -375,3 +375,28 @@ class TestProperties(_TestSession):
     self._add_flow_job('bar', 'foo', msg=message)
     exec_id = self._run_workflow('bar')
     ok_(override in self.session.get_job_logs(exec_id, 'bar:foo')['data'])
+
+
+class TestExecution(_TestSession):
+
+  project_name = 'azkaban_cli_execution'
+
+  def test_execution_start(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+    exe = Execution.start(self.session, self.project, 'foo')
+    sleep(2)
+    eq_(exe.status['status'], 'SUCCEEDED')
+
+  def test_execution_logs(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+    exe = Execution.start(self.session, self.project, 'foo')
+    logs = '\n'.join(exe.logs(2))
+    ok_('Submitting job \'foo\' to run.' in logs)

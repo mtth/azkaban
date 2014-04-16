@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 def _azkaban_request(method, url, **kwargs):
   """Make request to azkaban server and catch common errors.
 
-  :param method: get, post, etc.
-  :param url: endpoint url
-  :param kwargs: arguments forwarded to the request handler
+  :param method: GET, POST, etc.
+  :param url: Endpoint url.
+  :param **kwargs: Arguments forwarded to the request handler.
 
   This function is meant to handle common errors and return a more helpful
   message than the default one.
@@ -46,9 +46,9 @@ def _azkaban_request(method, url, **kwargs):
       return response
 
 def _extract_json(response):
-  """Extract json from Azkaban response, gracefully handling errors.
+  """Extract JSON from Azkaban response, gracefully handling errors.
 
-  :param response: request response object
+  :param response: Request response object.
 
   """
   try:
@@ -67,7 +67,7 @@ def _extract_json(response):
 def _parse_url(url):
   """Parse url.
 
-  :param url: http endpoint (including protocol, port and optional user)
+  :param url: HTTP endpoint (including protocol, port and optional user).
 
   """
   parsed_url = url.rstrip('/').split('@')
@@ -84,7 +84,7 @@ def _parse_url(url):
 def _resolve_alias(config, alias):
   """Get url associated with an alias.
 
-  :param alias: alias name
+  :param alias: Alias name.
 
   """
   try:
@@ -95,7 +95,7 @@ def _resolve_alias(config, alias):
 def _get_session_id(config, url):
   """Retrieve session id associated with url.
 
-  :param url: http endpoint (including protocol, port and optional user)
+  :param url: HTTP endpoint (including protocol, port and optional user).
 
   """
   try:
@@ -110,8 +110,12 @@ class Session(object):
 
   """Azkaban session.
 
-  :param url: http endpoint (including protocol, port and optional user)
-  :param alias: alias name
+  :param url: HTTP endpoint (including protocol, port and optional user).
+  :param alias: Alias name.
+
+  This class contains mostly low-level methods that translate directly into
+  Azkaban API calls. The :class:`~azkaban.remote.Execution` class should be
+  preferred for interacting with workflow executions.
 
   """
 
@@ -130,11 +134,10 @@ class Session(object):
   def _refresh(self, password=None):
     """Refresh session ID.
 
-    :param password: password used to log into Azkaban (only used if no alias
-      is provided). can be set to `False` to fail instead of prompting for a
-      password.
+    :param password: Password used to log into Azkaban. If not specified,
+      will prompt for one.
 
-    Also saves session ID for future use.
+    Also caches the session ID for future use.
 
     """
     logger.debug('refreshing session')
@@ -150,14 +153,15 @@ class Session(object):
     self.config.save()
 
   def _request(self, method, endpoint, use_cookies=True, attempts=1, **kwargs):
-    """Make request to Azkaban using this session.
+    """Make a request to Azkaban using this session.
 
-    :param method: http method
-    :param endpoint: server endpoint (e.g. manager)
-    :param attempts: if current session ID is invalid, maximum number of
-      attempts to refresh it
-    :param use_cookies: include session_id in cookies instead of request data
-    :param **kwargs: keyword arguments passed to `_azkaban_request`
+    :param method: HTTP method.
+    :param endpoint: Server endpoint (e.g. manager).
+    :param attempts: If current session ID is invalid, maximum number of
+      attempts to refresh it.
+    :param use_cookies: Include `session_id` in cookies instead of request
+      data.
+    :param **kwargs: Keyword arguments passed to :func:`_azkaban_request`.
 
     If the session expired, will prompt for a password to refresh.
 
@@ -190,7 +194,7 @@ class Session(object):
   def get_execution_status(self, exec_id):
     """Get status of an execution.
 
-    :param exec_id: execution ID
+    :param exec_id: Execution ID.
 
     """
     return _extract_json(self._request(
@@ -202,13 +206,32 @@ class Session(object):
       },
     ))
 
+  def get_execution_logs(self, exec_id, offset=0, limit=50000):
+    """Get execution logs.
+
+    :param exec_id: Execution ID.
+    :param offset: Log offset.
+    :param limit: Size of log to download.
+
+    """
+    return _extract_json(self._request(
+      method='GET',
+      endpoint='executor',
+      params={
+        'execid': exec_id,
+        'ajax': 'fetchExecFlowLogs',
+        'offset': offset,
+        'length': limit,
+      },
+    ))
+
   def get_job_logs(self, exec_id, job, offset=0, limit=50000):
     """Get logs from a job execution.
 
-    :param exec_id: execution ID
-    :param job: job name
-    :param offset: log offset
-    :param limit: size of log to download
+    :param exec_id: Execution ID.
+    :param job: Job name.
+    :param offset: Log offset.
+    :param limit: Size of log to download.
 
     """
     return _extract_json(self._request(
@@ -226,7 +249,7 @@ class Session(object):
   def cancel_execution(self, exec_id):
     """Cancel workflow execution.
 
-    :param exec_id: execution ID
+    :param exec_id: Execution ID.
 
     """
     res = _extract_json(self._request(
@@ -244,8 +267,8 @@ class Session(object):
   def create_project(self, name, description):
     """Create project.
 
-    :param name: project name
-    :param description: project description
+    :param name: Project name.
+    :param description: Project description.
 
     """
     return _extract_json(self._request(
@@ -261,7 +284,7 @@ class Session(object):
   def delete_project(self, name):
     """Delete a project on Azkaban.
 
-    :param session: :class:`~azkaban.remote.Session` object
+    :param name: Project name.
 
     """
     res = self._request(
@@ -282,11 +305,11 @@ class Session(object):
 
     :param name: Name of the project.
     :param flow: Name of the workflow.
-    :param jobs: Name of jobs to run (run entire workflow by default).
+    :param jobs: List of names of jobs to run (run entire workflow by default).
     :param skip: Don't run if the same workflow is already running.
-    :param properties: Dictionary of properties that will override job options
-      in this execution of the workflow. This dictionary will be flattened
-      similarly to how :class:`~azkaban.job.Job` options are handled.
+    :param properties: Dictionary that will override global properties in this
+      execution of the workflow. This dictionary will be flattened similarly to
+      how :class:`~azkaban.job.Job` options are handled.
 
     Note that in order to run a workflow on Azkaban, it must already have been
     uploaded and the corresponding user must have permissions to run it.
@@ -333,8 +356,8 @@ class Session(object):
   def upload_project(self, name, path):
     """Upload project archive.
 
-    :param name: project name
-    :param path: path to zip archive
+    :param name: Project name.
+    :param path: Path to zip archive.
 
     """
     if not exists(path):
@@ -355,8 +378,8 @@ class Session(object):
   def get_workflow_info(self, name, flow):
     """Get list of jobs corresponding to a workflow.
 
-    :param name: project name
-    :param flow: name of flow in project
+    :param name: Project name.
+    :param flow: Name of flow in project.
 
     """
     raw_res = self._request(
@@ -378,8 +401,8 @@ class Execution(object):
 
   """Remote workflow execution.
 
-  :param session: :class:`~azkaban.remote.Session` instance
-  :param exec_id: execution ID
+  :param session: :class:`Session` instance.
+  :param exec_id: Execution ID.
 
   """
 
@@ -400,6 +423,33 @@ class Execution(object):
   def cancel(self):
     """Cancel execution."""
     self._session.cancel_execution(self.exec_id)
+
+  def logs(self, delay=5):
+    """Execution log generator.
+
+    :param delay: time in seconds between each server poll
+
+    Yields line by line.
+
+    """
+    finishing = False
+    offset = 0
+    while True:
+      sleep(delay)
+      logs = self._session.get_execution_logs(
+        exec_id=self.exec_id,
+        offset=offset,
+      )
+      if logs['length']:
+        offset += logs['length']
+        lines = (e for e in logs['data'].split('\n') if e)
+        for line in lines:
+          yield line
+      elif finishing:
+        break
+      else:
+        if self.status['status'] != 'RUNNING':
+          finishing = True
 
   def job_logs(self, job, delay=5):
     """Job log generator.
@@ -434,3 +484,15 @@ class Execution(object):
         )
         if job not in running_jobs:
           finishing = True
+
+  @classmethod
+  def start(cls, session, *args, **kwargs):
+    """Convenience method to start a new execution.
+
+    :param session: :class:`Session` instance.
+    :param *args: Cf. :meth:`Session.run_workflow`.
+    :param *kwargs: Cf. :meth:`Session.run_workflow`.
+
+    """
+    res = session.run_workflow(*args, **kwargs)
+    return cls(session, res['execid'])
