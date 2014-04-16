@@ -18,8 +18,9 @@ class Job(object):
     constructor.
 
   To enable more functionality, subclass and override the :meth:`on_add` and
-  :meth:`on_build` methods. The :meth:`join_option` and :meth:`join_prefix`
-  methods are also provided as helpers to write custom jobs.
+  :meth:`include_in_build` methods. The :meth:`join_option` and
+  :meth:`join_prefix` methods are also provided as helpers to write custom
+  jobs.
 
   """
 
@@ -43,19 +44,16 @@ class Job(object):
     :param project: :class:`~azkaban.project.Project` instance
     :param name: name corresponding to this job in the project.
 
-    The return value of this handler controls whether the job is added to the
-    project. The default implementation simply returns `True`.
-
     """
-    return True
+    pass
 
-  def on_build(self, project, name):
-    """Handler called when a project including this job is built.
+  def include_in_build(self, project, name):
+    """Method called when a project including this job is built.
 
     :param project: :class:`~azkaban.project.Project` instance
     :param name: name corresponding to this job in the project.
 
-    The return value of this handler controls whether the job is built, i.e.
+    The return value of this method controls whether the job is built, i.e.
     whether its job file will be added to the project archive. The default
     implementation simply returns `True`.
 

@@ -91,18 +91,10 @@ class TestProjectAddJob(_TestProject):
       test = None
       def on_add(self, project, name):
         self.test = (project.name, name)
-        return True
     job = OtherJob()
     self.project.add_job('bar', job)
     eq_(job.test, ('foo', 'bar'))
     ok_('bar' in self.project.jobs)
-
-  def test_add_job_with_handler_returning_false(self):
-    class OtherJob(Job):
-      def on_add(self, project, name):
-        return False
-    self.project.add_job('bar', OtherJob())
-    ok_('bar' not in self.project.jobs)
 
   @raises(AzkabanError)
   def test_add_duplicate_job(self):
@@ -142,7 +134,7 @@ class TestProjectBuild(_TestProject):
   def test_build_single_job(self):
     class OtherJob(Job):
       test = None
-      def on_build(self, project, name):
+      def include_in_build(self, project, name):
         self.test = (project.name, name)
         return True
     job = OtherJob({'a': 2})
@@ -160,7 +152,7 @@ class TestProjectBuild(_TestProject):
   def test_build_single_job_with_handler_returning_false(self):
     class OtherJob(Job):
       test = None
-      def on_build(self, project, name):
+      def include_in_build(self, project, name):
         return False
     self.project.add_job('bar', OtherJob())
     self.project.add_job('foo', Job())
