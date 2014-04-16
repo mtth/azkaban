@@ -13,7 +13,7 @@ from ConfigParser import NoOptionError, NoSectionError
 from getpass import getpass, getuser
 from os.path import exists
 from time import sleep
-from .util import AzkabanError, Config
+from .util import AzkabanError, Config, flatten
 import logging
 import requests as rq
 
@@ -277,16 +277,19 @@ class Session(object):
       raise AzkabanError('Delete failed. Check permissions and existence.')
     return res
 
-  def run_workflow(self, name, flow, jobs=None, skip=False):
+  def run_workflow(self, name, flow, jobs=None, skip=False, properties=None):
     """Launch a workflow.
 
-    :param name: name of the project
-    :param flow: name of the workflow
-    :param jobs: name of jobs to run (run entire workflow by default)
-    :param skip: don't run if the same workflow is already running
+    :param name: Name of the project.
+    :param flow: Name of the workflow.
+    :param jobs: Name of jobs to run (run entire workflow by default).
+    :param skip: Don't run if the same workflow is already running.
+    :param properties: Dictionary of properties that will override job options
+      in this execution of the workflow. This dictionary will be flattened
+      similarly to how :class:`~azkaban.job.Job` options are handled.
 
     Note that in order to run a workflow on Azkaban, it must already have been
-    uploaded and the corresponding user must have permissions to run.
+    uploaded and the corresponding user must have permissions to run it.
 
     """
     if not jobs:
@@ -308,17 +311,23 @@ class Session(object):
           '[%s]'
           % (','.join('"%s"' % (n, ) for n in all_names - run_names), )
         )
+    request_data = {
+      'ajax': 'executeFlow',
+      'project': name,
+      'flow': flow,
+      'disabled': disabled,
+      'concurrentOption': 'skip' if skip else 'concurrent',
+    }
+    if properties:
+      request_data.update(dict(
+        ('flowOverride[%s]' % (key, ), value)
+        for key, value in flatten(properties).items()
+      ))
     return _extract_json(self._request(
       method='POST',
       endpoint='executor',
       use_cookies=False,
-      data={
-        'ajax': 'executeFlow',
-        'project': name,
-        'flow': flow,
-        'disabled': disabled,
-        'concurrentOption': 'skip' if skip else 'concurrent',
-      },
+      data=request_data,
     ))
 
   def upload_project(self, name, path):

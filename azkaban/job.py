@@ -67,7 +67,8 @@ class Job(object):
     .. note::
 
       This method should not have any side effects as it is also called by
-      other methods than :meth:`~azkaban.project.Project.build`.
+      methods other than :meth:`~azkaban.project.Project.build`, e.g.
+      `~azkaban.project.Project.jobs`.
 
     """
     return True

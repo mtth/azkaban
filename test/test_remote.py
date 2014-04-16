@@ -267,31 +267,111 @@ class TestProperties(_TestSession):
 
   project_name = 'azkabancli_test_properties'
 
-  def test_properties(self):
-    message = 'This is definitely a unique message.'
-    self.project.properties = {'msg': message}
-    self.project.add_job(
-      'foo',
-      Job({'type': 'command', 'command': 'echo ${msg}'}),
-    )
+  def _run_workflow(self, flow, **kwargs):
     with temppath() as path:
       self.project.build(path)
       self.session.upload_project(self.project, path)
-      exe = self.session.run_workflow(self.project.name, 'foo')
+    exec_id = self.session.run_workflow(
+      self.project.name,
+      flow,
+      properties=kwargs,
+    )['execid']
+    for i in range(5):
+      # wait until workflow is launched
       sleep(1)
-      ok_(message in self.session.get_job_logs(exe['execid'], 'foo')['data'])
+      try:
+        self.session.get_execution_status(exec_id)
+      except AzkabanError:
+        pass
+      else:
+        break
+    return exec_id
 
-  def test_properties_override(self):
+  def _add_command_job(self, name, command, **kwargs):
+    self.project.add_job(
+      name,
+      Job({'type': 'command', 'command': command}, kwargs),
+    )
+
+  def _add_flow_job(self, name, flow, **kwargs):
+    self.project.add_job(
+      name,
+      Job({'type': 'flow', 'flow.name': flow}, kwargs),
+    )
+
+  def test_global_properties(self):
+    message = 'This is definitely a unique message.'
+    self.project.properties = {'msg': message}
+    self._add_command_job('foo', 'echo ${msg}')
+    exec_id = self._run_workflow('foo')
+    ok_(message in self.session.get_job_logs(exec_id, 'foo')['data'])
+    eq_(self.session.get_execution_status(exec_id)['status'], 'SUCCEEDED')
+
+  def test_missing_global_properties(self):
+    self._add_command_job('foo', 'echo ${msg}')
+    exec_id = self._run_workflow('foo')
+    eq_(self.session.get_execution_status(exec_id)['status'], 'FAILED')
+
+  def test_options_override_global_properties(self):
     message = 'This is definitely a unique message.'
     override = 'This is even more definitely a unique message.'
     self.project.properties = {'msg': message}
-    self.project.add_job(
-      'foo',
-      Job({'type': 'command', 'command': 'echo ${msg}', 'msg': override}),
-    )
-    with temppath() as path:
-      self.project.build(path)
-      self.session.upload_project(self.project, path)
-      exe = self.session.run_workflow(self.project.name, 'foo')
-      sleep(1)
-      ok_(override in self.session.get_job_logs(exe['execid'], 'foo')['data'])
+    self._add_command_job('foo', 'echo ${msg}', msg=override)
+    exec_id = self._run_workflow('foo')
+    ok_(override in self.session.get_job_logs(exec_id, 'foo')['data'])
+    eq_(self.session.get_execution_status(exec_id)['status'], 'SUCCEEDED')
+
+  def test_runtime_properties_override_global_properties(self):
+    # runtime properties can be used to override .properties options
+    message = 'This is definitely a unique message.'
+    override = 'This is even more definitely a unique message.'
+    self.project.properties = {'msg': message}
+    self._add_command_job('foo', 'echo ${msg}')
+    exec_id = self._run_workflow('foo', msg=override)
+    ok_(override in self.session.get_job_logs(exec_id, 'foo')['data'])
+    eq_(self.session.get_execution_status(exec_id)['status'], 'SUCCEEDED')
+
+  def test_options_override_runtime_properties(self):
+    # but runtime properties don't override .job options
+    message = 'This is definitely a unique message.'
+    override = 'This is even more definitely a unique message.'
+    self._add_command_job('foo', 'echo ${msg}', msg=message)
+    exec_id = self._run_workflow('foo', msg=override)
+    ok_(message in self.session.get_job_logs(exec_id, 'foo')['data'])
+    eq_(self.session.get_execution_status(exec_id)['status'], 'SUCCEEDED')
+
+  def test_embedded_properties(self):
+    # note the colon separated notation for embedded flows
+    message = 'This is definitely a unique message.'
+    self._add_command_job('foo', 'echo ${msg}')
+    self._add_flow_job('bar', 'foo', msg=message)
+    exec_id = self._run_workflow('bar')
+    ok_(message in self.session.get_job_logs(exec_id, 'bar:foo')['data'])
+
+  def test_global_properties_override_embedded_properties(self):
+    # embedded flow properties don't override global properties
+    message = 'This is definitely a unique message.'
+    override = 'This is even more definitely a unique message.'
+    self.project.properties = {'msg': override}
+    self._add_command_job('foo', 'echo ${msg}')
+    self._add_flow_job('bar', 'foo', msg=message)
+    exec_id = self._run_workflow('bar')
+    ok_(override in self.session.get_job_logs(exec_id, 'bar:foo')['data'])
+
+  def test_runtime_properties_override_embedded_properties(self):
+    # embedded flow properties don't override runtime properties
+    message = 'This is definitely a unique message.'
+    override = 'This is even more definitely a unique message.'
+    self._add_command_job('foo', 'echo ${msg}')
+    self._add_flow_job('bar', 'foo', msg=message)
+    exec_id = self._run_workflow('bar', msg=override)
+    ok_(override in self.session.get_job_logs(exec_id, 'bar:foo')['data'])
+
+  def test_options_override_embedded_properties(self):
+    # embedded flow properties don't override job options
+    message = 'This is definitely a unique message.'
+    override = 'This is even more definitely a unique message.'
+    self._add_command_job('foo', 'echo ${msg}', msg=override)
+    self._add_flow_job('bar', 'foo', msg=message)
+    exec_id = self._run_workflow('bar')
+    ok_(override in self.session.get_job_logs(exec_id, 'bar:foo')['data'])
