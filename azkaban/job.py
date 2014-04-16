@@ -44,9 +44,10 @@ class Job(object):
     :param project: :class:`~azkaban.project.Project` instance
     :param name: name corresponding to this job in the project.
     :param kwargs: Keyword arguments. If this method is triggered by
-      :meth:`~azkaban.project.Project.add_job`, these will simply be
-      forwarded. Else if this method is triggered by a project merge, kwargs
-      will be the dictionary `{'merging': True, 'origin': origin_project}`.
+      :meth:`~azkaban.project.Project.add_job`, the latter's keyword arguments
+      will simply be forwarded. Else if this method is triggered by a merge,
+      kwargs will be a dictionary with single key `'merging'` and value the
+      merged project.
 
     The default implementation does nothing.
 

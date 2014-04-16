@@ -89,11 +89,11 @@ class TestProjectAddJob(_TestProject):
   def test_add_job(self):
     class OtherJob(Job):
       test = None
-      def on_add(self, project, name):
-        self.test = (project.name, name)
+      def on_add(self, project, name, **kwargs):
+        self.test = (project.name, name, kwargs)
     job = OtherJob()
-    self.project.add_job('bar', job)
-    eq_(job.test, ('foo', 'bar'))
+    self.project.add_job('bar', job, baz=48)
+    eq_(job.test, ('foo', 'bar', {'baz': 48}))
     ok_('bar' in self.project.jobs)
 
   def test_add_duplicate_consistent_job(self):
@@ -121,6 +121,17 @@ class TestProjectMerge(_TestProject):
     eq_(self.project.name, 'foo')
     eq_(self.project._jobs, {'bar': job_bar, 'baz': job_baz})
     eq_(self.project._files, {'bar': FILEPATHS[0], 'baz': FILEPATHS[1]})
+
+  def test_merge_project_on_add_kwargs(self):
+    class OtherJob(Job):
+      test = None
+      def on_add(self, project, name, **kwargs):
+        self.test = kwargs
+    job = OtherJob()
+    project2 = Project('qux')
+    project2.add_job('bar', job)
+    project2.merge_into(self.project)
+    eq_(job.test, {'merging': project2})
 
   @raises(AzkabanError)
   def test_merge_project_with_different_roots(self):

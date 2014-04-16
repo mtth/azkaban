@@ -149,7 +149,7 @@ class Project(object):
     logger.debug('adding job %r', name)
     if not job is self._jobs.get(name, job):
       raise AzkabanError('Inconsistent duplicate job: %r.' % (name, ))
-    job.on_add(self, name)
+    job.on_add(self, name, **kwargs)
     self._jobs[name] = job
 
   def merge_into(self, project, unregister=False):
@@ -170,7 +170,7 @@ class Project(object):
         self.root, project.root,
       )
     for name, job in self._jobs.items():
-      project.add_job(name, job, merging=True, origin=self)
+      project.add_job(name, job, merging=self)
     for archive_path, path in self._files.items():
       project.add_file(path, archive_path)
     if unregister:
