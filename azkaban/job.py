@@ -38,11 +38,17 @@ class Job(object):
     """
     write_properties(self.options, path)
 
-  def on_add(self, project, name):
+  def on_add(self, project, name, **kwargs):
     """Handler called when the job is added to a project.
 
     :param project: :class:`~azkaban.project.Project` instance
     :param name: name corresponding to this job in the project.
+    :param kwargs: Keyword arguments. If this method is triggered by
+      :meth:`~azkaban.project.Project.add_job`, these will simply be
+      forwarded. Else if this method is triggered by a project merge, kwargs
+      will be the dictionary `{'merging': True, 'origin': origin_project}`.
+
+    The default implementation does nothing.
 
     """
     pass
@@ -56,6 +62,11 @@ class Job(object):
     The return value of this method controls whether the job is built, i.e.
     whether its job file will be added to the project archive. The default
     implementation simply returns `True`.
+
+    .. note::
+
+      This method should not have any side effects as it is also called by
+      other methods than :meth:`~azkaban.project.Project.build`.
 
     """
     return True

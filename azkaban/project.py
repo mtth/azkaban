@@ -69,6 +69,9 @@ class Project(object):
   def jobs(self):
     """Returns a dictionary with each job options.
 
+    Only jobs that will be included in the archive will be returned (cf.
+    :meth:`~azkaban.job.Job.include_in_build`).
+
     .. note::
 
       This property should not be used to add jobs. Use :meth:`add_job`
@@ -78,6 +81,7 @@ class Project(object):
     return dict(
       (name, job.options)
       for name, job in self._jobs.items()
+      if job.include_in_build(self, name)
     )
 
   def add_file(self, path, archive_path=None, overwrite=False):
@@ -129,20 +133,22 @@ class Project(object):
       raise AzkabanError('File not found: %r.' % (path, ))
     self._files[archive_path] = path
 
-  def add_job(self, name, job):
+  def add_job(self, name, job, **kwargs):
     """Include a job in the project.
 
     :param name: Name assigned to job (must be unique).
     :param job: :class:`~azkaban.job.Job` instance.
+    :param kwargs: Keyword arguments that will be forwarded to the
+      :meth:`~azkaban.job.Job.on_add` handler.
 
     This method triggers the :meth:`~azkaban.job.Job.on_add` method on the
-    added job (passing the project and name as arguments). The handler will be
-    called right after the job is added.
+    added job (passing the project and name as arguments, along with any
+    `kwargs`). The handler will be called right after the job is added.
 
     """
     logger.debug('adding job %r', name)
-    if name in self._jobs:
-      raise AzkabanError('Duplicate job name: %r.' % (name, ))
+    if not job is self._jobs.get(name, job):
+      raise AzkabanError('Inconsistent duplicate job: %r.' % (name, ))
     job.on_add(self, name)
     self._jobs[name] = job
 
@@ -164,7 +170,7 @@ class Project(object):
         self.root, project.root,
       )
     for name, job in self._jobs.items():
-      project.add_job(name, job)
+      project.add_job(name, job, merging=True, origin=self)
     for archive_path, path in self._files.items():
       project.add_file(path, archive_path)
     if unregister:
@@ -176,9 +182,10 @@ class Project(object):
     :param path: Destination path.
     :param overwrite: Don't throw an error if a file already exists at `path`.
 
-    Triggers the :meth:`~azkaban.job.Job.on_build` method on each job inside the
-    project (passing itself and the job's name as two argument). This method
-    will be called right before the job file is generated.
+    Triggers the :meth:`~azkaban.job.Job.include_in_build` method on each job
+    inside the project (passing itself and the job's name as two argument).
+    This method will be called right before the job file is generated and can
+    be used to dynamically decide which jobs to include in the project archive.
 
     """
     logger.debug('building project')

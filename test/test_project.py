@@ -96,8 +96,13 @@ class TestProjectAddJob(_TestProject):
     eq_(job.test, ('foo', 'bar'))
     ok_('bar' in self.project.jobs)
 
+  def test_add_duplicate_consistent_job(self):
+    job = Job()
+    self.project.add_job('bar', job)
+    self.project.add_job('bar', job)
+
   @raises(AzkabanError)
-  def test_add_duplicate_job(self):
+  def test_add_duplicate_inconsistent_job(self):
     self.project.add_job('bar', Job())
     self.project.add_job('bar', Job())
 
