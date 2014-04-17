@@ -40,33 +40,42 @@ class _TestSession(object):
         pass
       else:
         cls.session = Session(alias=alias)
+        try:
+          cls.session.create_project(cls.project_name, 'Testing project.')
+        except AzkabanError:
+          pass # project already exists somehow
+
+  @classmethod
+  def teardown_class(cls):
+    if cls.session:
+      try:
+        cls.session.delete_project(cls.project_name)
+      except AzkabanError:
+        pass # project was already deleted
 
   def setup(self):
     if not self.session:
       raise SkipTest
     if self.project_name:
+      sleep(2)
       self.project = Project(self.project_name)
-      self.session.create_project(self.project, 'Testing project.')
-
-  def teardown(self):
-    sleep(3)
-    if self.project:
-      try:
-        self.session.delete_project(self.project)
-      except AzkabanError:
-        pass # project was already deleted
 
 
 class TestCreateDelete(_TestSession):
 
   project_name = 'azkabancli_test_create_delete'
 
-  def setup(self):
-    if not self.session:
-      raise SkipTest
-    if self.project_name:
-      self.project = Project(self.project_name)
-      # don't create project automatically (goal of these tests...)
+  @classmethod
+  def setup_class(cls):
+    # don't create project automatically (goal of these tests...)
+    if not cls.session:
+      config = Config()
+      try:
+        alias = config.parser.get('azkaban', 'test.alias')
+      except (NoOptionError, NoSectionError):
+        pass
+      else:
+        cls.session = Session(alias=alias)
 
   def project_exists(self, project):
     try:
@@ -82,24 +91,22 @@ class TestCreateDelete(_TestSession):
     else:
       return True
 
-  def test_create_project(self):
+  def test_create_delete_project(self):
     ok_(not self.project_exists(self.project))
     self.session.create_project(self.project, 'Some description.')
     ok_(self.project_exists(self.project))
+    self.session.delete_project(self.project)
+    ok_(not self.project_exists(self.project))
 
   @raises(AzkabanError)
   def test_create_duplicate_project(self):
     self.session.create_project(self.project, 'Some description.')
     self.session.create_project(self.project, 'Some other description.')
 
-  def test_delete_project(self):
-    self.session.create_project(self.project, 'Some description.')
-    self.session.delete_project(self.project)
-    ok_(not self.project_exists(self.project))
-
   @raises(AzkabanError)
   def test_delete_nonexistent_project(self):
-    ok_(not self.project_exists(self.project))
+    if self.project_exists(self.project):
+      self.session.delete_project(self.project)
     self.session.delete_project(self.project)
 
 
@@ -211,7 +218,7 @@ class TestRun(_TestSession):
 
   @raises(AzkabanError)
   def test_run_missing_workflow(self):
-    self.session.run_workflow(self.project, 'foo')
+    self.session.run_workflow(self.project, 'foo2')
 
   @raises(AzkabanError)
   def test_run_non_workflow_job(self):
@@ -263,29 +270,61 @@ class TestRun(_TestSession):
     self.session.run_workflow(self.project, 'bar', jobs=['foo'])
 
 
+class TestExecution(_TestSession):
+
+  project_name = 'azkabancli_test_execution'
+
+  def setup(self):
+    super(TestExecution, self).setup()
+    options = {'type': 'command', 'command': 'sleep 4'}
+    self.project.add_job('foo', Job(options))
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+
+  def test_execution_start(self):
+    exe = Execution.start(self.session, self.project, 'foo')
+    sleep(2)
+    exe.status['status'] == 'RUNNING'
+    sleep(2)
+    exe.status['status'] == 'SUCCESSFUL'
+
+  def test_execution_cancel(self):
+    exe = Execution.start(self.session, self.project, 'foo')
+    sleep(1)
+    exe.cancel()
+    sleep(1)
+    exe.status['status'] == 'KILLED'
+
+  def test_execution_logs(self):
+    exe = Execution.start(self.session, self.project, 'foo')
+    logs = '\n'.join(exe.logs(2))
+    ok_('Submitting job \'foo\' to run.' in logs)
+
+
 class TestProperties(_TestSession):
 
   project_name = 'azkabancli_test_properties'
+
+  message = 'This is definitely a unique message.'
+  override = 'This is even more definitely a unique message.'
 
   def _run_workflow(self, flow, **kwargs):
     with temppath() as path:
       self.project.build(path)
       self.session.upload_project(self.project, path)
-    exec_id = self.session.run_workflow(
-      self.project.name,
-      flow,
-      properties=kwargs,
-    )['execid']
+    exe = Execution.start(self.session, self.project, flow, properties=kwargs)
     for i in range(5):
       # wait until workflow is launched
       sleep(1)
       try:
-        self.session.get_execution_status(exec_id)
+        status = exe.status
       except AzkabanError:
         pass
       else:
-        break
-    return exec_id
+        if status['status'] != 'PREPARING':
+          break
+    return exe
 
   def _add_command_job(self, name, command, **kwargs):
     self.project.add_job(
@@ -300,103 +339,76 @@ class TestProperties(_TestSession):
     )
 
   def test_global_properties(self):
-    message = 'This is definitely a unique message.'
-    self.project.properties = {'msg': message}
+    self.project.properties = {'msg': self.message}
     self._add_command_job('foo', 'echo ${msg}')
-    exec_id = self._run_workflow('foo')
-    ok_(message in self.session.get_job_logs(exec_id, 'foo')['data'])
-    eq_(self.session.get_execution_status(exec_id)['status'], 'SUCCEEDED')
+    exe = self._run_workflow('foo')
+    ok_(self.message in '\n'.join(exe.job_logs('foo', 1)))
 
   def test_missing_global_properties(self):
     self._add_command_job('foo', 'echo ${msg}')
-    exec_id = self._run_workflow('foo')
-    eq_(self.session.get_execution_status(exec_id)['status'], 'FAILED')
+    exe = self._run_workflow('foo')
+    eq_(exe.status['status'], 'FAILED')
 
   def test_options_override_global_properties(self):
-    message = 'This is definitely a unique message.'
-    override = 'This is even more definitely a unique message.'
-    self.project.properties = {'msg': message}
-    self._add_command_job('foo', 'echo ${msg}', msg=override)
-    exec_id = self._run_workflow('foo')
-    ok_(override in self.session.get_job_logs(exec_id, 'foo')['data'])
-    eq_(self.session.get_execution_status(exec_id)['status'], 'SUCCEEDED')
+    self.project.properties = {'msg': self.message}
+    self._add_command_job('foo', 'echo ${msg}', msg=self.override)
+    exe = self._run_workflow('foo')
+    ok_(self.override in '\n'.join(exe.job_logs('foo', 1)))
 
   def test_runtime_properties_override_global_properties(self):
     # runtime properties can be used to override .properties options
-    message = 'This is definitely a unique message.'
-    override = 'This is even more definitely a unique message.'
-    self.project.properties = {'msg': message}
+    self.project.properties = {'msg': self.message}
     self._add_command_job('foo', 'echo ${msg}')
-    exec_id = self._run_workflow('foo', msg=override)
-    ok_(override in self.session.get_job_logs(exec_id, 'foo')['data'])
-    eq_(self.session.get_execution_status(exec_id)['status'], 'SUCCEEDED')
+    exe = self._run_workflow('foo', msg=self.override)
+    ok_(self.override in '\n'.join(exe.job_logs('foo', 1)))
 
   def test_options_override_runtime_properties(self):
     # but runtime properties don't override .job options
-    message = 'This is definitely a unique message.'
-    override = 'This is even more definitely a unique message.'
-    self._add_command_job('foo', 'echo ${msg}', msg=message)
-    exec_id = self._run_workflow('foo', msg=override)
-    ok_(message in self.session.get_job_logs(exec_id, 'foo')['data'])
-    eq_(self.session.get_execution_status(exec_id)['status'], 'SUCCEEDED')
+    self._add_command_job('foo', 'echo ${msg}', msg=self.message)
+    exe = self._run_workflow('foo', msg=self.override)
+    ok_(self.message in '\n'.join(exe.job_logs('foo', 1)))
 
   def test_embedded_properties(self):
     # note the colon separated notation for embedded flows
-    message = 'This is definitely a unique message.'
     self._add_command_job('foo', 'echo ${msg}')
-    self._add_flow_job('bar', 'foo', msg=message)
-    exec_id = self._run_workflow('bar')
-    ok_(message in self.session.get_job_logs(exec_id, 'bar:foo')['data'])
+    self._add_flow_job('bar', 'foo', msg=self.message)
+    exe = self._run_workflow('bar')
+    ok_(self.message in '\n'.join(exe.job_logs('bar:foo', 1)))
+
+  def test_embedded_properties_propagate(self):
+    # embedded flow properties also propagate to nested flows
+    self._add_command_job('foo', 'echo ${msg}')
+    self._add_flow_job('flow1', 'foo')
+    self._add_flow_job('flow2', 'flow1', msg=self.message)
+    exe = self._run_workflow('flow2')
+    ok_(self.message in '\n'.join(exe.job_logs('flow2:flow1:foo', 1)))
+
+  def test_embedded_properties_override_propagated_embedded_properties(self):
+    # embedded flow properties also propagate to nested flows
+    self._add_command_job('foo', 'echo ${msg}')
+    self._add_flow_job('flow1', 'foo', msg=self.override)
+    self._add_flow_job('flow2', 'flow1', msg=self.message)
+    exe = self._run_workflow('flow2')
+    ok_(self.override in '\n'.join(exe.job_logs('flow2:flow1:foo', 1)))
 
   def test_global_properties_override_embedded_properties(self):
     # embedded flow properties don't override global properties
-    message = 'This is definitely a unique message.'
-    override = 'This is even more definitely a unique message.'
-    self.project.properties = {'msg': override}
+    self.project.properties = {'msg': self.override}
     self._add_command_job('foo', 'echo ${msg}')
-    self._add_flow_job('bar', 'foo', msg=message)
-    exec_id = self._run_workflow('bar')
-    ok_(override in self.session.get_job_logs(exec_id, 'bar:foo')['data'])
+    self._add_flow_job('bar', 'foo', msg=self.message)
+    exe = self._run_workflow('bar')
+    ok_(self.override in '\n'.join(exe.job_logs('bar:foo', 1)))
 
   def test_runtime_properties_override_embedded_properties(self):
     # embedded flow properties don't override runtime properties
-    message = 'This is definitely a unique message.'
-    override = 'This is even more definitely a unique message.'
     self._add_command_job('foo', 'echo ${msg}')
-    self._add_flow_job('bar', 'foo', msg=message)
-    exec_id = self._run_workflow('bar', msg=override)
-    ok_(override in self.session.get_job_logs(exec_id, 'bar:foo')['data'])
+    self._add_flow_job('bar', 'foo', msg=self.message)
+    exe = self._run_workflow('bar', msg=self.override)
+    ok_(self.override in '\n'.join(exe.job_logs('bar:foo', 1)))
 
   def test_options_override_embedded_properties(self):
     # embedded flow properties don't override job options
-    message = 'This is definitely a unique message.'
-    override = 'This is even more definitely a unique message.'
-    self._add_command_job('foo', 'echo ${msg}', msg=override)
-    self._add_flow_job('bar', 'foo', msg=message)
-    exec_id = self._run_workflow('bar')
-    ok_(override in self.session.get_job_logs(exec_id, 'bar:foo')['data'])
-
-
-class TestExecution(_TestSession):
-
-  project_name = 'azkaban_cli_execution'
-
-  def test_execution_start(self):
-    options = {'type': 'command', 'command': 'ls'}
-    self.project.add_job('foo', Job(options))
-    with temppath() as path:
-      self.project.build(path)
-      self.session.upload_project(self.project, path)
-    exe = Execution.start(self.session, self.project, 'foo')
-    sleep(2)
-    eq_(exe.status['status'], 'SUCCEEDED')
-
-  def test_execution_logs(self):
-    options = {'type': 'command', 'command': 'ls'}
-    self.project.add_job('foo', Job(options))
-    with temppath() as path:
-      self.project.build(path)
-      self.session.upload_project(self.project, path)
-    exe = Execution.start(self.session, self.project, 'foo')
-    logs = '\n'.join(exe.logs(2))
-    ok_('Submitting job \'foo\' to run.' in logs)
+    self._add_command_job('foo', 'echo ${msg}', msg=self.override)
+    self._add_flow_job('bar', 'foo', msg=self.message)
+    exe = self._run_workflow('bar')
+    ok_(self.override in '\n'.join(exe.job_logs('bar:foo', 1)))
