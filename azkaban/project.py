@@ -30,7 +30,7 @@ class _JobDict(dict):
 
   def __getitem__(self, key):
     try:
-      super(_JobDict, self).__getitem__(key)
+      return super(_JobDict, self).__getitem__(key)
     except KeyError:
       raise AzkabanError('Job %r not found.', key)
 
@@ -87,10 +87,7 @@ class Project(object):
 
   @property
   def jobs(self):
-    """Returns a dictionary with each job.
-
-    Only jobs that will be included in the archive will be returned (cf.
-    :meth:`~azkaban.job.Job.include_in_build`).
+    """Returns a dictionary of all jobs in the project, keyed by name.
 
     .. note::
 

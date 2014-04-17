@@ -96,11 +96,6 @@ class TestProjectAddJob(_TestProject):
     eq_(job.test, ('foo', 'bar', {'baz': 48}))
     ok_('bar' in self.project.jobs)
 
-  @raises(AzkabanError)
-  def test_add_job_to_property(self):
-    job = Job()
-    self.project.jobs['bar'] = job
-
   def test_add_duplicate_consistent_job(self):
     job = Job()
     self.project.add_job('bar', job)
@@ -110,6 +105,16 @@ class TestProjectAddJob(_TestProject):
   def test_add_duplicate_inconsistent_job(self):
     self.project.add_job('bar', Job())
     self.project.add_job('bar', Job())
+
+  def test_job(self):
+    job = Job()
+    self.project.add_job('bar', job)
+    eq_(self.project.jobs['bar'], job)
+
+  @raises(AzkabanError)
+  def test_add_job_to_property(self):
+    job = Job()
+    self.project.jobs['bar'] = job
 
   @raises(AzkabanError)
   def test_missing_job(self):
