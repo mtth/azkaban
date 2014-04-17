@@ -18,9 +18,8 @@ class Job(object):
     constructor.
 
   To enable more functionality, subclass and override the :meth:`on_add` and
-  :meth:`include_in_build` methods. The :meth:`join_option` and
-  :meth:`join_prefix` methods are also provided as helpers to write custom
-  jobs.
+  :meth:`build` methods. The :meth:`join_option` and :meth:`join_prefix`
+  methods are also provided as helpers to write custom jobs.
 
   """
 
@@ -29,11 +28,11 @@ class Job(object):
     for option in options:
       self.options.update(flatten(option))
 
-  def build(self, path):
-    """Create job file.
+  def build(self, path=None):
+    """Write job file.
 
-    :param path: path where job file will be created. Any existing file will
-      be overwritten.
+    :param path: Path where job file will be created. Any existing file will
+      be overwritten. Writes to stdout if no path is specified.
 
     """
     write_properties(self.options, path)
@@ -53,25 +52,6 @@ class Job(object):
 
     """
     pass
-
-  def include_in_build(self, project, name):
-    """Method called when a project including this job is built.
-
-    :param project: :class:`~azkaban.project.Project` instance
-    :param name: name corresponding to this job in the project.
-
-    The return value of this method controls whether the job is built, i.e.
-    whether its job file will be added to the project archive. The default
-    implementation simply returns `True`.
-
-    .. note::
-
-      This method should not have any side effects as it is also called by
-      methods other than :meth:`~azkaban.project.Project.build`, e.g.
-      `~azkaban.project.Project.jobs`.
-
-    """
-    return True
 
   def join_option(self, option, sep, formatter='%s'):
     """Helper method to join iterable options into a string.

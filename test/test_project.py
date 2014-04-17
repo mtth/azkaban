@@ -96,6 +96,11 @@ class TestProjectAddJob(_TestProject):
     eq_(job.test, ('foo', 'bar', {'baz': 48}))
     ok_('bar' in self.project.jobs)
 
+  @raises(AzkabanError)
+  def test_add_job_to_property(self):
+    job = Job()
+    self.project.jobs['bar'] = job
+
   def test_add_duplicate_consistent_job(self):
     job = Job()
     self.project.add_job('bar', job)
@@ -105,6 +110,10 @@ class TestProjectAddJob(_TestProject):
   def test_add_duplicate_inconsistent_job(self):
     self.project.add_job('bar', Job())
     self.project.add_job('bar', Job())
+
+  @raises(AzkabanError)
+  def test_missing_job(self):
+    self.project.jobs['bar']
 
 
 class TestProjectMerge(_TestProject):
@@ -148,39 +157,16 @@ class TestProjectBuild(_TestProject):
       self.project.build(path)
 
   def test_build_single_job(self):
-    class OtherJob(Job):
-      test = None
-      def include_in_build(self, project, name):
-        self.test = (project.name, name)
-        return True
-    job = OtherJob({'a': 2})
+    job = Job({'a': 2})
     self.project.add_job('bar', job)
     with temppath() as path:
       self.project.build(path)
-      eq_(job.test, ('foo', 'bar'))
       reader =  ZipFile(path)
       try:
         ok_('bar.job' in reader.namelist())
         eq_(reader.read('bar.job'), 'a=2\n')
       finally:
         reader.close()
-
-  def test_build_single_job_with_handler_returning_false(self):
-    class OtherJob(Job):
-      test = None
-      def include_in_build(self, project, name):
-        return False
-    self.project.add_job('bar', OtherJob())
-    self.project.add_job('foo', Job())
-    with temppath() as path:
-      self.project.build(path)
-      reader =  ZipFile(path)
-      try:
-        ok_('bar.job' not in reader.namelist())
-        ok_('foo.job' in reader.namelist())
-      finally:
-        reader.close()
-
 
   def test_build_with_file(self):
     self.project.add_file(__file__.rstrip('c'), 'this.py')

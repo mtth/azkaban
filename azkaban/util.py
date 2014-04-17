@@ -141,14 +141,19 @@ def human_readable(size):
       return '%3.1f%s' % (size, suffix)
     size /= 1024.0
 
-def write_properties(options, path):
+def write_properties(options, path=None):
   """Write options to properties file.
 
   :param options: Dictionary of options.
-  :param path: Path to file. Note that no existence check is done. Any existing
-    file will be overwritten.
+  :param path: Path to file. Any existing file will be overwritten. Writes to
+    stdout if no path is specified.
 
   """
-  with open(path, 'w') as writer:
-    for key, value in sorted(options.items()):
-      writer.write('%s=%s\n' % (key, value))
+  lines = ('%s=%s\n' % t for t in sorted(options.items()))
+  if path:
+    with open(path, 'w') as writer:
+      for line in lines:
+        writer.write(line)
+  else:
+    for line in lines:
+      sys.stdout.write(line)

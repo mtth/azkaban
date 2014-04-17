@@ -182,12 +182,7 @@ def delete_project(url, alias):
 def view_info(project, files, options, job):
   """List jobs in project."""
   if job:
-    job_name = job[0]
-    if job_name in project.jobs:
-      for option, value in sorted(project.jobs[job_name].items()):
-        stdout.write('%s=%s\n' % (option, value))
-    else:
-      raise AzkabanError('Job %r not found.' % (job_name, ))
+    project.jobs[job[0]].build()
   elif files:
     for path, archive_path in sorted(project.files):
       stdout.write('%s\t%s\n' % (relpath(path), archive_path))

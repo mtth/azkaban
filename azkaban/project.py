@@ -18,6 +18,26 @@ import sys
 logger = logging.getLogger(__name__)
 
 
+class _JobDict(dict):
+
+  """Simple dictionary subclass for jobs.
+
+  It disables the default `__setitem__` method and implements a custom
+  `KeyError` exception. Note that this isn't completely fool-proof but enough
+  for our purpose.
+
+  """
+
+  def __getitem__(self, key):
+    try:
+      super(_JobDict, self).__getitem__(key)
+    except KeyError:
+      raise AzkabanError('Job %r not found.', key)
+
+  def __setitem__(self, key, value):
+    raise AzkabanError('Cannot insert job. Use `Project.add_job` instead.')
+
+
 class Project(object):
 
   """Azkaban project.
@@ -67,7 +87,7 @@ class Project(object):
 
   @property
   def jobs(self):
-    """Returns a dictionary with each job options.
+    """Returns a dictionary with each job.
 
     Only jobs that will be included in the archive will be returned (cf.
     :meth:`~azkaban.job.Job.include_in_build`).
@@ -78,11 +98,7 @@ class Project(object):
       instead.
 
     """
-    return dict(
-      (name, job.options)
-      for name, job in self._jobs.items()
-      if job.include_in_build(self, name)
-    )
+    return _JobDict(self._jobs)
 
   def add_file(self, path, archive_path=None, overwrite=False):
     """Include a file in the project archive.
@@ -182,11 +198,6 @@ class Project(object):
     :param path: Destination path.
     :param overwrite: Don't throw an error if a file already exists at `path`.
 
-    Triggers the :meth:`~azkaban.job.Job.include_in_build` method on each job
-    inside the project (passing itself and the job's name as two argument).
-    This method will be called right before the job file is generated and can
-    be used to dynamically decide which jobs to include in the project archive.
-
     """
     logger.debug('building project')
     # not using a with statement for compatibility with older python versions
@@ -201,12 +212,9 @@ class Project(object):
           write_properties(self.properties, fpath)
           writer.write(fpath, 'project.properties')
       for name, job in self._jobs.items():
-        if job.include_in_build(self, name):
-          with temppath() as fpath:
-            job.build(fpath)
-            writer.write(fpath, '%s.job' % (name, ))
-        else:
-          logger.debug('skipping building job %r', name)
+        with temppath() as fpath:
+          job.build(fpath)
+          writer.write(fpath, '%s.job' % (name, ))
       for archive_path, path in self._files.items():
         writer.write(path, archive_path)
     finally:
