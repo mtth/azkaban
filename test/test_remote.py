@@ -285,16 +285,16 @@ class TestExecution(_TestSession):
   def test_execution_start(self):
     exe = Execution.start(self.session, self.project, 'foo')
     sleep(2)
-    exe.status['status'] == 'RUNNING'
+    eq_(exe.status['status'], 'RUNNING')
     sleep(2)
-    exe.status['status'] == 'SUCCESSFUL'
+    eq_(exe.status['status'],'SUCCEEDED')
 
   def test_execution_cancel(self):
     exe = Execution.start(self.session, self.project, 'foo')
     sleep(1)
     exe.cancel()
     sleep(1)
-    exe.status['status'] == 'KILLED'
+    eq_(exe.status['status'],'KILLED')
 
   def test_execution_logs(self):
     exe = Execution.start(self.session, self.project, 'foo')
