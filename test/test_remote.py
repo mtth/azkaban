@@ -144,7 +144,7 @@ class TestUpload(_TestSession):
     with temppath() as path:
       with open(path, 'w') as writer:
         writer.write('-- pig script')
-      self.project.add_job('foo', PigJob(path))
+      self.project.add_job('foo', PigJob({'pig.script': path}))
       with temppath() as path:
         self.project.build(path)
         res = self.session.upload_project(self.project, path)

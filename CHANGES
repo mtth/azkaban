@@ -1,6 +1,29 @@
 Azkaban
 =======
 
+
+Version 0.6.0 (04/26/2014)
+--------------------------
+
+* Added ability to pass runtime properties when executing a workflow.
+* Keyword arguments passed to the `Project.add_job` method will be forwarded to the
+  `Job.on_add` handler. In the case of a project merge, the handler gets the
+  merged project as single keyword argument.
+* Added `Execution.logs` and `Execution.start` methods to respectively view the
+  global execution logs and start a new execution from an existion session.
+* `Job.build` now writes to standard out when no path is specified.
+* `Project.jobs` now returns a dictionary of actual `Job` instances.
+
+Breaking changes:
+
+* Removed the `Job.on_build` method.
+* Removed the effect of the return value of the `Job.on_add` handler. This lead to
+  overly complex archive file generation.
+* To regain some consistency, the `PigJob` class doesn't expect a path to a pig
+  script as first parameter anymore. Instead it requires the `'pig.script'`
+  option to be specified.
+
+
 Version 0.5.0 (04/15/2014)
 --------------------------
 

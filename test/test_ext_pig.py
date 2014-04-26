@@ -1,13 +1,17 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-"""Test Azkaban pig extension."""
+"""Test Azkaban pig extension.
+
+Note the type `'pig'` enforcement to override a potential configuration option.
+
+"""
 
 from azkaban.ext.pig import *
 from azkaban.project import Project
 from azkaban.util import AzkabanError, Config, temppath
 from nose.tools import eq_, ok_, raises, nottest
-from os.path import dirname, relpath
+from os.path import dirname, realpath, relpath
 from zipfile import ZipFile
 
 
@@ -17,8 +21,11 @@ class TestPigJob(object):
     with temppath() as path:
       with open(path, 'w') as writer:
         writer.write('-- pig script')
-      # forcing type to override potential configuration option
-      job = PigJob(path, {'a': 2}, {'a': 3, 'b': 4}, {'type': 'pig'})
+      job = PigJob(
+        {'a': 2, 'pig.script': path},
+        {'a': 3, 'b': 4},
+        {'type': 'pig'},
+      )
       with temppath() as tpath:
         job.build(tpath)
         with open(tpath) as reader:
@@ -31,7 +38,7 @@ class TestPigJob(object):
     with temppath() as path:
       with open(path, 'w') as writer:
         writer.write('-- pig script')
-      job = PigJob(path, {'type': 'bar'})
+      job = PigJob({'pig.script': path, 'type': 'bar'})
       with temppath() as tpath:
         job.build(tpath)
         with open(tpath) as reader:
@@ -45,14 +52,17 @@ class TestPigJob(object):
     with temppath() as path:
       with open(path, 'w') as writer:
         writer.write('-- pig script')
-      project.add_job('foo', PigJob(path))
-      eq_(project._files, {path.lstrip('/'): path})
+      project.add_job('foo', PigJob({'pig.script': path}))
+      eq_(project._files, {path.lstrip('/'): realpath(path)})
 
   def test_format_jvm_args(self):
     with temppath() as path:
       with open(path, 'w') as writer:
         writer.write('-- pig script')
-      job = PigJob(path, {'jvm.args': {'a': 2, 'b': 2}}, {'jvm.args.a': 3})
+      job = PigJob(
+        {'pig.script': path, 'jvm.args': {'a': 2, 'b': 2}},
+        {'jvm.args.a': 3},
+      )
       with temppath() as tpath:
         job.build(tpath)
         with open(tpath) as reader:
@@ -68,9 +78,8 @@ class TestPigJob(object):
     with temppath() as path:
       with open(path, 'w') as writer:
         writer.write('-- pig script')
-      # forcing type to override potential configuration option
-      project.add_job('foo', PigJob(path, {'type': 'pig'}))
-      eq_(project._files, {path.lstrip('/'): path})
+      project.add_job('foo', PigJob({'pig.script': path, 'type': 'pig'}))
+      eq_(project._files, {path.lstrip('/'): realpath(path)})
       with temppath() as zpath:
         project.build(zpath)
         reader = ZipFile(zpath)
@@ -91,7 +100,7 @@ class TestPigJob(object):
       with open(path, 'w') as writer:
         writer.write('-- pig script')
       rpath = relpath(path, root)
-      project.add_job('foo', PigJob(rpath, {'type': 'pig'}))
+      project.add_job('foo', PigJob({'pig.script': rpath, 'type': 'pig'}))
 
   def test_on_add_relative_with_root(self):
     with temppath() as path:
@@ -99,10 +108,9 @@ class TestPigJob(object):
       project = Project('pj', root=root)
       with open(path, 'w') as writer:
         writer.write('-- pig script')
-      # forcing type to override potential configuration option
       rpath = relpath(path, root)
-      project.add_job('foo', PigJob(rpath, {'type': 'pig'}))
-      eq_(project._files, {rpath: path})
+      project.add_job('foo', PigJob({'pig.script': rpath, 'type': 'pig'}))
+      eq_(project._files, {rpath: realpath(path)})
       with temppath() as zpath:
         project.build(zpath)
         reader = ZipFile(zpath)

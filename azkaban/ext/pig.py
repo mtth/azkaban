@@ -57,33 +57,37 @@ class PigJob(Job):
 
   """Convenience job class for running pig scripts.
 
-  :param path: path to pig script (this script will automatically be added to
-    the project archive when it is built)
-  :param options: cf. `Job`
-
-  By default the job type used is `'pig'`. You can specify a custom job type in
-  the `azkabanpig` section of the `~/.azkabanrc` configuration file via the
-  `default.type` option.
+  :param options: Tuple of options (cf. :class:`~azkaban.job.Job`). These
+    options must specify a `'pig.script'` key. The corresponding file will
+    then automatically be included in the project archive.
 
   This class allows you to specify JVM args as a dictionary by correctly
   converting these to the format used by Azkaban when building the job options.
   For example: `{'jvm.args': {'foo': 1, 'bar': 2}}` will be converted to
   `jvm.args=-Dfoo=1 -Dbar=2`. Note that this enables JVM args to behave like
-  all other `Job` options when defined multiple times (the latest value takes
+  all other `Job` options when defined multiple times (latest values taking
   precedence).
+
+  Finally, by default the job type will be set automatically to `'pig'`. You
+  can also specify a custom job type for all :class:`PigJob` instances in the
+  `azkabanpig` section of the `~/.azkabanrc` configuration file via the
+  `default.type` option.
 
   """
 
-  def __init__(self, path, *options):
+  def __init__(self, *options):
     super(PigJob, self).__init__(
-      {
-        'type': Config().get_option('azkabanpig', 'type', 'pig'),
-        'pig.script': path.lstrip('/'),
-      },
+      {'type': Config().get_option('azkabanpig', 'type', 'pig')},
       *options
     )
-    self.path = path
-    self.join_prefix('jvm.args', ' ', '-D%s=%s')
+    try:
+      self.path = self.options['pig.script']
+    except KeyError:
+      raise AzkabanError('Missing `\'pig.script\'` option.')
+    else:
+      # absolute archive paths get trimmed
+      self.options['pig.script'] = self.path.lstrip('/')
+      self.join_prefix('jvm.args', ' ', '-D%s=%s')
 
   def on_add(self, project, name):
     """This handler adds the corresponding script file to the project."""

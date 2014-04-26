@@ -24,29 +24,35 @@ four pig scripts.
   from azkaban import PigJob, Project
   from getpass import getuser
 
-  project = Project('sample', root=__file__)
+  PROJECT = Project('sample', root=__file__)
 
-  # default options for all scripts
-  default_options = {
+  # default options for all jobs
+  DEFAULTS = {
     'user.to.proxy': getuser(),
-    'mapred': {
+    'param': {
+      'input_root': 'sample_dir/',
+      'n_reducers': 20,
+    },
+    'jvm.args.mapred': {
       'max.split.size': 2684354560,
       'min.split.size': 2684354560,
     },
   }
 
-  # dictionary of pig script options, keyed on the pig script path
-  pig_job_options = {
-    'first.pig': {},
-    'second.pig': {'dependencies': 'first.pig'},
-    'third.pig': {'param': {'foo': 48, 'bar': 'abc'}},
-    'fourth.pig': {'dependencies': 'second.pig,third.pig'},
-  }
+  # list of pig job options
+  OPTIONS = [
+    {'pig.script': 'first.pig'},
+    {'pig.script': 'second.pig', 'dependencies': 'first.pig'},
+    {'pig.script': 'third.pig', 'param': {'foo': 48}},
+    {'pig.script': 'fourth.pig', 'dependencies': 'second.pig,third.pig'},
+  ]
 
-  for path, options in pig_job_options.items():
-    project.add_job(path, PigJob(path, default_options, options))
+  for option in OPTIONS:
+    PROJECT.add_job(option['pig.script'], PigJob(DEFAULTS, option))
 
-More examples_ are also available.
+The examples_ directory contains another sample project that uses Azkaban 
+properties to build a project with two configurations: production and test, 
+without any job duplication.
 
 
 Documentation
