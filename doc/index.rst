@@ -13,20 +13,46 @@ A lightweight Azkaban_ client providing:
 
   .. code-block:: bash
 
-    $ azkaban upload my_project.zip
-
+    $ azkaban --project=my_project upload archive.zip
     Project my_project successfully uploaded (id: 1, size: 205kB, version: 1).
     Details at https://azkaban.server.url/manager?project=my_project
+
+    $ azkaban --project=my_project run my_flow
+    Flow my_flow successfully submitted (execution id: 48).
+    Details at https://azkaban.server.url/executor?execid=48
 
 * A convenient and extensible way to build project configuration files.
 
   .. code-block:: python
 
-    from azkaban import Job, Project
+    from azkaban import PigJob, Project
+    from getpass import getuser
 
-    project = Project('my_project')
-    project.add_file('hey.txt')
-    project.add_job('hi', Job({'type': 'command', 'command': 'cat hey.txt'}))
+    PROJECT = Project('sample', root=__file__)
+
+    # default options for all jobs
+    DEFAULTS = {
+      'user.to.proxy': getuser(),
+      'param': {
+        'input_root': 'sample_dir/',
+        'n_reducers': 20,
+      },
+      'jvm.args.mapred': {
+        'max.split.size': 2684354560,
+        'min.split.size': 2684354560,
+      },
+    }
+
+    # list of pig job options
+    OPTIONS = [
+      {'pig.script': 'first.pig'},
+      {'pig.script': 'second.pig', 'dependencies': 'first.pig'},
+      {'pig.script': 'third.pig', 'param': {'foo': 48}},
+      {'pig.script': 'fourth.pig', 'dependencies': 'second.pig,third.pig'},
+    ]
+
+    for option in OPTIONS:
+      PROJECT.add_job(option['pig.script'], PigJob(DEFAULTS, option))
 
 
 Table of contents

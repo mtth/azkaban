@@ -141,7 +141,7 @@ We can use this to efficiently share default options among jobs, for example:
 
 .. code-block:: python
 
-  defaults = {'user.to.proxy': 'boo', 'retries': 0}
+  defaults = {'user.to.proxy': 'foo', 'retries': 0}
 
   jobs = [
     Job({'type': 'noop'}),
@@ -158,10 +158,10 @@ we can create a new `Job` subclass to do it for us:
 
 .. code-block:: python
 
-  class BooJob(Job):
+  class FooJob(Job):
 
     def __init__(self, *options):
-      super(BooJob, self).__init__(defaults, *options)
+      super(FooJob, self).__init__(defaults, *options)
 
 
 More
@@ -216,8 +216,7 @@ Next steps
 
 Any valid python code can go inside a jobs configuration file. This includes 
 using loops to add jobs, subclassing the base `Job` class to better suit a 
-project's needs (e.g. by implementing the `on_add` and `on_build` handlers), 
-etc.
+project's needs (e.g. by implementing the `on_add` handler), etc.
 
 Finally, the `info` command becomes quite powerful when combined with other 
 Unix tools. Here are a few examples:

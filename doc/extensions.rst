@@ -17,15 +17,14 @@ Since pig jobs are so common, `azkaban` comes with an extension to:
   etc.).
 
 * integrate pig jobs easily into your project configuration via the `PigJob` 
-  class. It accepts a file path (to the pig script) as first constructor 
-  argument, optionally followed by job options. It then automatically sets the 
-  job type and adds the corresponding script file to the project.
+  class which  automatically sets the job type and adds the corresponding 
+  script file to the project.
 
   .. code-block:: python
 
     from azkaban import PigJob
 
-    project.add_job('baz', PigJob('baz.pig', {'dependencies': 'bar'}))
+    project.add_job('baz', PigJob({'pig.script': 'baz.pig'})
 
 
 The full API for the `PigJob` class is below.
