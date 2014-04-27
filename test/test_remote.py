@@ -238,7 +238,7 @@ class TestRun(_TestSession):
       self.project.build(path)
       self.session.upload_project(self.project, path)
     self.session.run_workflow(self.project, 'foo')
-    self.session.run_workflow(self.project, 'foo', skip=True)
+    self.session.run_workflow(self.project, 'foo', concurrent=False)
 
   def test_run_non_blocking_workflow(self):
     options = {'type': 'command', 'command': 'sleep 2'}
@@ -250,6 +250,43 @@ class TestRun(_TestSession):
     res = self.session.run_workflow(self.project, 'foo')
     eq_(['execid', 'flow', 'message', 'project'], sorted(res.keys()))
     eq_(res['message'][:32], 'Flow foo is already running with')
+
+  def test_run_fail_early(self):
+    options = {'type': 'command', 'command': 'sleep ${time}'}
+    self.project.add_job('foo', Job(options))
+    self.project.add_job('bar', Job(options, {'time': 5}))
+    self.project.add_job('f', Job({'type': 'noop', 'dependencies': 'foo,bar'}))
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+    res = self.session.run_workflow(self.project, 'f', on_failure='cancel')
+    exec_id = res['execid']
+    sleep(2)
+    eq_(self.session.get_execution_status(exec_id)['status'], 'FAILED')
+
+  def test_run_fail_finish(self):
+    options = {'type': 'command', 'command': 'sleep ${time}'}
+    self.project.add_job('foo', Job(options))
+    self.project.add_job('bar', Job(options, {'time': 5}))
+    self.project.add_job('f', Job({'type': 'noop', 'dependencies': 'foo,bar'}))
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+    res = self.session.run_workflow(self.project, 'f', on_failure='finish')
+    eid = res['execid']
+    sleep(2)
+    eq_(self.session.get_execution_status(eid)['status'], 'FAILED_FINISHING')
+
+  @raises(AzkabanError)
+  def test_run_fail_invalid_on_failure(self):
+    options = {'type': 'command', 'command': 'sleep ${time}'}
+    self.project.add_job('foo', Job(options))
+    self.project.add_job('bar', Job(options, {'time': 5}))
+    self.project.add_job('f', Job({'type': 'noop', 'dependencies': 'foo,bar'}))
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+    self.session.run_workflow(self.project, 'f', on_failure='foobar')
 
   @raises(AzkabanError)
   def test_run_wrong_job_in_workflow(self):
