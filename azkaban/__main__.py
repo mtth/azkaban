@@ -5,9 +5,10 @@
 
 Usage:
   azkaban build [-crp PROJECT] [-a ALIAS | -u URL | ZIP]
-  azkaban (create | delete) [-a ALIAS | -u URL]
+  azkaban create [-a ALIAS | -u URL]
+  azkaban delete [-a ALIAS | -u URL]
   azkaban info [-p PROJECT] [-f | -o OPTIONS | JOB]
-  azkaban run [-sp PROJECT]  [-a ALIAS | -u URL] FLOW [JOB ...]
+  azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAIL] FLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
   azkaban -h | --help | -v | --version
 
@@ -32,10 +33,13 @@ Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
                                 to reuse session IDs for later connections.
   -c --create                   Create the project if it does not exist.
+  -e EMAIL --email=EMAIL        Comma separated list of emails that will be
+                                notified when the workflow finishes.
   -f --files                    List project files instead of jobs. The first
                                 column is the local path of the file, the
                                 second the path of the file in the archive.
   -h --help                     Show this message and exit.
+  -k --kill                     Kill worfklow on first job failure.
   -o OPTIONS --options=OPTIONS  Comma separated list of options that will be
                                 displayed next to each job. E.g. `-o type,foo`.
                                 The resulting output will be tab separated.
@@ -196,10 +200,17 @@ def view_info(project, files, options, job):
       for name in sorted(project.jobs):
         stdout.write('%s\n' % (name, ))
 
-def run_flow(project_name, flow, job, url, alias, skip):
+def run_flow(project_name, flow, job, url, alias, skip, kill, email):
   """Run workflow."""
   session = Session(url, alias)
-  res = session.run_workflow(project_name, flow, job, skip)
+  res = session.run_workflow(
+    name=project_name,
+    flow=flow,
+    jobs=job,
+    concurrent=not skip,
+    on_failure='cancel' if kill else 'finish',
+    emails=email.split(',') if email else None,
+  )
   exec_id = res['execid']
   job_names = ', jobs: %s' % (', '.join(job), ) if job else ''
   stdout.write(
@@ -255,7 +266,10 @@ def main():
   elif args['run']:
     run_flow(
       _get_project_name(args['--project']),
-      **_forward(args, ['FLOW', 'JOB', '--skip', '--url', '--alias'])
+      **_forward(
+        args,
+        ['FLOW', 'JOB', '--skip', '--url', '--alias', '--kill', '--email']
+      )
     )
   elif args['upload']:
     upload_project(
