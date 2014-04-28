@@ -136,10 +136,11 @@ class _PigProject(Project):
     :param execution: `azkaban.remote.Execution`
 
     """
+    ok_statuses = set(['RUNNING', 'SUCCEEDED'])
     for job in self.ordered_jobs:
       for line in execution.job_logs(job):
         yield line
-      if execution.status['status'] == 'FAILURE':
+      if not execution.status['status'] in ok_statuses:
         raise AzkabanError('Execution failed.')
 
 
