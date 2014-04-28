@@ -123,7 +123,7 @@ class _PigProject(Project):
       self.add_job(
         basename(path),
         PigJob(
-          abspath(path),
+          {'pig.script': abspath(path)},
           default_options,
           dependency_options,
           options or {},
