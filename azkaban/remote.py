@@ -453,7 +453,7 @@ class Execution(object):
   @property
   def url(self):
     """Execution URL."""
-    return '%s/executor?exec_id=%s' % (self._session.url, self.exec_id)
+    return '%s/executor?execid=%s' % (self._session.url, self.exec_id)
 
   def cancel(self):
     """Cancel execution."""
