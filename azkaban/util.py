@@ -19,7 +19,7 @@ class AzkabanError(Exception):
   """Base error class."""
 
   def __init__(self, message, *args):
-    super(AzkabanError, self).__init__(message % args or ())
+    super(AzkabanError, self).__init__(message % args if args else message)
 
 
 class Config(object):
