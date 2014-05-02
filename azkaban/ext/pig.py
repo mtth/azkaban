@@ -91,7 +91,7 @@ class PigJob(Job):
 
   def on_add(self, project, name):
     """This handler adds the corresponding script file to the project."""
-    project.add_file(self.path, self.path)
+    project.add_file(self.path)
 
 
 class _PigProject(Project):

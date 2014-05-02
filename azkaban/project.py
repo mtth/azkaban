@@ -83,7 +83,7 @@ class Project(object):
       instead.
 
     """
-    return [(e[1], e[0]) for e in self._files.items()]
+    return [(e[1][0], e[0]) for e in self._files.items()]
 
   @property
   def jobs(self):
@@ -124,7 +124,10 @@ class Project(object):
       path = join(self.root, path)
     # disambiguate (symlinks, pardirs, etc.)
     path = realpath(path)
-    if not archive_path:
+    if archive_path:
+      frozen = True
+    else:
+      frozen = False
       if self.root:
         if not path.startswith(self.root):
           raise AzkabanError(
@@ -138,13 +141,13 @@ class Project(object):
     archive_path = archive_path.lstrip('/')
     if (
       archive_path in self._files and
-      self._files[archive_path] != path and
+      self._files[archive_path][0] != path and
       not overwrite
     ):
       raise AzkabanError('Inconsistent duplicate file: %r.' % (path, ))
     if not exists(path):
       raise AzkabanError('File not found: %r.' % (path, ))
-    self._files[archive_path] = path
+    self._files[archive_path] = (path, frozen)
 
   def add_job(self, name, job, **kwargs):
     """Include a job in the project.
@@ -165,27 +168,27 @@ class Project(object):
     job.on_add(self, name, **kwargs)
     self._jobs[name] = job
 
-  def merge_into(self, project, unregister=False):
+  def merge_into(self, project, overwrite=False, unregister=False):
     """Merge one project with another.
 
     :param project: Target :class:`Project` to merge into.
+    :param overwrite: Overwrite any existing files.
     :param unregister: Unregister project after merging it.
 
     The current project remains unchanged while the target project gains all
-    the current project's jobs and files. Note that only projects with the same
-    `root` can be merged.
+    the current project's jobs and files.
 
     """
     logger.debug('merging into project %r', project.name)
-    if self.root != project.root:
-      raise AzkabanError(
-        'Cannot merge projects with different roots: %r and %r',
-        self.root, project.root,
-      )
     for name, job in self._jobs.items():
       project.add_job(name, job, merging=self)
-    for archive_path, path in self._files.items():
-      project.add_file(path, archive_path)
+    for archive_path, (path, frozen) in self._files.items():
+      if frozen:
+        # propagate the archive path
+        project.add_file(path, archive_path=archive_path, overwrite=overwrite)
+      else:
+        # autogenerate a new archive_path
+        project.add_file(path, overwrite=overwrite)
     if unregister:
       self._registry.pop(self.name)
 
@@ -212,7 +215,7 @@ class Project(object):
         with temppath() as fpath:
           job.build(fpath)
           writer.write(fpath, '%s.job' % (name, ))
-      for archive_path, path in self._files.items():
+      for archive_path, (path, _) in self._files.items():
         writer.write(path, archive_path)
     finally:
       writer.close()

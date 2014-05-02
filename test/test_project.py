@@ -10,7 +10,7 @@ from ConfigParser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
 from os import pardir
-from os.path import dirname, expanduser, relpath, abspath, join
+from os.path import basename, dirname, expanduser, relpath, abspath, join
 from requests import ConnectionError, post
 from time import sleep, time
 from zipfile import ZipFile
@@ -30,18 +30,21 @@ class TestProjectAddFile(_TestProject):
 
   def test_add_file(self):
     self.project.add_file(__file__, 'bar')
-    eq_(self.project._files, {'bar': __file__})
+    eq_(self.project._files, {'bar': (__file__, True)})
 
   def test_add_relative_file(self):
     project = Project('foo', root=__file__)
     project.add_file('test_job.py')
     path = join(dirname(__file__), 'test_job.py')
-    eq_(project._files, {'test_job.py': path})
+    eq_(project._files, {'test_job.py': (path, False)})
 
   def test_add_relative_file_with_archive_path(self):
     project = Project('foo', root=__file__)
     project.add_file('test_job.py', 'bar')
-    eq_(project._files, {'bar': join(dirname(__file__), 'test_job.py')})
+    eq_(
+      project._files,
+      {'bar': (join(dirname(__file__), 'test_job.py'), True)}
+    )
 
   @raises(AzkabanError)
   def test_add_relative_file_outside_root(self):
@@ -59,12 +62,12 @@ class TestProjectAddFile(_TestProject):
   def test_add_duplicate_file(self):
     self.project.add_file(__file__)
     self.project.add_file(__file__)
-    eq_(self.project._files, {__file__.lstrip('/'): __file__})
+    eq_(self.project._files, {__file__.lstrip('/'): (__file__, False)})
 
   def test_add_duplicate_file_with_archive_path(self):
     self.project.add_file(FILEPATHS[0], 'foo')
     self.project.add_file(FILEPATHS[0], 'foo')
-    eq_(self.project._files, {'foo': __file__})
+    eq_(self.project._files, {'foo': (__file__, True)})
 
   @raises(AzkabanError)
   def test_add_inconsistent_duplicate_file(self):
@@ -75,7 +78,7 @@ class TestProjectAddFile(_TestProject):
     self.project.add_file(FILEPATHS[0], 'foo')
     self.project.add_file(FILEPATHS[1], 'foo', overwrite=True)
     path = abspath(FILEPATHS[1])
-    eq_(self.project._files, {'foo': path})
+    eq_(self.project._files, {'foo': (path, True)})
 
   def test_files(self):
     self.project.add_file(FILEPATHS[0], 'foo')
@@ -134,7 +137,10 @@ class TestProjectMerge(_TestProject):
     project2.merge_into(self.project)
     eq_(self.project.name, 'foo')
     eq_(self.project._jobs, {'bar': job_bar, 'baz': job_baz})
-    eq_(self.project._files, {'bar': FILEPATHS[0], 'baz': FILEPATHS[1]})
+    eq_(
+      self.project._files,
+      {'bar': (FILEPATHS[0], True), 'baz': (FILEPATHS[1], True)}
+    )
 
   def test_merge_project_on_add_kwargs(self):
     class OtherJob(Job):
@@ -147,11 +153,13 @@ class TestProjectMerge(_TestProject):
     project2.merge_into(self.project)
     eq_(job.test, {'merging': project2})
 
-  @raises(AzkabanError)
   def test_merge_project_with_different_roots(self):
     project2 = Project('qux', root=__file__)
-    project2.add_job('foo', Job())
-    project2.merge_into(self.project)
+    project2.add_file(__file__)
+    project2.add_file(__file__, 'bar')
+    project1 = Project('oth', root=dirname(dirname(abspath(__file__))))
+    project2.merge_into(project1)
+    eq_(sorted(project1._files), ['bar', join('test', basename(__file__))])
 
 
 class TestProjectBuild(_TestProject):
