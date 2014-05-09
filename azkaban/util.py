@@ -8,6 +8,7 @@ from ConfigParser import (NoOptionError, NoSectionError, ParsingError,
   RawConfigParser)
 from contextlib import contextmanager
 from functools import wraps
+from itertools import chain
 from os import close, remove
 from os.path import exists, expanduser
 from tempfile import mkstemp
@@ -141,15 +142,18 @@ def human_readable(size):
       return '%3.1f%s' % (size, suffix)
     size /= 1024.0
 
-def write_properties(options, path=None):
+def write_properties(options, path=None, header=None):
   """Write options to properties file.
 
   :param options: Dictionary of options.
   :param path: Path to file. Any existing file will be overwritten. Writes to
     stdout if no path is specified.
+  :param header: Optional comment to be included at the top of the file.
 
   """
   lines = ('%s=%s\n' % t for t in sorted(options.items()))
+  if header:
+    lines = chain(['# %s\n' % (header, )], lines)
   if path:
     with open(path, 'w') as writer:
       for line in lines:

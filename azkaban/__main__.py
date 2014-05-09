@@ -7,7 +7,7 @@ Usage:
   azkaban build [-crp PROJECT] [-a ALIAS | -u URL | ZIP]
   azkaban create [-a ALIAS | -u URL]
   azkaban delete [-a ALIAS | -u URL]
-  azkaban info [-p PROJECT] [-f | -o OPTIONS | JOB]
+  azkaban info [-p PROJECT] [-f | -o OPTIONS | [-i] JOB ...]
   azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAIL] FLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
   azkaban -h | --help | -v | --version
@@ -39,6 +39,7 @@ Options:
                                 column is the local path of the file, the
                                 second the path of the file in the archive.
   -h --help                     Show this message and exit.
+  -i --include-properties       Include project properties with job options.
   -k --kill                     Kill worfklow on first job failure.
   -o OPTIONS --options=OPTIONS  Comma separated list of options that will be
                                 displayed next to each job. E.g. `-o type,foo`.
@@ -66,7 +67,8 @@ Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 from azkaban import __version__
 from azkaban.project import Project
 from azkaban.remote import Session
-from azkaban.util import AzkabanError, Config, catch, human_readable, temppath
+from azkaban.util import (AzkabanError, Config, catch, human_readable,
+  temppath, write_properties)
 from docopt import docopt
 from os.path import exists, getsize, relpath
 from sys import stdout
@@ -81,7 +83,7 @@ def _forward(args, names):
   """
   names = set(names)
   return dict(
-    (k.lower().lstrip('-'), v)
+    (k.lower().lstrip('-').replace('-', '_'), v)
     for (k, v) in args.items() if k in names
   )
 
@@ -183,10 +185,13 @@ def delete_project(url, alias):
   session.delete_project(project)
   stdout.write('Project %s successfully deleted.\n' % (project, ))
 
-def view_info(project, files, options, job):
+def view_info(project, files, options, job, include_properties):
   """List jobs in project."""
   if job:
-    project.jobs[job[0]].build()
+    if include_properties:
+      write_properties(project.properties, header='project.properties')
+    for name in job:
+      write_properties(project.jobs[name].options, header='%s.job' % (name, ))
   elif files:
     for path, archive_path in sorted(project.files):
       stdout.write('%s\t%s\n' % (relpath(path), archive_path))
@@ -261,7 +266,7 @@ def main():
   elif args['info']:
     view_info(
       _load_project(args['--project']),
-      **_forward(args, ['--files', '--options', 'JOB'])
+      **_forward(args, ['--files', '--options', 'JOB', '--include-properties'])
     )
   elif args['run']:
     run_flow(
