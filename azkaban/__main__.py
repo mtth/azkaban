@@ -191,7 +191,7 @@ def view_info(project, files, options, job, include_properties):
     if include_properties:
       write_properties(project.properties, header='project.properties')
     for name in job:
-      write_properties(project.jobs[name].options, header='%s.job' % (name, ))
+      project.jobs[name].build(header='%s.job' % (name, ))
   elif files:
     for path, archive_path in sorted(project.files):
       stdout.write('%s\t%s\n' % (relpath(path), archive_path))

@@ -28,14 +28,15 @@ class Job(object):
     for option in options:
       self.options.update(flatten(option))
 
-  def build(self, path=None):
+  def build(self, path=None, header=None):
     """Write job file.
 
     :param path: Path where job file will be created. Any existing file will
       be overwritten. Writes to stdout if no path is specified.
+    :param header: Optional comment to be included at the top of the job file.
 
     """
-    write_properties(self.options, path)
+    write_properties(self.options, path=path, header=header)
 
   def on_add(self, project, name, **kwargs):
     """Handler called when the job is added to a project.
