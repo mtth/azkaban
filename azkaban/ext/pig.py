@@ -154,7 +154,11 @@ def main():
   job_paths = (opt for opt in args['--option'] if not '=' in opt)
   for i, job_path in enumerate(job_paths):
     if not exists(job_path):
-      raise AzkabanError('Invalid option: %r' % (' '.join(args['OPTION']), ))
+      raise AzkabanError(
+        'Invalid `--option`: %s\nOptions should point to an existing job file'
+        ' or be of the form `key=value`.'
+        % (job_path, )
+      )
     project.add_file(abspath(job_path), '%s.properties' % (i, ))
   for jar in jars:
     project.add_file(abspath(jar))
