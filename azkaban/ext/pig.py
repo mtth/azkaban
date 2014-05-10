@@ -112,8 +112,7 @@ class _PigProject(Project):
       options = {'pig.script': abspath(path)}
       if pig_type:
         options['type'] = pig_type
-      if dep:
-        options['dependencies'] = dep
+      options['dependencies'] = dep or '' # override key if exists
       self.add_job(basename(path), PigJob(options))
 
   def logs(self, execution):
