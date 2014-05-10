@@ -13,8 +13,8 @@ Arguments:
   PATH                          Path to pig script. If more than one path is
                                 specified, they will be run in order. Note that
                                 all the pig jobs will share the same Azkaban
-                                options; for more flexibility, you can use the
-                                Azkaban CLI directly.
+                                options; for more flexibility, you can use
+                                AzkabanCLI directly.
 
 Options:
   -a ALIAS --alias=ALIAS        Cf. `azkaban --help`.
@@ -24,10 +24,11 @@ Options:
   -j JAR --jar=JAR              Path to jar file. It will be available on the
                                 class path when the pig script is run, no need
                                 to register it inside your scripts.
-  -o OPTION --option=OPTION     Azkaban option. Should be of the form
-                                key=value. E.g. '-o param.foo=bar' will
-                                substitute parameter '$foo' with 'bar' in the
-                                pig script.
+  -o OPTION --option=OPTION     Azkaban option. Can either be a path to a job
+                                file or a single option formatted as key=value.
+                                E.g. `-o param.foo=bar` will substitute
+                                parameter `$foo` with `'bar'` in the pig
+                                script.
   -p PROJECT --project=PROJECT  Project name under which to run the pig script.
   -t TYPE --type=TYPE           Pig job type used.
   -u URL --url=URL              Cf. `azkaban --help`.
@@ -45,7 +46,7 @@ __all__ = ['PigJob']
 
 from docopt import docopt
 from os import sep
-from os.path import abspath, basename
+from os.path import abspath, basename, exists
 from sys import stdout
 from ..job import Job
 from ..project import Project
@@ -98,37 +99,22 @@ class _PigProject(Project):
 
   """Project to run pig jobs from the command line.
 
-  :param name: project name used
-  :param paths: paths to pig scripts, these will be run in order
-  :param type: pig job type used
-  :param jars: jars to include, these will also be added to the classpath
-  :param options: options forwarded to pig scripts
+  :param name: Project name used.
+  :param paths: Paths to pig scripts, these will be run in order.
+  :param pig_type: Pig job type used.
 
   """
 
-  def __init__(self, name, paths, user, type=None, jars=None, options=None):
+  def __init__(self, name, paths, pig_type=None):
     super(_PigProject, self).__init__(name, register=False)
     self.ordered_jobs = [basename(path) for path in paths]
-    jars = jars or []
-    default_options = {
-      'user.to.proxy': user,
-      'pig.additional.jars': ','.join(abspath(j).lstrip(sep) for j in jars),
-    }
-    if type:
-      default_options['type'] = type
-    for jar in jars:
-      self.add_file(abspath(jar))
     for path, dep in zip(paths, [None] + self.ordered_jobs):
-      dependency_options = {'dependencies': dep} if dep else {}
-      self.add_job(
-        basename(path),
-        PigJob(
-          {'pig.script': abspath(path)},
-          default_options,
-          dependency_options,
-          options or {},
-        )
-      )
+      options = {'pig.script': abspath(path)}
+      if pig_type:
+        options['type'] = pig_type
+      if dep:
+        options['dependencies'] = dep
+      self.add_job(basename(path), PigJob(options))
 
   def logs(self, execution):
     """Jobs logs. In order.
@@ -149,19 +135,29 @@ def main():
   """AzkabanPig entry point."""
   args = docopt(__doc__)
   paths = args['PATH']
+  jars = args['--jar'] or []
   session = Session(args['--url'], args['--alias'])
-  try:
-    job_options = dict(opt.split('=', 1) for opt in args['--option'])
-  except ValueError:
-    raise AzkabanError('Invalid options: %r' % (' '.join(args['OPTION']), ))
   project = _PigProject(
     name=args['--project'] or Config().get_option('azkabanpig', 'project'),
     paths=paths,
-    user=session.user,
-    type=args['--type'],
-    jars=args['--jar'],
-    options=job_options,
+    pig_type=args['--type'],
   )
+  project.properties = {
+    'user.to.proxy': session.user,
+    'pig.additional.jars': ','.join(abspath(j).lstrip(sep) for j in jars),
+  }
+  project.properties.update(
+    opt.split('=', 1)
+    for opt in args['--option']
+    if '=' in opt
+  )
+  job_paths = (opt for opt in args['--option'] if not '=' in opt)
+  for i, job_path in enumerate(job_paths):
+    if not exists(job_path):
+      raise AzkabanError('Invalid option: %r' % (' '.join(args['OPTION']), ))
+    project.add_file(abspath(job_path), '%s.properties' % (i, ))
+  for jar in jars:
+    project.add_file(abspath(jar))
   with temppath() as tpath:
     project.build(tpath)
     while True:
