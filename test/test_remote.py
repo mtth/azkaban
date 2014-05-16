@@ -428,19 +428,18 @@ class TestProperties(_TestSession):
     exe = self._run_workflow('flow2')
     ok_(self.override in '\n'.join(exe.job_logs('flow2:flow1:foo', 1)))
 
-  def test_global_properties_override_embedded_properties(self):
-    # embedded flow properties don't override global properties
-    self.project.properties = {'msg': self.override}
+  def test_embedded_properties_override_global_properties(self):
+    self.project.properties = {'msg': self.message}
     self._add_command_job('foo', 'echo ${msg}')
-    self._add_flow_job('bar', 'foo', msg=self.message)
+    self._add_flow_job('bar', 'foo', msg=self.override)
     exe = self._run_workflow('bar')
     ok_(self.override in '\n'.join(exe.job_logs('bar:foo', 1)))
 
-  def test_runtime_properties_override_embedded_properties(self):
-    # embedded flow properties don't override runtime properties
+  def test_embedded_properties_override_runtime_properties(self):
+    # embedded flow properties override runtime properties (!)
     self._add_command_job('foo', 'echo ${msg}')
-    self._add_flow_job('bar', 'foo', msg=self.message)
-    exe = self._run_workflow('bar', msg=self.override)
+    self._add_flow_job('bar', 'foo', msg=self.override)
+    exe = self._run_workflow('bar', msg=self.message)
     ok_(self.override in '\n'.join(exe.job_logs('bar:foo', 1)))
 
   def test_options_override_embedded_properties(self):

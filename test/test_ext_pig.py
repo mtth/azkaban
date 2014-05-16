@@ -53,7 +53,7 @@ class TestPigJob(object):
       with open(path, 'w') as writer:
         writer.write('-- pig script')
       project.add_job('foo', PigJob({'pig.script': path}))
-      eq_(project._files, {path.lstrip('/'): (realpath(path), False)})
+      eq_(project._files, {realpath(path).lstrip('/'): (realpath(path), False)})
 
   def test_format_jvm_args(self):
     with temppath() as path:
@@ -76,10 +76,11 @@ class TestPigJob(object):
   def test_on_add_absolute(self):
     project = Project('pj')
     with temppath() as path:
+      path = realpath(path)
       with open(path, 'w') as writer:
         writer.write('-- pig script')
       project.add_job('foo', PigJob({'pig.script': path, 'type': 'pig'}))
-      eq_(project._files, {path.lstrip('/'): (realpath(path), False)})
+      eq_(project._files, {path.lstrip('/'): (path, False)})
       with temppath() as zpath:
         project.build(zpath)
         reader = ZipFile(zpath)
@@ -105,7 +106,7 @@ class TestPigJob(object):
   def test_on_add_relative_with_root(self):
     with temppath() as path:
       root = dirname(path)
-      project = Project('pj', root=root)
+      project = Project('pj', root=realpath(root))
       with open(path, 'w') as writer:
         writer.write('-- pig script')
       rpath = relpath(path, root)

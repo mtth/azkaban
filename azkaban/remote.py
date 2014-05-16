@@ -131,9 +131,10 @@ class Session(object):
   def __str__(self):
     return '%s@%s' % (self.user, self.url)
 
-  def _refresh(self, password=None):
+  def _refresh(self, attempts, password=None):
     """Refresh session ID.
 
+    :param attempts: Maximum number of attempts to refresh session.
     :param password: Password used to log into Azkaban. If not specified,
       will prompt for one.
 
@@ -141,18 +142,31 @@ class Session(object):
 
     """
     logger.debug('refreshing session')
-    password = password or getpass('Azkaban password for %s: ' % (self, ))
-    res = _extract_json(_azkaban_request(
-      'POST',
-      self.url,
-      data={'action': 'login', 'username': self.user, 'password': password},
-    ))
+    while True:
+      password = password or getpass('Azkaban password for %s: ' % (self, ))
+      try:
+        res = _extract_json(_azkaban_request(
+          'POST',
+          self.url,
+          data={
+            'action': 'login',
+            'username': self.user,
+            'password': password,
+          },
+        ))
+      except AzkabanError:
+        attempts -= 1
+        password = None
+        if attempts <= 0:
+          raise AzkabanError('Too many unsuccessful login attempts. Aborting.')
+      else:
+        break
     self.id = res['session.id']
     logger.debug('saving session id')
     self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
     self.config.save()
 
-  def _request(self, method, endpoint, use_cookies=True, attempts=1, **kwargs):
+  def _request(self, method, endpoint, use_cookies=True, attempts=3, **kwargs):
     """Make a request to Azkaban using this session.
 
     :param method: HTTP method.
@@ -177,17 +191,11 @@ class Session(object):
       if (
         res is None or # explicit check because 500 responses evaluate to False
         '<!-- /.login -->' in res.text or # usual non API error response
-        'Login error' in res.text # special case for API
+        'Login error' in res.text or # special case for API
+        '"error" : "session"' in res.text # error when running a flow's jobs
       ):
         logger.debug('request failed because of invalid login')
-        if attempts > 0:
-          self._refresh()
-          attempts -= 1
-        else:
-          raise AzkabanError(
-            'Too many unsuccessful login attempts for url %r. Aborting.',
-            self.url
-          )
+        self._refresh(attempts)
       else:
         return res
 
