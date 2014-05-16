@@ -154,7 +154,9 @@ class Session(object):
             'password': password,
           },
         ))
-      except AzkabanError:
+      except AzkabanError as err:
+        if not 'Incorrect Login.' in err.message:
+          raise err
         attempts -= 1
         password = None
         if attempts <= 0:
@@ -166,7 +168,8 @@ class Session(object):
     self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
     self.config.save()
 
-  def _request(self, method, endpoint, use_cookies=True, attempts=3, **kwargs):
+  def _request(self, method, endpoint, use_cookies=True, attempts=3,
+    check_first=False, **kwargs):
     """Make a request to Azkaban using this session.
 
     :param method: HTTP method.
@@ -175,19 +178,27 @@ class Session(object):
       attempts to refresh it.
     :param use_cookies: Include `session_id` in cookies instead of request
       data.
-    :param **kwargs: Keyword arguments passed to :func:`_azkaban_request`.
+    :param check_first: Send an extra request to check that the current session
+      is valid before sending the actual one. This is useful when the request
+      is large (e.g. when uploading a project archive).
+    :param kwargs: Keyword arguments passed to :func:`_azkaban_request`.
 
     If the session expired, will prompt for a password to refresh.
 
     """
     full_url = '%s/%s' % (self.url, endpoint.lstrip('/'))
     logger.debug('sending request to %r: %r', full_url, kwargs)
-    while True:
+    for retry in [False, True]:
       if use_cookies:
         kwargs.setdefault('cookies', {})['azkaban.browser.session.id'] = self.id
       else:
         kwargs.setdefault('data', {})['session.id'] = self.id
-      res = _azkaban_request(method, full_url, **kwargs) if self.id else None
+      if check_first and not retry:
+        # hack: this request will return a 200 empty response with a valid
+        # session and prompts for login otherwise
+        res = _azkaban_request('POST', '%s/manager' % (self.url, ))
+      else:
+        res = _azkaban_request(method, full_url, **kwargs) if self.id else None
       if (
         res is None or # explicit check because 500 responses evaluate to False
         '<!-- /.login -->' in res.text or # usual non API error response
@@ -196,7 +207,7 @@ class Session(object):
       ):
         logger.debug('request failed because of invalid login')
         self._refresh(attempts)
-      else:
+      elif retry or not check_first:
         return res
 
   def get_execution_status(self, exec_id):
@@ -409,6 +420,7 @@ class Session(object):
       method='POST',
       endpoint='manager',
       use_cookies=False,
+      check_first=True,
       data={
         'ajax': 'upload',
         'project': name,
