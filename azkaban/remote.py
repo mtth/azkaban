@@ -194,9 +194,13 @@ class Session(object):
       else:
         kwargs.setdefault('data', {})['session.id'] = self.id
       if check_first and not retry:
-        # hack: this request will return a 200 empty response with a valid
-        # session and prompts for login otherwise
-        res = _azkaban_request('POST', '%s/manager' % (self.url, ))
+        # this request will return a 200 empty response if the current session
+        # ID is valid and a 500 response otherwise
+        res = _azkaban_request(
+          'POST',
+          '%s/manager' % (self.url, ),
+          data={'session.id': self.id},
+        )
       else:
         res = _azkaban_request(method, full_url, **kwargs) if self.id else None
       if (
