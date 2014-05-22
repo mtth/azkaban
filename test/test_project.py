@@ -6,7 +6,10 @@
 from azkaban.project import *
 from azkaban.job import Job
 from azkaban.util import AzkabanError, flatten, temppath
-from ConfigParser import RawConfigParser
+try:
+  from ConfigParser import RawConfigParser
+except ImportError:
+  from configparser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
 from os import pardir
@@ -177,7 +180,7 @@ class TestProjectBuild(_TestProject):
       reader =  ZipFile(path)
       try:
         ok_('bar.job' in reader.namelist())
-        eq_(reader.read('bar.job'), 'a=2\n')
+        eq_(reader.read('bar.job').decode('utf-8'), 'a=2\n')
       finally:
         reader.close()
 
@@ -188,7 +191,10 @@ class TestProjectBuild(_TestProject):
       reader = ZipFile(path)
       try:
         ok_('this.py' in reader.namelist())
-        eq_(reader.read('this.py').split('\n')[0], '#!/usr/bin/env python')
+        eq_(
+          reader.read('this.py').decode('utf-8').split('\n')[0],
+          '#!/usr/bin/env python'
+        )
       finally:
         reader.close()
 
@@ -203,7 +209,7 @@ class TestProjectBuild(_TestProject):
         ok_('foo.job' in reader.namelist())
         ok_('bar.job' in reader.namelist())
         ok_('this.py' in reader.namelist())
-        eq_(reader.read('foo.job'), 'a=2\n')
+        eq_(reader.read('foo.job').decode('utf-8'), 'a=2\n')
       finally:
         reader.close()
 
@@ -228,6 +234,6 @@ class TestProjectProperties(_TestProject):
       reader = ZipFile(path)
       try:
         eq_(sorted(reader.namelist()), ['foo.job', 'project.properties'])
-        eq_(reader.read('project.properties'), 'bar=123\n')
+        eq_(reader.read('project.properties').decode('utf-8'), 'bar=123\n')
       finally:
         reader.close()

@@ -65,9 +65,9 @@ class TestPigJob(object):
       )
       with temppath() as tpath:
         job.build(tpath)
-        with open(tpath) as reader:
+        with open(tpath, 'rb') as reader: # adding b for python3 compatibility
           eq_(
-            reader.read(),
+            reader.read().decode('utf-8'),
             'jvm.args=-Da=3 -Db=2\npig.script=%s\ntype=%s\n' % (
               path.lstrip('/'), Config().get_option('azkabanpig', 'type', 'pig')
             )
@@ -89,7 +89,10 @@ class TestPigJob(object):
           files = reader.namelist()
           ok_('foo.job' in files)
           ok_(apath in files)
-          eq_(reader.read('foo.job'), 'pig.script=%s\ntype=pig\n' % (apath, ))
+          eq_(
+            reader.read('foo.job').decode('utf-8'),
+            u'pig.script=%s\ntype=pig\n' % (apath, )
+          )
         finally:
           reader.close()
 
@@ -119,6 +122,9 @@ class TestPigJob(object):
           files = reader.namelist()
           ok_('foo.job' in files)
           ok_(rpath in files)
-          eq_(reader.read('foo.job'), 'pig.script=%s\ntype=pig\n' % (rpath, ))
+          eq_(
+            reader.read('foo.job').decode('utf-8'),
+            'pig.script=%s\ntype=pig\n' % (rpath, )
+          )
         finally:
           reader.close()

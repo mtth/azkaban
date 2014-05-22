@@ -104,7 +104,9 @@ class Job(object):
     """
     prefix = prefix.rstrip('.')
     opts = []
-    for key in self.options.keys(): # copy keys to modify dict in loop
+    for key in list(self.options):
+      # copying keys to a list to allow modifying dict in loop
+      # note that we aren't using `.keys()` for compatibility with python3
       if key.startswith(prefix):
         opts.append(
           (key.replace('%s.' % (prefix, ), ''), self.options.pop(key))

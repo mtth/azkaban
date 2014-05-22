@@ -18,7 +18,7 @@ from getpass import getuser
 # This project is configured to run in a production environment (e.g. using a
 # headless user with permissions to write to a specific directory).
 
-PROJECT = Project('sample', root=__file__)
+PROJECT = Project('azkabancli_sample', root=__file__)
 PROJECT.properties = {
   'user.to.proxy': 'production_user',
   'hdfs.root': '/jobs/sample/'

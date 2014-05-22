@@ -12,7 +12,7 @@ from azkaban import PigJob, Project
 from getpass import getuser
 
 
-PROJECT = Project('sample', root=__file__)
+PROJECT = Project('azkabancli_sample', root=__file__)
 
 # default options for all jobs
 DEFAULTS = {

@@ -4,8 +4,14 @@
 """Utility module."""
 
 
-from ConfigParser import (NoOptionError, NoSectionError, ParsingError,
-  RawConfigParser)
+try:
+  from ConfigParser import (NoOptionError, NoSectionError, ParsingError,
+    RawConfigParser)
+except ImportError:
+  # python 3
+  from configparser import (NoOptionError, NoSectionError, ParsingError,
+    RawConfigParser)
+
 from contextlib import contextmanager
 from functools import wraps
 from itertools import chain

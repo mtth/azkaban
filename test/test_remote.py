@@ -9,7 +9,10 @@ from azkaban.project import Project
 from azkaban.job import Job
 from azkaban.remote import Execution, Session
 from azkaban.util import AzkabanError, Config, temppath
-from ConfigParser import NoOptionError, NoSectionError
+try:
+  from ConfigParser import NoOptionError, NoSectionError
+except ImportError:
+  from configparser import NoOptionError, NoSectionError
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
 from time import sleep
@@ -131,7 +134,7 @@ class TestUpload(_TestSession):
       self.project.add_job('test', Job({'type': 'noop'}))
       self.project.build(path)
       res = self.session.upload_project(self.project, path)
-      eq_(['projectId', 'version'], res.keys())
+      eq_(['projectId', 'version'], sorted(res))
 
   @raises(AzkabanError)
   def test_upload_missing_type(self):
@@ -148,7 +151,7 @@ class TestUpload(_TestSession):
       with temppath() as path:
         self.project.build(path)
         res = self.session.upload_project(self.project, path)
-    eq_(['projectId', 'version'], sorted(res.keys()))
+    eq_(['projectId', 'version'], sorted(res))
 
 
 class TestGetWorkflowInfo(_TestSession):

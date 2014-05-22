@@ -9,7 +9,12 @@ a remote Azkaban server.
 """
 
 
-from ConfigParser import NoOptionError, NoSectionError
+try:
+  from ConfigParser import NoOptionError, NoSectionError
+except ImportError:
+  # python 3
+  from configparser import NoOptionError, NoSectionError
+
 from getpass import getpass, getuser
 from os.path import exists
 from time import sleep
