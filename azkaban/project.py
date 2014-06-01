@@ -10,7 +10,7 @@ from os.path import (abspath, basename, dirname, exists, isabs, isdir, join,
 from traceback import format_exc
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
-from .util import AzkabanError, temppath, write_properties
+from .util import AzkabanError, flatten, temppath, write_properties
 import logging
 import sys
 
@@ -209,7 +209,7 @@ class Project(object):
     try:
       if self.properties:
         with temppath() as fpath:
-          write_properties(self.properties, fpath)
+          write_properties(flatten(self.properties), fpath)
           writer.write(fpath, 'project.properties')
       for name, job in self._jobs.items():
         with temppath() as fpath:

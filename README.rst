@@ -26,8 +26,8 @@ four pig scripts.
 
   PROJECT = Project('sample', root=__file__)
 
-  # default options for all jobs
-  DEFAULTS = {
+  # properties available to all jobs
+  PROJECT.properties = {
     'user.to.proxy': getuser(),
     'param': {
       'input_root': 'sample_dir/',
@@ -39,16 +39,16 @@ four pig scripts.
     },
   }
 
-  # list of pig job options
-  OPTIONS = [
+  # list of pig jobs
+  JOBS = [
     {'pig.script': 'first.pig'},
     {'pig.script': 'second.pig', 'dependencies': 'first.pig'},
     {'pig.script': 'third.pig', 'param': {'foo': 48}},
     {'pig.script': 'fourth.pig', 'dependencies': 'second.pig,third.pig'},
   ]
 
-  for option in OPTIONS:
-    PROJECT.add_job(option['pig.script'], PigJob(DEFAULTS, option))
+  for option in JOBS:
+    PROJECT.add_job(option['pig.script'], PigJob(option))
 
 The examples_ directory contains another sample project that uses Azkaban 
 properties to build a project with two configurations: production and test, 

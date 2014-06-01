@@ -237,3 +237,15 @@ class TestProjectProperties(_TestProject):
         eq_(reader.read('project.properties').decode('utf-8'), 'bar=123\n')
       finally:
         reader.close()
+
+  def test_properties_flattened(self):
+    self.project.add_job('foo', Job({'a': 2}))
+    self.project.properties = {'param': {'foo': 1, 'bar': 'baz'}}
+    with temppath() as path:
+      self.project.build(path)
+      reader = ZipFile(path)
+      try:
+        eq_(sorted(reader.namelist()), ['foo.job', 'project.properties'])
+        eq_(reader.read('project.properties'), 'param.bar=baz\nparam.foo=1\n')
+      finally:
+        reader.close()
