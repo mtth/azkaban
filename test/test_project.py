@@ -234,7 +234,10 @@ class TestProjectProperties(_TestProject):
       reader = ZipFile(path)
       try:
         eq_(sorted(reader.namelist()), ['foo.job', 'project.properties'])
-        eq_(reader.read('project.properties').decode('utf-8'), 'bar=123\n')
+        eq_(
+          reader.read('project.properties').decode('utf-8'),
+          'bar=123\n'
+        )
       finally:
         reader.close()
 
@@ -246,6 +249,9 @@ class TestProjectProperties(_TestProject):
       reader = ZipFile(path)
       try:
         eq_(sorted(reader.namelist()), ['foo.job', 'project.properties'])
-        eq_(reader.read('project.properties'), 'param.bar=baz\nparam.foo=1\n')
+        eq_(
+          reader.read('project.properties').decode('utf-8'),
+          'param.bar=baz\nparam.foo=1\n'
+        )
       finally:
         reader.close()
