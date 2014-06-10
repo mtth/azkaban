@@ -90,9 +90,10 @@ class PigJob(Job):
       self.options['pig.script'] = self.path.lstrip('/')
       self.join_prefix('jvm.args', ' ', '-D%s=%s')
 
-  def on_add(self, project, name):
+  def on_add(self, project, name, **kwargs):
     """This handler adds the corresponding script file to the project."""
-    project.add_file(self.path)
+    if not 'merging' in kwargs:
+      project.add_file(self.path)
 
 
 class _PigProject(Project):
