@@ -16,7 +16,7 @@ except ImportError:
   from configparser import NoOptionError, NoSectionError
 
 from getpass import getpass, getuser
-from os.path import exists, split
+from os.path import basename, exists
 from time import sleep
 from .util import AzkabanError, Config, flatten
 import logging
@@ -426,7 +426,7 @@ class Session(object):
     if not exists(path):
       raise AzkabanError('Unable to find archive at %r.' % (path, ))
     if path.endswith('.zip'):
-      file_name = split(path)[-1]
+      file_name = basename(path)
     else:
       file_name = 'file.zip'
     return _extract_json(self._request(
