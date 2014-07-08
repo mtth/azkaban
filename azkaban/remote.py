@@ -16,7 +16,7 @@ except ImportError:
   from configparser import NoOptionError, NoSectionError
 
 from getpass import getpass, getuser
-from os.path import exists
+from os.path import exists, split
 from time import sleep
 from .util import AzkabanError, Config, flatten
 import logging
@@ -425,6 +425,10 @@ class Session(object):
     """
     if not exists(path):
       raise AzkabanError('Unable to find archive at %r.' % (path, ))
+    if path.endswith('.zip'):
+      file_name = split(path)[-1]
+    else:
+      file_name = 'file.zip'
     return _extract_json(self._request(
       method='POST',
       endpoint='manager',
@@ -435,7 +439,7 @@ class Session(object):
         'project': name,
       },
       files={
-        'file': ('file.zip', open(path, 'rb').read(), 'application/zip'),
+        'file': (file_name, open(path, 'rb').read(), 'application/zip'),
       },
     ))
 
