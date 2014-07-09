@@ -33,10 +33,6 @@ four pig scripts.
       'input_root': 'sample_dir/',
       'n_reducers': 20,
     },
-    'jvm.args.mapred': {
-      'max.split.size': 2684354560,
-      'min.split.size': 2684354560,
-    },
   }
 
   # list of pig jobs

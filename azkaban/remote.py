@@ -416,19 +416,18 @@ class Session(object):
       data=request_data,
     ))
 
-  def upload_project(self, name, path):
+  def upload_project(self, name, path, archive_name=None):
     """Upload project archive.
 
     :param name: Project name.
-    :param path: Path to zip archive.
+    :param path: Local path to zip archive.
+    :param archive_name: Filename used for the archive uploaded to Azkaban.
+      Defaults to `basename(path)`.
 
     """
     if not exists(path):
       raise AzkabanError('Unable to find archive at %r.' % (path, ))
-    if path.endswith('.zip'):
-      file_name = basename(path)
-    else:
-      file_name = 'file.zip'
+    archive_name = archive_name or basename(path)
     return _extract_json(self._request(
       method='POST',
       endpoint='manager',
@@ -439,7 +438,7 @@ class Session(object):
         'project': name,
       },
       files={
-        'file': (file_name, open(path, 'rb').read(), 'application/zip'),
+        'file': (archive_name, open(path, 'rb').read(), 'application/zip'),
       },
     ))
 

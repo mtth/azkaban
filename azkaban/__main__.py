@@ -135,16 +135,17 @@ def build_project(project, zip, url, alias, replace, create):
   if zip:
     project.build(zip, overwrite=replace)
     stdout.write(
-      'Project successfully built and saved as %r (size: %s).\n'
-      % (zip, human_readable(getsize(zip)))
+      'Project %s successfully built (size: %s).\n'
+      % (project, human_readable(getsize(zip)))
     )
   else:
     with temppath() as zip:
       project.build(zip)
+      archive_name = '%s.zip' % (project.versioned_name, )
       session = Session(url, alias)
       while True:
         try:
-          res = session.upload_project(project.name, zip)
+          res = session.upload_project(project.name, zip, archive_name)
         except AzkabanError as err:
           if create and str(err).endswith("doesn't exist."):
             session.create_project(project.name, project.name)

@@ -47,6 +47,8 @@ class Project(object):
     it invisible to the CLI.
   :param root: Path to a root file or directory used to enable adding files
     using relative paths (typically used with `root=__file__`).
+  :param version: Project version, currently only used for setting the name
+    of the archive uploaded to Azkaban.
 
   The `properties` attribute of a project is a dictionary which can be used to
   pass Azkaban options which will then be available to all jobs in the project.
@@ -57,8 +59,9 @@ class Project(object):
   root = None
   _registry = WeakValueDictionary()
 
-  def __init__(self, name, root=None, register=True):
+  def __init__(self, name, root=None, register=True, version=None):
     self.name = name
+    self.version = version
     if root:
       self.root = abspath(root if isdir(root) else dirname(root))
     if register:
@@ -69,6 +72,11 @@ class Project(object):
 
   def __str__(self):
     return self.name
+
+  @property
+  def versioned_name(self):
+    """Project name, including version if present."""
+    return '%s-%s' % (self.name, self.version) if self.version else self.name
 
   @property
   def files(self):
@@ -195,12 +203,16 @@ class Project(object):
   def build(self, path, overwrite=False):
     """Create the project archive.
 
-    :param path: Destination path.
+    :param path: Destination path. If it points to a directory, the archive
+      will be named after the project name (and version, if present) and
+      created in said directory.
     :param overwrite: Don't throw an error if a file already exists at `path`.
 
     """
     logger.debug('building project')
     # not using a with statement for compatibility with older python versions
+    if isdir(path):
+      path = join(path, '%s.zip' % (self.versioned_name, ))
     if exists(path) and not overwrite:
       raise AzkabanError('Path %r already exists.' % (path, ))
     if not (len(self._jobs) or len(self._files)):
