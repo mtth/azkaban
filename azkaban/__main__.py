@@ -73,7 +73,7 @@ from azkaban.remote import Session
 from azkaban.util import (AzkabanError, Config, catch, human_readable,
   temppath, write_properties)
 from docopt import docopt
-from os.path import exists, getsize, relpath
+from os.path import exists, getsize, isdir, join, relpath
 from sys import stdout
 
 
@@ -160,7 +160,7 @@ def build_project(project, zip, url, alias, replace, create):
           break
       stdout.write(
         'Project %s successfully built and uploaded '
-        '(id: %s, size: %s, version: %s).\n'
+        '(id: %s, size: %s, upload: %s).\n'
         'Details at %s/manager?project=%s\n'
         % (
           project,
