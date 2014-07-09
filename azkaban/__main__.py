@@ -27,7 +27,10 @@ Arguments:
   JOB                           Job name.
   ZIP                           For `upload` command, the path to an existing
                                 project zip archive. For `build`, the path
-                                where the output archive will be built.
+                                where the output archive will be built. If it
+                                points to a directory, the archive will be
+                                named after the project name (and version, if
+                                present) and created in said directory.
 
 Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
@@ -133,10 +136,12 @@ def _load_project(project_arg):
 def build_project(project, zip, url, alias, replace, create):
   """Build project."""
   if zip:
+    if isdir(zip):
+      zip = join(zip, '%s.zip' % (project.versioned_name, ))
     project.build(zip, overwrite=replace)
     stdout.write(
-      'Project %s successfully built (size: %s).\n'
-      % (project, human_readable(getsize(zip)))
+      'Project %s successfully built and saved as %r (size: %s).\n'
+      % (project, zip, human_readable(getsize(zip)))
     )
   else:
     with temppath() as zip:

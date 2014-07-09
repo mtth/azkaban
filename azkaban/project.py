@@ -203,16 +203,12 @@ class Project(object):
   def build(self, path, overwrite=False):
     """Create the project archive.
 
-    :param path: Destination path. If it points to a directory, the archive
-      will be named after the project name (and version, if present) and
-      created in said directory.
+    :param path: Destination path.
     :param overwrite: Don't throw an error if a file already exists at `path`.
 
     """
     logger.debug('building project')
     # not using a with statement for compatibility with older python versions
-    if isdir(path):
-      path = join(path, '%s.zip' % (self.versioned_name, ))
     if exists(path) and not overwrite:
       raise AzkabanError('Path %r already exists.' % (path, ))
     if not (len(self._jobs) or len(self._files)):
