@@ -69,3 +69,14 @@ class TestConfig(object):
         writer.write('[cmd]\ndefault.opt = foo\ndefault.bar = hi\n')
       config = Config(path)
       config.get_option('cmd2', 'opt2')
+
+
+class TestMultipartForm(object):
+
+  def test_single_file(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
+        writer.write('HAI')
+      form = MultipartForm([{'path': path, 'name': 'foo', 'type': 'text/plain'}])
+      data = ''.join(chunk for chunk in form)
+      eq_(data, '')

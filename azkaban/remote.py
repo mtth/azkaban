@@ -18,7 +18,7 @@ except ImportError:
 from getpass import getpass, getuser
 from os.path import basename, exists
 from time import sleep
-from .util import AzkabanError, Config, flatten
+from .util import AzkabanError, Config, MultipartForm, flatten
 import logging
 import requests as rq
 
@@ -196,7 +196,7 @@ class Session(object):
     for retry in [False, True]:
       if use_cookies:
         kwargs.setdefault('cookies', {})['azkaban.browser.session.id'] = self.id
-      else:
+      elif isinstance(kwargs.get('data', {}), dict):
         kwargs.setdefault('data', {})['session.id'] = self.id
       if check_first and not retry:
         # this request will return a 200 empty response if the current session
@@ -428,18 +428,21 @@ class Session(object):
     if not exists(path):
       raise AzkabanError('Unable to find archive at %r.' % (path, ))
     archive_name = archive_name or basename(path)
+    form = MultipartForm(
+      files=[{'path': path, 'type': 'application/zip'}],
+      data={
+        'ajax': 'upload',
+        'project': name,
+        'session.id': self.id,
+      }
+    )
     return _extract_json(self._request(
       method='POST',
       endpoint='manager',
       use_cookies=False,
       check_first=True,
-      data={
-        'ajax': 'upload',
-        'project': name,
-      },
-      files={
-        'file': (archive_name, open(path, 'rb').read(), 'application/zip'),
-      },
+      headers=form.headers,
+      data=form,
     ))
 
   def get_workflow_info(self, name, flow):

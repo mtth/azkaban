@@ -3,6 +3,7 @@
 
 """Utility module."""
 
+from __future__ import unicode_literals
 
 try:
   from ConfigParser import (NoOptionError, NoSectionError, ParsingError,
@@ -14,11 +15,19 @@ except ImportError:
 
 from contextlib import contextmanager
 from functools import wraps
+from io import BytesIO
 from itertools import chain
+from mimetools import choose_boundary
+from mimetypes import guess_type
 from os import close, remove
 from os.path import exists, expanduser
+from requests.packages.urllib3.fields import guess_content_type
 from tempfile import mkstemp
+from uuid import uuid4
+import codecs
+import os.path as osp
 import sys
+
 
 
 class AzkabanError(Exception):
@@ -74,6 +83,109 @@ class Config(object):
           '`%(command)s` section.'
           % {'command': command, 'name': name, 'path': self.path}
         )
+
+
+class MultipartForm(object):
+
+  """Form allowing streaming.
+
+  Usage:
+
+  .. code:: python
+
+    from requests import post
+
+    form = MultipartForm(files={'a.txt': 'a.txt'})
+    post('http://your.url', data=form, headers=form.headers)
+
+  """
+
+  # headers to be formatted using the boundary (different for each)
+
+  def __init__(self, files, data=None, callback=None):
+    self.outer_boundary = self._get_boundary()
+    self.inner_boundary = self._get_boundary()
+    self.headers = {
+      'Content-Type': 'multipart/form-data; boundary=%s' % (self.outer_boundary, )
+    }
+    if data:
+      data_content = ''.join(
+        self._get_data_part(name, content, self.outer_boundary)
+        for name, content in data.items()
+      )
+    else:
+      data_content = ''
+    # self.static_content = (
+    #   b'%s'
+    #   b'\r\n--%s\r\n'
+    #   b'Content-Disposition: form-data; name="files"\r\n'
+    #   b'Content-Type: multipart/mixed; boundary=%s\r\n'
+    # ) % (data_content, self.outer_boundary, self.inner_boundary)
+    self.static_content = data_content
+    self.files = files
+
+  def _get_boundary(self):
+    return uuid4().hex
+
+  def _get_data_part(self, name, content, boundary):
+    """Non streamed. Returns a string."""
+    # TODO: ensure name and content are bytes
+    header = (
+      b'\r\n--%s\r\n'
+      b'Content-Disposition: form-data; name="%s"\r\n'
+      b'\r\n'
+      % (boundary, name)
+    )
+    return header + str(content)
+
+  def _get_file_part(self, boundary, path, name=None, content_type=None, chunksize=4096):
+    """Streamed. Returns a generator."""
+    # TODO: ensure name and path are bytes
+    name = name or osp.basename(path)
+    content_type = content_type or guess_type(name)[0] or 'application/octet-stream'
+    header = (
+      b'\r\n--%s\r\n'
+      # b'Content-Disposition: file; filename="%s"\r\n'
+      b'Content-Disposition: form-data; name="file"; filename="%s"\r\n'
+      b'Content-Type: %s\r\n'
+      b'\r\n'
+      % (boundary, name, content_type)
+    )
+    def _generator():
+      """Data generator."""
+      yield header
+      with open(path, 'rb') as reader:
+        while True:
+          chunk = reader.read(chunksize)
+          if chunk:
+            yield chunk
+          else:
+            break
+    return _generator()
+
+  def __iter__(self):
+    def _generator():
+      """Overall generator."""
+      yield self.static_content
+      for file_opts in self.files:
+        if isinstance(file_opts, basestring):
+          file_opts = {'path': file_opts}
+        for chunk in self._get_file_part(
+          # boundary=self.inner_boundary,
+          boundary=self.outer_boundary,
+          path=file_opts['path'],
+          name=file_opts.get('name'),
+          content_type=file_opts.get('type'),
+        ):
+          yield chunk
+      # yield b'\r\n--%s--\r\n--%s--\r\n' % (self.inner_boundary, self.outer_boundary)
+      yield b'\r\n--%s--\r\n' % (self.outer_boundary, )
+    return _generator()
+
+  @property
+  def content(self):
+    """TODO: content docstring."""
+    return b''.join(chunk for chunk in self)
 
 
 @contextmanager
