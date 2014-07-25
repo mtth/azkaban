@@ -212,7 +212,6 @@ class Session(object):
         'Login error' in res.text or # special case for API
         '"error" : "session"' in res.text # error when running a flow's jobs
       ):
-        import pdb; pdb.set_trace()
         logger.debug('request failed because of invalid login')
         self._refresh(attempts)
       elif retry or not check_first:

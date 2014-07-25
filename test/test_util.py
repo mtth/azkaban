@@ -5,6 +5,7 @@
 
 from azkaban.util import *
 from nose.tools import eq_, ok_, raises, nottest
+from six import u
 
 
 class TestFlatten(object):
@@ -79,11 +80,11 @@ class TestMultipartForm(object):
   def test_single_file(self):
     with temppath() as path:
       with open(path, 'w') as writer:
-        writer.write(b'HAI')
+        writer.write('HAI')
       form = MultipartForm([
         {'path': path, 'name': 'foo', 'type': 'text/plain'}
       ])
-      ok_('HAI' in self.get_form_content(form))
+      ok_(b'HAI' in self.get_form_content(form))
 
   def test_multiple_files(self):
     with temppath() as path:
@@ -93,7 +94,7 @@ class TestMultipartForm(object):
         {'path': path, 'name': 'foo', 'type': 'text/plain'},
         path,
       ])
-      ok_('HAI' in self.get_form_content(form))
+      ok_(b'HAI' in u(self.get_form_content(form)))
 
   def test_params(self):
     with temppath() as path:
