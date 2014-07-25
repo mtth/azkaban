@@ -73,10 +73,36 @@ class TestConfig(object):
 
 class TestMultipartForm(object):
 
+  def get_form_content(self, form):
+    return b''.join(chunk for chunk in form)
+
   def test_single_file(self):
     with temppath() as path:
       with open(path, 'w') as writer:
+        writer.write(b'HAI')
+      form = MultipartForm([
+        {'path': path, 'name': 'foo', 'type': 'text/plain'}
+      ])
+      ok_('HAI' in self.get_form_content(form))
+
+  def test_multiple_files(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
         writer.write('HAI')
-      form = MultipartForm([{'path': path, 'name': 'foo', 'type': 'text/plain'}])
-      data = ''.join(chunk for chunk in form)
-      eq_(data, '')
+      form = MultipartForm([
+        {'path': path, 'name': 'foo', 'type': 'text/plain'},
+        path,
+      ])
+      ok_('HAI' in self.get_form_content(form))
+
+  def test_params(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
+        writer.write('HAI')
+      form = MultipartForm(
+        files=[{'path': path, 'name': 'foo', 'type': 'text/plain'}, path],
+        params={'foo': 'bar'},
+      )
+      content = self.get_form_content(form)
+      ok_(b'name="foo"' in content)
+      ok_(b'bar' in content)

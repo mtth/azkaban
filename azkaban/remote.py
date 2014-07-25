@@ -173,7 +173,7 @@ class Session(object):
     self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
     self.config.save()
 
-  def _request(self, method, endpoint, use_cookies=True, attempts=3,
+  def _request(self, method, endpoint, include_session='cookies', attempts=3,
     check_first=False, **kwargs):
     """Make a request to Azkaban using this session.
 
@@ -181,8 +181,8 @@ class Session(object):
     :param endpoint: Server endpoint (e.g. manager).
     :param attempts: If current session ID is invalid, maximum number of
       attempts to refresh it.
-    :param use_cookies: Include `session_id` in cookies instead of request
-      data.
+    :param include_session: Where to include the `session_id` (possible values:
+      `'cookies'`, `'params'`, `False`).
     :param check_first: Send an extra request to check that the current session
       is valid before sending the actual one. This is useful when the request
       is large (e.g. when uploading a project archive).
@@ -194,10 +194,12 @@ class Session(object):
     full_url = '%s/%s' % (self.url, endpoint.lstrip('/'))
     logger.debug('sending request to %r: %r', full_url, kwargs)
     for retry in [False, True]:
-      if use_cookies:
+      if include_session == 'cookies':
         kwargs.setdefault('cookies', {})['azkaban.browser.session.id'] = self.id
-      elif isinstance(kwargs.get('data', {}), dict):
+      elif include_session == 'params':
         kwargs.setdefault('data', {})['session.id'] = self.id
+      elif include_session:
+        raise ValueError('Invalid `include_session`: %r' % (include_session, ))
       if check_first and not retry:
         # this request will return a 200 empty response if the current session
         # ID is valid and a 500 response otherwise
@@ -412,34 +414,39 @@ class Session(object):
     return _extract_json(self._request(
       method='POST',
       endpoint='executor',
-      use_cookies=False,
+      include_session='params',
       data=request_data,
     ))
 
-  def upload_project(self, name, path, archive_name=None):
+  def upload_project(self, name, path, archive_name=None, callback=None):
     """Upload project archive.
 
     :param name: Project name.
     :param path: Local path to zip archive.
     :param archive_name: Filename used for the archive uploaded to Azkaban.
       Defaults to `basename(path)`.
+    :param callback: Callback forwarded to the streaming upload.
 
     """
     if not exists(path):
       raise AzkabanError('Unable to find archive at %r.' % (path, ))
-    archive_name = archive_name or basename(path)
     form = MultipartForm(
-      files=[{'path': path, 'type': 'application/zip'}],
-      data={
+      files=[{
+        'path': path,
+        'name': archive_name or basename(path),
+        'type': 'application/zip' # force this (tempfiles don't have extension)
+      }],
+      params={
         'ajax': 'upload',
         'project': name,
         'session.id': self.id,
-      }
+      },
+      callback=callback
     )
     return _extract_json(self._request(
       method='POST',
       endpoint='manager',
-      use_cookies=False,
+      include_session=False,
       check_first=True,
       headers=form.headers,
       data=form,

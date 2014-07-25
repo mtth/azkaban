@@ -133,44 +133,19 @@ def _load_project(project_arg):
     )
   return Project.load(script, name)
 
-def build_project(project, zip, url, alias, replace, create):
-  """Build project."""
-  if zip:
-    if isdir(zip):
-      zip = join(zip, '%s.zip' % (project.versioned_name, ))
-    project.build(zip, overwrite=replace)
-    stdout.write(
-      'Project %s successfully built and saved as %r (size: %s).\n'
-      % (project, zip, human_readable(getsize(zip)))
-    )
-  else:
-    with temppath() as zip:
-      project.build(zip)
-      archive_name = '%s.zip' % (project.versioned_name, )
-      session = Session(url, alias)
-      while True:
-        try:
-          res = session.upload_project(project.name, zip, archive_name)
-        except AzkabanError as err:
-          if create and str(err).endswith("doesn't exist."):
-            session.create_project(project.name, project.name)
-          else:
-            raise err
-        else:
-          break
-      stdout.write(
-        'Project %s successfully built and uploaded '
-        '(id: %s, size: %s, upload: %s).\n'
-        'Details at %s/manager?project=%s\n'
-        % (
-          project,
-          res['projectId'],
-          human_readable(getsize(zip)),
-          res['version'],
-          session.url,
-          project,
-        )
-      )
+def _upload_callback(cur_bytes, tot_bytes, file_index):
+  """Callback for streaming upload.
+
+  :param cur_bytes: Total bytes uploaded so far.
+  :param tot_bytes: Total bytes to be uploaded.
+  :param file_index: (0-based) index of the file currently uploaded.
+
+  """
+  stdout.write(
+    'Uploading project archive: %d%%\r'
+    % (int(100. * cur_bytes / tot_bytes), )
+  )
+  stdout.flush()
 
 def create_project(url, alias):
   """Create new project on remote Azkaban server."""
@@ -235,7 +210,11 @@ def upload_project(project_name, zip, url, alias, create):
   session = Session(url, alias)
   while True:
     try:
-      res = session.upload_project(project_name, zip)
+      res = session.upload_project(
+        name=project_name,
+        path=zip,
+        callback=_upload_callback
+      )
     except AzkabanError as err:
       if create:
         session.create_project(project_name, project_name)
@@ -255,6 +234,50 @@ def upload_project(project_name, zip, url, alias, create):
       project_name,
     )
   )
+
+def build_project(project, zip, url, alias, replace, create):
+  """Build project."""
+  if zip:
+    if isdir(zip):
+      zip = join(zip, '%s.zip' % (project.versioned_name, ))
+    project.build(zip, overwrite=replace)
+    stdout.write(
+      'Project %s successfully built and saved as %r (size: %s).\n'
+      % (project, zip, human_readable(getsize(zip)))
+    )
+  else:
+    with temppath() as zip:
+      project.build(zip)
+      archive_name = '%s.zip' % (project.versioned_name, )
+      session = Session(url, alias)
+      while True:
+        try:
+          res = session.upload_project(
+            name=project.name,
+            path=zip,
+            archive_name=archive_name,
+            callback=_upload_callback
+          )
+        except AzkabanError as err:
+          if create and str(err).endswith("doesn't exist."):
+            session.create_project(project.name, project.name)
+          else:
+            raise err
+        else:
+          break
+      stdout.write(
+        'Project %s successfully built and uploaded '
+        '(id: %s, size: %s, upload: %s).\n'
+        'Details at %s/manager?project=%s\n'
+        % (
+          project,
+          res['projectId'],
+          human_readable(getsize(zip)),
+          res['version'],
+          session.url,
+          project,
+        )
+      )
 
 @catch(AzkabanError)
 def main():
