@@ -141,10 +141,13 @@ def _upload_callback(cur_bytes, tot_bytes, file_index):
   :param file_index: (0-based) index of the file currently uploaded.
 
   """
-  stdout.write(
-    'Uploading project archive: %.1f%%\r'
-    % (100. * cur_bytes / tot_bytes, )
-  )
+  if cur_bytes != tot_bytes:
+    stdout.write(
+      'Uploading project: %.1f%%\r'
+      % (100. * cur_bytes / tot_bytes, )
+    )
+  else:
+    stdout.write('Validating project...    \r')
   stdout.flush()
 
 def view_info(project, files, options, job, include_properties):
