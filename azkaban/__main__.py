@@ -5,26 +5,26 @@
 
 Usage:
   azkaban build [-crp PROJECT] [-a ALIAS | -u URL | ZIP]
-  azkaban create [-a ALIAS | -u URL]
-  azkaban delete [-a ALIAS | -u URL]
   azkaban info [-p PROJECT] [-f | -o OPTIONS | [-i] JOB ...]
-  azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAIL] FLOW [JOB ...]
+  azkaban log [-p PROJECT] [-a ALIAS | -u URL] EXECUTION [JOB]
+  azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAIL] WORKFLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
   azkaban -h | --help | -v | --version
 
 Commmands:
   build*                        Build project and upload to Azkaban or save
                                 locally the resulting archive.
-  create                        Create a project on the Azkaban server.
-  delete                        Delete a project on the Azkaban server.
   info*                         View information about jobs or files.
+  log                           View workflow or job execution logs.
   run                           Run jobs or workflows. If no job is specified,
                                 the entire workflow will be executed.
   upload                        Upload archive to Azkaban server.
 
 Arguments:
-  FLOW                          Workflow (job without children) name.
+  EXECUTION                     Execution ID.
   JOB                           Job name.
+  WORKFLOW                      Workflow name. Recall that in the Azkaban world
+                                this is simply a job without children.
   ZIP                           For `upload` command, the path to an existing
                                 project zip archive. For `build`, the path
                                 where the output archive will be built. If it
@@ -69,7 +69,7 @@ Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 
 from azkaban import __version__
 from azkaban.project import Project
-from azkaban.remote import Session
+from azkaban.remote import Execution, Session
 from azkaban.util import (AzkabanError, Config, catch, human_readable,
   temppath, write_properties)
 from docopt import docopt
@@ -147,25 +147,6 @@ def _upload_callback(cur_bytes, tot_bytes, file_index):
   )
   stdout.flush()
 
-def create_project(url, alias):
-  """Create new project on remote Azkaban server."""
-  session = Session(url, alias)
-  name = raw_input('Project name: ').strip()
-  description = raw_input('Project description [%s]: ' % (name, ))
-  session.create_project(name, description.strip() or name)
-  stdout.write(
-    'Project %s successfully created.\n'
-    'Details at %s/manager?project=%s\n'
-    % (name, session.url, name)
-  )
-
-def delete_project(url, alias):
-  """Delete a project on remote Azkaban server."""
-  session = Session(url, alias)
-  project = raw_input('Project name: ')
-  session.delete_project(project)
-  stdout.write('Project %s successfully deleted.\n' % (project, ))
-
 def view_info(project, files, options, job, include_properties):
   """List jobs in project."""
   if job:
@@ -185,6 +166,14 @@ def view_info(project, files, options, job, include_properties):
     else:
       for name in sorted(project.jobs):
         stdout.write('%s\n' % (name, ))
+
+def view_log(project, execution, job, url, alias):
+  """View workflow or job execution logs."""
+  session = Session(url, alias)
+  exc = Execution(session, execution)
+  logs = exc.job_logs(job[0]) if job else exc.logs()
+  for line in logs:
+    stdout.write('%s\n' % (line.encode('utf-8'), ))
 
 def run_flow(project_name, flow, job, url, alias, skip, kill, email):
   """Run workflow."""
@@ -288,10 +277,11 @@ def main():
       _load_project(args['--project']),
       **_forward(args, ['ZIP', '--url', '--alias', '--replace', '--create'])
     )
-  elif args['create']:
-    create_project(**_forward(args, ['--url', '--alias']))
-  elif args['delete']:
-    delete_project(**_forward(args, ['--url', '--alias']))
+  elif args['log']:
+    view_log(
+      _load_project(args['--project']),
+      **_forward(args, ['EXECUTION', 'JOB', '--url', '--alias'])
+    )
   elif args['info']:
     view_info(
       _load_project(args['--project']),
@@ -302,7 +292,7 @@ def main():
       _get_project_name(args['--project']),
       **_forward(
         args,
-        ['FLOW', 'JOB', '--skip', '--url', '--alias', '--kill', '--email']
+        ['WORKFLOW', 'JOB', '--skip', '--url', '--alias', '--kill', '--email']
       )
     )
   elif args['upload']:

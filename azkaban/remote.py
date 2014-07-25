@@ -15,10 +15,11 @@ except ImportError:
   # python 3
   from configparser import NoOptionError, NoSectionError
 
+from .util import AzkabanError, Config, MultipartForm, flatten
 from getpass import getpass, getuser
 from os.path import basename, exists
+from six import string_types
 from time import sleep
-from .util import AzkabanError, Config, MultipartForm, flatten
 import logging
 import requests as rq
 
@@ -399,7 +400,7 @@ class Session(object):
         for key, value in flatten(properties).items()
       ))
     if emails:
-      if isinstance(emails[0], basestring):
+      if isinstance(emails[0], string_types):
         failure_emails = ','.join(emails)
         success_emails = failure_emails
       else:

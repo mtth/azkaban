@@ -18,6 +18,7 @@ from mimetypes import guess_type
 from os import close, remove
 from os.path import exists, expanduser
 from requests.packages.urllib3.filepost import choose_boundary
+from six import string_types
 from tempfile import mkstemp
 import os.path as osp
 import sys
@@ -105,7 +106,7 @@ class MultipartForm(object):
     self._boundary = choose_boundary()
     self._params = params
     self._files = [
-      {'path': o} if isinstance(o, basestring) else o
+      {'path': o} if isinstance(o, string_types) else o
       for o in files
     ]
     self._callback = callback
@@ -117,7 +118,7 @@ class MultipartForm(object):
     # prepare files
     self._files = []
     for opts in files:
-      if isinstance(opts, basestring):
+      if isinstance(opts, string_types):
         opts = {'path': opts}
       opts.setdefault('name', opts.get('name') or osp.basename(opts['path']))
       opts.setdefault('type', opts.get('type') or guess_type(opts['name'])[0])
