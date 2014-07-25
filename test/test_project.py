@@ -6,15 +6,12 @@
 from azkaban.project import *
 from azkaban.job import Job
 from azkaban.util import AzkabanError, flatten, temppath
-try:
-  from ConfigParser import RawConfigParser
-except ImportError:
-  from configparser import RawConfigParser
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
 from os import pardir
 from os.path import basename, dirname, expanduser, relpath, abspath, join
 from requests import ConnectionError, post
+from six.moves.configparser import RawConfigParser
 from time import sleep, time
 from zipfile import ZipFile
 

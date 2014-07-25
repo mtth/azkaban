@@ -3,14 +3,6 @@
 
 """Utility module."""
 
-try:
-  from ConfigParser import (NoOptionError, NoSectionError, ParsingError,
-    RawConfigParser)
-except ImportError:
-  # python 3
-  from configparser import (NoOptionError, NoSectionError, ParsingError,
-    RawConfigParser)
-
 from contextlib import contextmanager
 from functools import wraps
 from itertools import chain
@@ -18,7 +10,9 @@ from mimetypes import guess_type
 from os import close, remove
 from os.path import exists, expanduser
 from requests.packages.urllib3.filepost import choose_boundary
-from six import string_types
+from six import b, string_types
+from six.moves.configparser import (NoOptionError, NoSectionError,
+  ParsingError, RawConfigParser)
 from tempfile import mkstemp
 import os.path as osp
 import sys
@@ -97,8 +91,8 @@ class MultipartForm(object):
 
     from requests import post
 
-    form = MultipartForm(files={'a.txt': 'a.txt'})
-    post('http://your.url', data=form, headers=form.headers)
+    form = MultipartForm(files=['README.rst'])
+    post('http://your.url', headers=form.headers, data=form)
 
   """
 
@@ -132,10 +126,10 @@ class MultipartForm(object):
       tot_bytes = self.size
       # start the content body with the form parameters
       if self._params:
-        params_content = b''.join(
-          b'%s%s' % (self._get_section_header(name), content)
+        params_content = b(''.join(
+          '%s%s' % (self._get_section_header(name), content)
           for name, content in self._params.items()
-        )
+        ))
       else:
         params_content = b''
       yield params_content
@@ -143,11 +137,11 @@ class MultipartForm(object):
       if len(self._files) == 1:
         # simple case, only one file (included as any other form param)
         file_opts = self._files[0]
-        yield self._get_section_header(
+        yield b(self._get_section_header(
           name='file',
           filename=file_opts['name'],
           content_type=file_opts['type'],
-        )
+        ))
         for chunk in stream_file(file_opts['path'], self._chunksize):
           cur_bytes += len(chunk)
           yield chunk
@@ -156,22 +150,22 @@ class MultipartForm(object):
       else:
         # we need to group all files in a single multipart/mixed section
         file_boundary = choose_boundary()
-        yield self._get_section_header(
+        yield b(self._get_section_header(
           name='files',
           content_type='multipart/mixed; boundary=%s' % (file_boundary, )
-        )
+        ))
         for index, file_opts in enumerate(self._files):
-          yield self._get_section_header(
+          yield b(self._get_section_header(
             filename=file_opts['name'],
             content_type=file_opts['type'],
-          )
+          ))
           for chunk in stream_file(file_opts['path'], self._chunksize):
             cur_bytes += len(chunk)
             yield chunk
             if callback:
               callback(cur_bytes, tot_bytes, index)
-        yield b'\r\n--%s--' % (file_boundary, )
-      yield b'\r\n--%s--\r\n' % (self._boundary, )
+        yield b('\r\n--%s--' % (file_boundary, ))
+      yield b('\r\n--%s--\r\n' % (self._boundary, ))
     return _generator()
 
   @property
@@ -188,16 +182,16 @@ class MultipartForm(object):
     filename=None, content_type=None, boundary=None):
     """Non streamed. Returns a string."""
     return (
-      b'\r\n'
-      b'--%(b)s\r\n'
-      b'Content-Disposition: %(d)s%(n)s%(f)s\r\n'
-      b'%(t)s\r\n'
+      '\r\n'
+      '--%(b)s\r\n'
+      'Content-Disposition: %(d)s%(n)s%(f)s\r\n'
+      '%(t)s\r\n'
       % {
         'b': boundary or self._boundary,
         'd': content_disposition,
-        'n': b'; name="%s"' % (name, ) if name else b'',
-        'f': b'; filename="%s"' % (filename, ) if filename else b'',
-        't': b'Content-Type: %s\r\n' % (content_type, ) if content_type else b''
+        'n': '; name="%s"' % (name, ) if name else '',
+        'f': '; filename="%s"' % (filename, ) if filename else '',
+        't': 'Content-Type: %s\r\n' % (content_type, ) if content_type else ''
       }
     )
 

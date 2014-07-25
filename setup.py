@@ -27,6 +27,7 @@ setup(
       'Programming Language :: Python :: 3.3',
     ],
     install_requires=[
+      'six',
       'docopt',
       'requests>=2.0.1',
     ],

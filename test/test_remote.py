@@ -9,10 +9,7 @@ from azkaban.project import Project
 from azkaban.job import Job
 from azkaban.remote import Execution, Session
 from azkaban.util import AzkabanError, Config, temppath
-try:
-  from ConfigParser import NoOptionError, NoSectionError
-except ImportError:
-  from configparser import NoOptionError, NoSectionError
+from six.moves.configparser import NoOptionError, NoSectionError
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
 from time import sleep

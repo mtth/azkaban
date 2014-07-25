@@ -9,16 +9,11 @@ a remote Azkaban server.
 """
 
 
-try:
-  from ConfigParser import NoOptionError, NoSectionError
-except ImportError:
-  # python 3
-  from configparser import NoOptionError, NoSectionError
-
 from .util import AzkabanError, Config, MultipartForm, flatten
 from getpass import getpass, getuser
 from os.path import basename, exists
 from six import string_types
+from six.moves.configparser import NoOptionError, NoSectionError
 from time import sleep
 import logging
 import requests as rq
@@ -217,6 +212,7 @@ class Session(object):
         'Login error' in res.text or # special case for API
         '"error" : "session"' in res.text # error when running a flow's jobs
       ):
+        import pdb; pdb.set_trace()
         logger.debug('request failed because of invalid login')
         self._refresh(attempts)
       elif retry or not check_first:

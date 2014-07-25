@@ -142,8 +142,8 @@ def _upload_callback(cur_bytes, tot_bytes, file_index):
 
   """
   stdout.write(
-    'Uploading project archive: %d%%\r'
-    % (int(100. * cur_bytes / tot_bytes), )
+    'Uploading project archive: %.1f%%\r'
+    % (100. * cur_bytes / tot_bytes, )
   )
   stdout.flush()
 
