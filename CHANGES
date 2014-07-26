@@ -6,6 +6,7 @@ Version 0.7.0 (?)
 
 * Display progress percentage during project upload.
 * Added `log` CLI command to view flow and job execution logs.
+* Improved logging and added default file handler for the CLIs.
 
 Breaking changes:
 

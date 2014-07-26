@@ -8,7 +8,6 @@ a remote Azkaban server.
 
 """
 
-
 from .util import AzkabanError, Config, MultipartForm, flatten
 from getpass import getpass, getuser
 from os.path import basename, exists
@@ -40,9 +39,9 @@ def _azkaban_request(method, url, **kwargs):
     try:
       response = handler(url, verify=False, **kwargs)
     except rq.ConnectionError:
-      raise AzkabanError('Unable to connect to azkaban at %r.' % (url, ))
+      raise AzkabanError('Unable to connect to Azkaban server %r.' % (url, ))
     except rq.exceptions.MissingSchema:
-      raise AzkabanError('Invalid azkaban server url: %r.' % (url, ))
+      raise AzkabanError('Invalid Azkaban server url: %r.' % (url, ))
     else:
       return response
 
@@ -54,9 +53,14 @@ def _extract_json(response):
   """
   try:
     json = response.json()
-  except ValueError:
-    # no json decoded probably
-    raise ValueError('No JSON decoded from response %r' % (response.text, ))
+  except ValueError as err:
+    logger.error('No JSON decoded from response: %r', response.text)
+    if not response:
+      # probably something wrong in the server
+      raise AzkabanError('Azkaban server is busy.')
+    else:
+      # this shouldn't happen
+      raise err
   else:
     if 'error' in json:
       raise AzkabanError(json['error'])
@@ -127,7 +131,10 @@ class Session(object):
       url = _resolve_alias(self.config, alias)
     self.user, self.url = _parse_url(url)
     self.id = _get_session_id(self.config, str(self).replace(':', '.'))
-    logger.debug('session %s instantiated', self)
+    logger.debug('%r instantiated.', self)
+
+  def __repr__(self):
+    return '<Session(url=\'%s@%s\')>' % (self.user, self.url)
 
   def __str__(self):
     return '%s@%s' % (self.user, self.url)
@@ -142,7 +149,7 @@ class Session(object):
     Also caches the session ID for future use.
 
     """
-    logger.debug('refreshing session')
+    logger.debug('Refreshing %r.', self)
     while True:
       password = password or getpass('Azkaban password for %s: ' % (self, ))
       try:
@@ -165,7 +172,7 @@ class Session(object):
       else:
         break
     self.id = res['session.id']
-    logger.debug('saving session id')
+    logger.debug('Got new ID for %r.', self)
     self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
     self.config.save()
 
@@ -188,7 +195,6 @@ class Session(object):
 
     """
     full_url = '%s/%s' % (self.url, endpoint.lstrip('/'))
-    logger.debug('sending request to %r: %r', full_url, kwargs)
     for retry in [False, True]:
       if include_session == 'cookies':
         kwargs.setdefault('cookies', {})['azkaban.browser.session.id'] = self.id
@@ -197,6 +203,7 @@ class Session(object):
       elif include_session:
         raise ValueError('Invalid `include_session`: %r' % (include_session, ))
       if check_first and not retry:
+        logger.debug('Checking that %r is valid.', self)
         # this request will return a 200 empty response if the current session
         # ID is valid and a 500 response otherwise
         res = _azkaban_request(
@@ -212,7 +219,7 @@ class Session(object):
         'Login error' in res.text or # special case for API
         '"error" : "session"' in res.text # error when running a flow's jobs
       ):
-        logger.debug('request failed because of invalid login')
+        logger.warn('Request failed because %r is invalid.', self)
         self._refresh(attempts)
       elif retry or not check_first:
         return res
@@ -223,6 +230,7 @@ class Session(object):
     :param exec_id: Execution ID.
 
     """
+    logger.debug('Fetching execution status for ID %s.', exec_id)
     return _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -240,6 +248,7 @@ class Session(object):
     :param limit: Size of log to download.
 
     """
+    logger.debug('Fetching execution logs for ID %s.', exec_id)
     return _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -260,6 +269,7 @@ class Session(object):
     :param limit: Size of log to download.
 
     """
+    logger.debug('Fetching execution job logs for ID %s, %s.', exec_id, job)
     return _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -278,6 +288,7 @@ class Session(object):
     :param exec_id: Execution ID.
 
     """
+    logger.debug('Cancelling execution %s.', exec_id)
     res = _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -297,6 +308,7 @@ class Session(object):
     :param description: Project description.
 
     """
+    logger.debug('Creating project %s.', name)
     return _extract_json(self._request(
       method='POST',
       endpoint='manager',
@@ -313,6 +325,7 @@ class Session(object):
     :param name: Project name.
 
     """
+    logger.debug('Deleting project %s.', name)
     res = self._request(
       method='GET',
       endpoint='manager',
@@ -353,6 +366,7 @@ class Session(object):
     uploaded and the corresponding user must have permissions to run it.
 
     """
+    logger.debug('Starting project %s workflow %s.', name, flow)
     if not jobs:
       disabled = '[]'
     else:
@@ -379,7 +393,7 @@ class Session(object):
         'cancel': 'cancelImmediately',
       }[on_failure]
     except KeyError:
-      raise AzkabanError('Invalid `on_failure` value: %r.', on_failure)
+      raise ValueError('Invalid `on_failure` value: %r.' % (on_failure, ))
     request_data = {
       'ajax': 'executeFlow',
       'project': name,
@@ -407,12 +421,14 @@ class Session(object):
         'successEmails': success_emails,
         'successEmailsOverride': 'true',
       })
-    return _extract_json(self._request(
+    res = _extract_json(self._request(
       method='POST',
       endpoint='executor',
       include_session='params',
       data=request_data,
     ))
+    logger.debug('Started project %s workflow %s.', name, flow)
+    return res
 
   def upload_project(self, name, path, archive_name=None, callback=None):
     """Upload project archive.
@@ -424,6 +440,7 @@ class Session(object):
     :param callback: Callback forwarded to the streaming upload.
 
     """
+    logger.debug('Uploading %r as %r to project %s.', path, archive_name, name)
     if not exists(path):
       raise AzkabanError('Unable to find archive at %r.' % (path, ))
     form = MultipartForm(
@@ -439,7 +456,7 @@ class Session(object):
       },
       callback=callback
     )
-    return _extract_json(self._request(
+    res = _extract_json(self._request(
       method='POST',
       endpoint='manager',
       include_session=False,
@@ -447,6 +464,8 @@ class Session(object):
       headers=form.headers,
       data=form,
     ))
+    logger.info('Archive for project %s successfully uploaded.', name)
+    return res
 
   def get_workflow_info(self, name, flow):
     """Get list of jobs corresponding to a workflow.
@@ -455,6 +474,7 @@ class Session(object):
     :param flow: Name of flow in project.
 
     """
+    logger.debug('Gathering project %s workflow %s information.', name, flow)
     raw_res = self._request(
       method='GET',
       endpoint='manager',

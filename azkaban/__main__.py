@@ -4,9 +4,9 @@
 """Azkaban CLI: a lightweight command line interface for Azkaban.
 
 Usage:
-  azkaban build [-crp PROJECT] [-a ALIAS | -u URL | ZIP]
+  azkaban build [-cp PROJECT] [-a ALIAS | -u URL | [-r] ZIP]
   azkaban info [-p PROJECT] [-f | -o OPTIONS | [-i] JOB ...]
-  azkaban log [-p PROJECT] [-a ALIAS | -u URL] EXECUTION [JOB]
+  azkaban log [-a ALIAS | -u URL] EXECUTION [JOB]
   azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAIL] WORKFLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
   azkaban -h | --help | -v | --version
@@ -75,6 +75,11 @@ from azkaban.util import (AzkabanError, Config, catch, human_readable,
 from docopt import docopt
 from os.path import exists, getsize, isdir, join, relpath
 from sys import stdout
+import logging as lg
+
+
+# logging handler used for the CLI
+_handler = Config().get_file_handler('azkaban')
 
 
 def _forward(args, names):
@@ -170,7 +175,7 @@ def view_info(project, files, options, job, include_properties):
       for name in sorted(project.jobs):
         stdout.write('%s\n' % (name, ))
 
-def view_log(project, execution, job, url, alias):
+def view_log(execution, job, url, alias):
   """View workflow or job execution logs."""
   session = Session(url, alias)
   exc = Execution(session, execution)
@@ -271,7 +276,7 @@ def build_project(project, zip, url, alias, replace, create):
         )
       )
 
-@catch(AzkabanError)
+@catch([AzkabanError], _handler.baseFilename)
 def main():
   """Command line argument parser."""
   args = docopt(__doc__, version=__version__)
@@ -282,7 +287,6 @@ def main():
     )
   elif args['log']:
     view_log(
-      _load_project(args['--project']),
       **_forward(args, ['EXECUTION', 'JOB', '--url', '--alias'])
     )
   elif args['info']:
@@ -305,4 +309,8 @@ def main():
     )
 
 if __name__ == '__main__':
+  # activate logging
+  logger = lg.getLogger()
+  logger.setLevel(lg.DEBUG)
+  logger.addHandler(_handler)
   main()

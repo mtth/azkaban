@@ -277,7 +277,7 @@ class TestRun(_TestSession):
     sleep(2)
     eq_(self.session.get_execution_status(eid)['status'], 'FAILED_FINISHING')
 
-  @raises(AzkabanError)
+  @raises(ValueError)
   def test_run_fail_invalid_on_failure(self):
     options = {'type': 'command', 'command': 'sleep ${time}'}
     self.project.add_job('foo', Job(options))

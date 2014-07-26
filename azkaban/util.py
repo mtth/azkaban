@@ -6,6 +6,7 @@
 from contextlib import contextmanager
 from functools import wraps
 from itertools import chain
+from logging.handlers import TimedRotatingFileHandler
 from mimetypes import guess_type
 from os import close, remove
 from os.path import exists, expanduser
@@ -13,10 +14,13 @@ from requests.packages.urllib3.filepost import choose_boundary
 from six import b, string_types
 from six.moves.configparser import (NoOptionError, NoSectionError,
   ParsingError, RawConfigParser)
-from tempfile import mkstemp
+from tempfile import gettempdir, mkstemp
+import logging as lg
 import os.path as osp
 import sys
 
+
+logger = lg.getLogger(__name__)
 
 
 class AzkabanError(Exception):
@@ -24,6 +28,7 @@ class AzkabanError(Exception):
   """Base error class."""
 
   def __init__(self, message, *args):
+    logger.error(message, *args)
     super(AzkabanError, self).__init__(message % args if args else message)
 
 
@@ -72,6 +77,26 @@ class Config(object):
           '`%(command)s` section.'
           % {'command': command, 'name': name, 'path': self.path}
         )
+
+  def get_file_handler(self, command):
+    """Add and configure file handler.
+
+    :param command: Command the options should be looked up for.
+
+    The default path can be configured via the `default.log` option in the
+    command's corresponding section.
+
+    """
+    handler_path = osp.join(gettempdir(), '%s.log' % (command, ))
+    handler = TimedRotatingFileHandler(
+      self.get_option(command, 'log', handler_path),
+      when='midnight', # daily backups
+      backupCount=1,
+      encoding='utf-8',
+    )
+    handler_format = '[%(levelname)s] %(asctime)s :: %(name)s :: %(message)s'
+    handler.setFormatter(lg.Formatter(handler_format))
+    return handler
 
 
 class MultipartForm(object):
@@ -217,14 +242,16 @@ def temppath():
     if exists(path):
       remove(path)
 
-def catch(*error_classes):
+def catch(error_classes, log=None):
   """Returns a decorator that catches errors and prints messages to stderr.
 
-  :param *error_classes: Error classes.
+  :param error_classes: Iterable of error classes.
+  :param log: Filepath to log file.
 
   Also exits with status 1 if any errors are caught.
 
   """
+  errors = tuple(e for e in error_classes)
   def decorator(func):
     """Decorator."""
     @wraps(func)
@@ -232,9 +259,16 @@ def catch(*error_classes):
       """Wrapper. Finally."""
       try:
         return func(*args, **kwargs)
-      except error_classes as err:
+      except errors as err:
         sys.stderr.write('%s\n' % (err, ))
         sys.exit(1)
+      except Exception as err: # catch all
+        logger.exception('Unexpected exception.')
+        if log:
+          sys.stderr.write('%s\nLog: %s\n' % (err, log))
+          sys.exit(1)
+        else:
+          raise err
     return wrapper
   return decorator
 

@@ -13,14 +13,15 @@ try:
 except ImportError:
   pass # in setup.py
 
-import logging
+import logging as lg
 
 
-class NullHandler(logging.Handler):
+class NullHandler(lg.Handler):
 
   """For python <2.7."""
 
   def emit(self, record):
     pass
 
-logging.getLogger(__name__).addHandler(NullHandler())
+
+lg.getLogger(__name__).addHandler(NullHandler())

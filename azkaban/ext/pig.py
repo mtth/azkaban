@@ -52,6 +52,11 @@ from ..job import Job
 from ..project import Project
 from ..remote import Execution, Session
 from ..util import AzkabanError, Config, catch, temppath
+import logging as lg
+
+
+# logging handler used for the AzkabanPig CLI
+_handler = Config().get_file_handler('azkabanpig')
 
 
 class PigJob(Job):
@@ -127,10 +132,10 @@ class _PigProject(Project):
       for line in execution.job_logs(job):
         yield line
       if not execution.status['status'] in ok_statuses:
-        raise AzkabanError('Execution failed.')
+        raise AzkabanError('Pig script execution failed.')
 
 
-@catch(AzkabanError)
+@catch([AzkabanError], _handler.baseFilename)
 def main():
   """AzkabanPig entry point."""
   args = docopt(__doc__)
@@ -189,4 +194,8 @@ def main():
         stdout.write('Execution still running at %s\n' % (exe.url, ))
 
 if __name__ == '__main__':
+  # activate logging
+  logger = lg.getLogger()
+  logger.setLevel(lg.DEBUG)
+  logger.addHandler(_handler)
   main()

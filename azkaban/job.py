@@ -3,7 +3,6 @@
 
 """Job definition module."""
 
-
 from .util import flatten, write_properties
 
 
