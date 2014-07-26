@@ -55,10 +55,6 @@ from ..util import AzkabanError, Config, catch, temppath
 import logging as lg
 
 
-# logging handler used for the AzkabanPig CLI
-_handler = Config().get_file_handler('azkabanpig')
-
-
 class PigJob(Job):
 
   """Convenience job class for running pig scripts.
@@ -135,7 +131,7 @@ class _PigProject(Project):
         raise AzkabanError('Pig script execution failed.')
 
 
-@catch([AzkabanError], _handler.baseFilename)
+@catch(AzkabanError)
 def main():
   """AzkabanPig entry point."""
   args = docopt(__doc__)
@@ -197,5 +193,7 @@ if __name__ == '__main__':
   # activate logging
   logger = lg.getLogger()
   logger.setLevel(lg.DEBUG)
-  logger.addHandler(_handler)
+  handler = Config().get_file_handler('azkabanpig')
+  logger.addHandler(handler)
+  # do things
   main()

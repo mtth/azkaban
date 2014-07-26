@@ -74,12 +74,9 @@ from azkaban.util import (AzkabanError, Config, catch, human_readable,
   temppath, write_properties)
 from docopt import docopt
 from os.path import exists, getsize, isdir, join, relpath
+from requests.exceptions import HTTPError
 from sys import stdout
 import logging as lg
-
-
-# logging handler used for the CLI
-_handler = Config().get_file_handler('azkaban')
 
 
 def _forward(args, names):
@@ -180,8 +177,17 @@ def view_log(execution, job, url, alias):
   session = Session(url, alias)
   exc = Execution(session, execution)
   logs = exc.job_logs(job[0]) if job else exc.logs()
-  for line in logs:
-    stdout.write('%s\n' % (line.encode('utf-8'), ))
+  try:
+    for line in logs:
+      stdout.write('%s\n' % (line.encode('utf-8'), ))
+  except HTTPError:
+    # Azkaban responds with 500 if the execution or job isn't found
+    if job:
+      raise AzkabanError(
+        'Execution %s and/or job %s not found.', execution, job
+      )
+    else:
+      raise AzkabanError('Execution %s not found.', execution)
 
 def run_flow(project_name, flow, job, url, alias, skip, kill, email):
   """Run workflow."""
@@ -276,7 +282,7 @@ def build_project(project, zip, url, alias, replace, create):
         )
       )
 
-@catch([AzkabanError], _handler.baseFilename)
+@catch(AzkabanError)
 def main():
   """Command line argument parser."""
   args = docopt(__doc__, version=__version__)
@@ -312,5 +318,7 @@ if __name__ == '__main__':
   # activate logging
   logger = lg.getLogger()
   logger.setLevel(lg.DEBUG)
-  logger.addHandler(_handler)
+  handler = Config().get_file_handler('azkaban')
+  logger.addHandler(handler)
+  # onward
   main()

@@ -18,6 +18,7 @@ from tempfile import gettempdir, mkstemp
 import logging as lg
 import os.path as osp
 import sys
+import warnings as wr
 
 
 logger = lg.getLogger(__name__)
@@ -88,15 +89,19 @@ class Config(object):
 
     """
     handler_path = osp.join(gettempdir(), '%s.log' % (command, ))
-    handler = TimedRotatingFileHandler(
-      self.get_option(command, 'log', handler_path),
-      when='midnight', # daily backups
-      backupCount=1,
-      encoding='utf-8',
-    )
-    handler_format = '[%(levelname)s] %(asctime)s :: %(name)s :: %(message)s'
-    handler.setFormatter(lg.Formatter(handler_format))
-    return handler
+    try:
+      handler = TimedRotatingFileHandler(
+        self.get_option(command, 'log', handler_path),
+        when='midnight', # daily backups
+        backupCount=1,
+        encoding='utf-8',
+      )
+    except IOError:
+      wr.warn('Unable to write to log file at %s.' % (handler_path, ))
+    else:
+      handler_format = '[%(levelname)s] %(asctime)s :: %(name)s :: %(message)s'
+      handler.setFormatter(lg.Formatter(handler_format))
+      return handler
 
 
 class MultipartForm(object):
@@ -242,16 +247,15 @@ def temppath():
     if exists(path):
       remove(path)
 
-def catch(error_classes, log=None):
+def catch(*error_classes):
   """Returns a decorator that catches errors and prints messages to stderr.
 
-  :param error_classes: Iterable of error classes.
+  :param error_classes: Error classes.
   :param log: Filepath to log file.
 
   Also exits with status 1 if any errors are caught.
 
   """
-  errors = tuple(e for e in error_classes)
   def decorator(func):
     """Decorator."""
     @wraps(func)
@@ -259,16 +263,12 @@ def catch(error_classes, log=None):
       """Wrapper. Finally."""
       try:
         return func(*args, **kwargs)
-      except errors as err:
+      except error_classes as err:
         sys.stderr.write('%s\n' % (err, ))
         sys.exit(1)
       except Exception as err: # catch all
         logger.exception('Unexpected exception.')
-        if log:
-          sys.stderr.write('%s\nLog: %s\n' % (err, log))
-          sys.exit(1)
-        else:
-          raise err
+        raise err
     return wrapper
   return decorator
 

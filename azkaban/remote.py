@@ -540,7 +540,6 @@ class Execution(object):
     finishing = False
     offset = 0
     while True:
-      sleep(delay)
       logs = self._session.get_execution_logs(
         exec_id=self.exec_id,
         offset=offset,
@@ -555,6 +554,7 @@ class Execution(object):
       else:
         if self.status['status'] != 'RUNNING':
           finishing = True
+      sleep(delay)
 
   def job_logs(self, job, delay=5):
     """Job log generator.
@@ -568,7 +568,6 @@ class Execution(object):
     finishing = False
     offset = 0
     while True:
-      sleep(delay)
       try:
         logs = self._session.get_job_logs(
           exec_id=self.exec_id,
@@ -589,7 +588,7 @@ class Execution(object):
             if not preparing:
               preparing = True
               logger.debug(
-                'Job %s in execution %s is still preparing.', job, self.id
+                'Job %s in execution %s is still preparing.', job, self.exec_id
               )
           else:
             break
@@ -612,6 +611,7 @@ class Execution(object):
           )
           if job not in running_jobs:
             finishing = True
+      sleep(delay)
 
   @classmethod
   def start(cls, session, *args, **kwargs):
