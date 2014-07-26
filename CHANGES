@@ -7,16 +7,13 @@ Version 0.7.0 (?)
 * Display progress percentage during project upload.
 * Added `log` CLI command to view flow and job execution logs.
 * Improved logging and added default file handler for the CLIs.
+* AzkabanPig now waits when the job is in a preparing stage, rather than
+  erroring out (because it is unable to find the logs).
+* Cleaner error message when the Azkaban server is down (i.e. on 500 response).
 
 Breaking changes:
 
 * Removed `create` and `delete` CLI commands.
-
-TODO:
-
-* Cleaner error message when the Azkaban server is down (i.e. on 500 response).
-* AzkabanPig now waits when the job is in a preparing stage, rather than
-  erroring out (because it is unable to find the logs).
 
 
 Version 0.6.0 (04/26/2014)

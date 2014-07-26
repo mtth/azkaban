@@ -11,6 +11,7 @@ a remote Azkaban server.
 from .util import AzkabanError, Config, MultipartForm, flatten
 from getpass import getpass, getuser
 from os.path import basename, exists
+from requests.exceptions import HTTPError
 from six import string_types
 from six.moves.configparser import NoOptionError, NoSectionError
 from time import sleep
@@ -39,9 +40,9 @@ def _azkaban_request(method, url, **kwargs):
     try:
       response = handler(url, verify=False, **kwargs)
     except rq.ConnectionError:
-      raise AzkabanError('Unable to connect to Azkaban server %r.' % (url, ))
+      raise AzkabanError('Unable to connect to Azkaban server %r.', url)
     except rq.exceptions.MissingSchema:
-      raise AzkabanError('Invalid Azkaban server url: %r.' % (url, ))
+      raise AzkabanError('Invalid Azkaban server url: %r.', url)
     else:
       return response
 
@@ -53,14 +54,9 @@ def _extract_json(response):
   """
   try:
     json = response.json()
-  except ValueError as err:
-    logger.error('No JSON decoded from response: %r', response.text)
-    if not response:
-      # probably something wrong in the server
-      raise AzkabanError('Azkaban server is busy.')
-    else:
-      # this shouldn't happen
-      raise err
+  except ValueError as err: # this should never happen
+    logger.error('No JSON decoded from response:\n%s', response.text)
+    raise err
   else:
     if 'error' in json:
       raise AzkabanError(json['error'])
@@ -172,9 +168,9 @@ class Session(object):
       else:
         break
     self.id = res['session.id']
-    logger.debug('Got new ID for %r.', self)
     self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
     self.config.save()
+    logger.info('Refreshed %r.', self)
 
   def _request(self, method, endpoint, include_session='cookies', attempts=3,
     check_first=False, **kwargs):
@@ -222,7 +218,16 @@ class Session(object):
         logger.warn('Request failed because %r is invalid.', self)
         self._refresh(attempts)
       elif retry or not check_first:
-        return res
+        try:
+          res.raise_for_status() # check that we get a 2XX response back
+        except HTTPError as err: # catch, log, and reraise
+          logger.warn(
+            'Received invalid response from %s:\n%s',
+            res.request.url, res.content
+          )
+          raise err
+        else:
+          return res
 
   def get_execution_status(self, exec_id):
     """Get status of an execution.
@@ -475,19 +480,26 @@ class Session(object):
 
     """
     logger.debug('Gathering project %s workflow %s information.', name, flow)
-    raw_res = self._request(
-      method='GET',
-      endpoint='manager',
-      params={
-        'ajax': 'fetchflowjobs',
-        'project': name,
-        'flow': flow,
-      },
-    )
     try:
-      return _extract_json(raw_res)
-    except ValueError:
-      raise AzkabanError('Flow %r not found.' % (flow, ))
+      res = self._request(
+        method='GET',
+        endpoint='manager',
+        params={
+          'ajax': 'fetchflowjobs',
+          'project': name,
+          'flow': flow,
+        },
+      )
+    except HTTPError:
+      # the Azkaban server throws a NullPointerException if the flow doesn't
+      # exist in the project, which causes a 500 response
+      raise AzkabanError('Worklow %s not found in project %s.', flow, name)
+    else:
+      try:
+        return _extract_json(res)
+      except ValueError:
+        # but sends a 200 empty response if the project doesn't exist
+        raise AzkabanError('Project %s not found.', name)
 
 
 class Execution(object):
@@ -557,26 +569,49 @@ class Execution(object):
     offset = 0
     while True:
       sleep(delay)
-      logs = self._session.get_job_logs(
-        exec_id=self.exec_id,
-        job=job,
-        offset=offset,
-      )
-      if logs['length']:
-        offset += logs['length']
-        lines = (e for e in logs['data'].split('\n') if e)
-        for line in lines:
-          yield line
-      elif finishing:
-        break
-      else:
-        running_jobs = set(
-          e['id']
-          for e in self.status['nodes']
-          if e['status'] == 'RUNNING'
+      try:
+        logs = self._session.get_job_logs(
+          exec_id=self.exec_id,
+          job=job,
+          offset=offset,
         )
-        if job not in running_jobs:
-          finishing = True
+      except HTTPError as err:
+        # if Azkaban is hanging, the job might be stuck in preparing stage
+        preparing = False
+        while True:
+          sleep(delay)
+          preparing_jobs = set(
+            e['id']
+            for e in self.status['nodes']
+            if e['status'] == 'PREPARING'
+          )
+          if job in preparing_jobs:
+            if not preparing:
+              preparing = True
+              logger.debug(
+                'Job %s in execution %s is still preparing.', job, self.id
+              )
+          else:
+            break
+        if not preparing:
+          # something else is causing the error
+          raise err
+      else:
+        if logs['length']:
+          offset += logs['length']
+          lines = (e for e in logs['data'].split('\n') if e)
+          for line in lines:
+            yield line
+        elif finishing:
+          break
+        else:
+          running_jobs = set(
+            e['id']
+            for e in self.status['nodes']
+            if e['status'] == 'RUNNING'
+          )
+          if job not in running_jobs:
+            finishing = True
 
   @classmethod
   def start(cls, session, *args, **kwargs):
