@@ -43,8 +43,8 @@ class Adapter(lg.LoggerAdapter):
   """
 
   def __init__(self, prefix, logger, extra=None):
-    # not using super since `LoggerAdapter` is an old-style class in python 2.6
     lg.LoggerAdapter.__init__(self, logger, extra)
+    # not using super since `LoggerAdapter` is an old-style class in python 2.6
     self.prefix = prefix
 
   def process(self, msg, kwargs):

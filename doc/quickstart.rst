@@ -51,7 +51,7 @@ the Azkaban server (and which user to connect as).
 
 .. code-block:: bash
 
-  $ azkaban create -u http://url.to.foo.server:port
+  $ azkaban build -u http://url.to.foo.server:port
 
 In order to avoid having to input the entire URL every time, it is possible to 
 defines aliases in `~/.azkabanrc`:
@@ -64,19 +64,19 @@ defines aliases in `~/.azkabanrc`:
   [azkaban]
   default.alias = foo
 
-We can now interact directly with each of these URLs using the `--alias` 
-option followed by their corresponding alias. Since we also specified a 
-default alias, it is also possible to omit the option altogether. As a result,
-the commands below are all equivalent:
+We can now interact directly with each of these URLs using the `--alias` option 
+followed by their corresponding alias. In particular, note that since we also 
+specified a default alias, it is also possible to omit the option altogether. 
+As a result, the commands below are now all equivalent:
 
 .. code-block:: bash
 
-  $ azkaban create -u http://url.to.foo.server:port
-  $ azkaban create -a foo
-  $ azkaban create
+  $ azkaban build -u http://url.to.foo.server:port
+  $ azkaban build -a foo
+  $ azkaban build
 
-Note finally that our session ID is cached on each successful login, so that 
-we won't have to authenticate on every remote interaction.
+Session IDs are conveniently cached after each successful login, so that we 
+don't have to authenticate every time.
 
 
 Building projects
@@ -165,14 +165,34 @@ we can create a new `Job` subclass to do it for us:
     def __init__(self, *options):
       super(FooJob, self).__init__(defaults, *options)
 
-Finally, since many Azkaban options are space- or comma-separated strings (e.g. 
-dependencies), the :class:`~azkaban.job.Job` class provides helpers to 
-conveniently transform python objects into these: 
-:meth:`~azkaban.job.Job.join_option` and :meth:`~azkaban.job.Job.join_prefix`.
+Finally, since many Azkaban options are space/comma-separated strings (e.g. 
+dependencies), the :class:`~azkaban.job.Job` class provides two helpers to 
+better handle their configuration: :meth:`~azkaban.job.Job.join_option` and 
+:meth:`~azkaban.job.Job.join_prefix`.
 
 
 More
 ****
+
+Project properties
+^^^^^^^^^^^^^^^^^^
+
+Any options added to a :class:`~azkaban.project.Project`'s `properties` 
+attribute will be available to all jobs inside of the project (under the hood, 
+these get written to a global `.properties` file):
+
+.. code-block:: python
+
+  project.properties = {
+    'user.to.proxy': 'foo',
+    'my.custom.key': 'bar',
+  }
+
+Note that this is particularly useful when combined with the 
+:meth:`~azkaban.project.Project.merge_into` method to avoid job duplication 
+when running projects with the same jobs but different options (e.g. a test and 
+a production project).
+
 
 Nested options
 ^^^^^^^^^^^^^^

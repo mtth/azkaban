@@ -16,9 +16,9 @@ Since pig jobs are so common, `azkaban` comes with an extension to:
   (using UDFs, substituting parameters, running several scripts in order, 
   etc.).
 
-* integrate pig jobs easily into your project configuration via the `PigJob` 
-  class which  automatically sets the job type and adds the corresponding 
-  script file to the project.
+* integrate pig jobs easily into your project configuration via the 
+  :class:`~azkaban.ext.pig.PigJob` class which  automatically sets the job type 
+  and adds the corresponding script file to the project.
 
   .. code-block:: python
 
@@ -27,7 +27,7 @@ Since pig jobs are so common, `azkaban` comes with an extension to:
     project.add_job('baz', PigJob({'pig.script': 'baz.pig'})
 
 
-The full API for the `PigJob` class is below.
+The full API for the :class:`~azkaban.ext.pig.PigJob` class is below.
 
 .. autoclass:: azkaban.ext.pig.PigJob
     :members:
