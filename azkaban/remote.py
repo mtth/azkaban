@@ -113,6 +113,7 @@ class Session(object):
 
   :param url: HTTP endpoint (including protocol, port and optional user).
   :param alias: Alias name.
+  :param attempts: Maximum number of attempts to refresh session.
 
   This class contains mostly low-level methods that translate directly into
   Azkaban API calls. The :class:`~azkaban.remote.Execution` class should be
@@ -120,7 +121,8 @@ class Session(object):
 
   """
 
-  def __init__(self, url=None, alias=None):
+  def __init__(self, url=None, alias=None, attempts=3):
+    self.attempts = attempts
     self.config = Config()
     if not url:
       alias = alias or self.config.get_option('azkaban', 'alias')
@@ -135,10 +137,9 @@ class Session(object):
   def __str__(self):
     return '%s@%s' % (self.user, self.url)
 
-  def _refresh(self, attempts, password=None):
+  def _refresh(self, password=None):
     """Refresh session ID.
 
-    :param attempts: Maximum number of attempts to refresh session.
     :param password: Password used to log into Azkaban. If not specified,
       will prompt for one.
 
@@ -146,6 +147,7 @@ class Session(object):
 
     """
     logger.debug('Refreshing %r.', self)
+    attempts = self.attempts
     while True:
       password = password or getpass('Azkaban password for %s: ' % (self, ))
       try:
@@ -172,62 +174,77 @@ class Session(object):
     self.config.save()
     logger.info('Refreshed %r.', self)
 
-  def _request(self, method, endpoint, include_session='cookies', attempts=3,
-    check_first=False, **kwargs):
+  def is_valid(self, response=None):
+    """Check if the current session ID is valid.
+
+    :param response: If passed, this reponse will be used to determine the
+      validity of the session. Otherwise a simple test request will be emitted.
+
+    """
+    logger.debug('Checking if %r is valid.', self)
+    # this request will return a 200 empty response if the current session
+    # ID is valid and a 500 response otherwise
+    response = response or _azkaban_request(
+      'POST',
+      '%s/manager' % (self.url, ),
+      data={'session.id': self.id},
+    )
+    if (
+      response is None or # 500 responses evaluate to False
+      '<!-- /.login -->' in response.text or # usual non API error response
+      'Login error' in response.text or # special case for API
+      '"error" : "session"' in response.text # error when running a flow's jobs
+    ):
+      logger.warn('%r is invalid:\n%s', self, response.text)
+      return False
+    else:
+      return True
+
+  def _request(self, method, endpoint, include_session='cookies', **kwargs):
     """Make a request to Azkaban using this session.
 
     :param method: HTTP method.
     :param endpoint: Server endpoint (e.g. manager).
-    :param attempts: If current session ID is invalid, maximum number of
-      attempts to refresh it.
     :param include_session: Where to include the `session_id` (possible values:
       `'cookies'`, `'params'`, `False`).
-    :param check_first: Send an extra request to check that the current session
-      is valid before sending the actual one. This is useful when the request
-      is large (e.g. when uploading a project archive).
     :param kwargs: Keyword arguments passed to :func:`_azkaban_request`.
 
     If the session expired, will prompt for a password to refresh.
 
     """
     full_url = '%s/%s' % (self.url, endpoint.lstrip('/'))
-    for retry in [False, True]:
+
+    if not self.id:
+      logger.debug('No ID found for %r.', self)
+      self._refresh()
+
+    def _send_request():
+      """Try sending the request with the appropriate credentials."""
       if include_session == 'cookies':
         kwargs.setdefault('cookies', {})['azkaban.browser.session.id'] = self.id
       elif include_session == 'params':
         kwargs.setdefault('data', {})['session.id'] = self.id
       elif include_session:
         raise ValueError('Invalid `include_session`: %r' % (include_session, ))
-      if check_first and not retry:
-        logger.debug('Checking that %r is valid.', self)
-        # this request will return a 200 empty response if the current session
-        # ID is valid and a 500 response otherwise
-        res = _azkaban_request(
-          'POST',
-          '%s/manager' % (self.url, ),
-          data={'session.id': self.id},
-        )
-      else:
-        res = _azkaban_request(method, full_url, **kwargs) if self.id else None
-      if (
-        res is None or # explicit check because 500 responses evaluate to False
-        '<!-- /.login -->' in res.text or # usual non API error response
-        'Login error' in res.text or # special case for API
-        '"error" : "session"' in res.text # error when running a flow's jobs
-      ):
-        logger.warn('Request failed because %r is invalid.', self)
-        self._refresh(attempts)
-      elif retry or not check_first:
-        try:
-          res.raise_for_status() # check that we get a 2XX response back
-        except HTTPError as err: # catch, log, and reraise
-          logger.warn(
-            'Received invalid response from %s:\n%s',
-            res.request.url, res.content
-          )
-          raise err
-        else:
-          return res
+      return _azkaban_request(method, full_url, **kwargs)
+
+    response = _send_request()
+    if not self.is_valid(response):
+      self._refresh()
+      response = _send_request()
+
+    assert self.is_valid(response)
+
+    try:
+      response.raise_for_status() # check that we get a 2XX response back
+    except HTTPError as err: # catch, log, and reraise
+      logger.warn(
+        'Received invalid response from %s:\n%s',
+        response.request.url, response.content
+      )
+      raise err
+    else:
+      return response
 
   def get_execution_status(self, exec_id):
     """Get status of an execution.
@@ -448,6 +465,8 @@ class Session(object):
     logger.debug('Uploading %r as %r to project %s.', path, archive_name, name)
     if not exists(path):
       raise AzkabanError('Unable to find archive at %r.' % (path, ))
+    if not self.is_valid():
+      self._refresh() # ensure that the ID is valid
     form = MultipartForm(
       files=[{
         'path': path,
@@ -461,11 +480,12 @@ class Session(object):
       },
       callback=callback
     )
+    # note that we aren't using the `_request` method here (we check that the
+    # session ID is valid manually, to avoid having to reupload large files)
     res = _extract_json(self._request(
       method='POST',
       endpoint='manager',
       include_session=False,
-      check_first=True,
       headers=form.headers,
       data=form,
     ))

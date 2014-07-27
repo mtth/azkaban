@@ -285,6 +285,13 @@ def build_project(project, zip, url, alias, replace, create):
 @catch(AzkabanError)
 def main():
   """Command line argument parser."""
+  # activate logging
+  logger = lg.getLogger()
+  logger.setLevel(lg.DEBUG)
+  handler = Config().get_file_handler('azkaban')
+  if handler:
+    logger.addHandler(handler)
+  # do things
   args = docopt(__doc__, version=__version__)
   if args['build']:
     build_project(
@@ -315,10 +322,4 @@ def main():
     )
 
 if __name__ == '__main__':
-  # activate logging
-  logger = lg.getLogger()
-  logger.setLevel(lg.DEBUG)
-  handler = Config().get_file_handler('azkaban')
-  logger.addHandler(handler)
-  # onward
   main()

@@ -134,6 +134,13 @@ class _PigProject(Project):
 @catch(AzkabanError)
 def main():
   """AzkabanPig entry point."""
+  # activate logging
+  logger = lg.getLogger()
+  logger.setLevel(lg.DEBUG)
+  handler = Config().get_file_handler('azkabanpig')
+  if handler:
+    logger.addHandler(handler)
+  # do things
   args = docopt(__doc__)
   paths = args['PATH']
   jars = args['--jar'] or []
@@ -190,10 +197,4 @@ def main():
         stdout.write('Execution still running at %s\n' % (exe.url, ))
 
 if __name__ == '__main__':
-  # activate logging
-  logger = lg.getLogger()
-  logger.setLevel(lg.DEBUG)
-  handler = Config().get_file_handler('azkabanpig')
-  logger.addHandler(handler)
-  # do things
   main()
