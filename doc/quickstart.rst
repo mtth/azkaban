@@ -7,16 +7,11 @@ Command line interface
 Overview
 ********
 
-Once installed, the `azkaban` executable provides several commands. These are 
-divided into two kinds:
+Once installed, the `azkaban` executable provides several useful commands. 
+These are divided into two kinds. The first will work out of the box with any 
+existing Azkaban project:
 
-Those which will work out of the box with any standard Azkaban project:
-
-* `azkaban (create | delete) [options]`
-
-  Create (or delete) a project on a remote Azkaban server.
-
-* `azkaban run [options] FLOW [JOB ...]`
+* `azkaban run [options] WORKFLOW [JOB ...]`
 
   Launch (asynchronously) an entire workflow or specific jobs in a given 
   workflow. This command will print the corresponding execution's URL to 
@@ -26,7 +21,12 @@ Those which will work out of the box with any standard Azkaban project:
 
   Upload an existing project zip archive.
 
-Those which require a configuration file (cf. `building projects`_):
+* `azkaban log [options] EXECUTION [JOB]`
+
+  View execution logs. If the execution is still running, the command will 
+  return on completion.
+
+The second require a project configuration file (cf. `building projects`_):
 
 * `azkaban build [options]`
 
@@ -114,23 +114,25 @@ file:
   project.add_file('/path/to/bar.txt', 'bar.txt')
   project.add_job('bar', Job({'type': 'command', 'command': 'cat bar.txt'}))
 
-The `add_file` method adds a file to the project archive (the second 
-optional argument specifies the destination path inside the zip file). The 
-`add_job` method will trigger the creation of a `.job` file. The 
-first argument will be the file's name, the second is a `Job` instance 
-(cf. `Job options`_).
+The :class:`~azkaban.project.Project` class corresponds transparently to a 
+project on the Azkaban server. The :meth:`~azkaban.project.Project.add_file` 
+method then adds a file to the project archive (the second optional argument 
+specifies the destination path inside the zip file). Similarly, the 
+:meth:`~azkaban.project.Project.add_job` method will trigger the creation of a 
+`.job` file. The first argument will be the file's name, the second is a 
+:class:`~azkaban.job.Job` instance (cf. `Job options`_).
 
-Once we've saved our jobs file, simply running the `azkaban` executable in the 
-same directory will pick it up automatically and activate all commands. Note 
-that we can also specify a custom configuration file location with the `-p 
---project` option.
+Once we've saved our jobs file, running the `azkaban` executable in the same 
+directory will pick it up automatically and activate all commands. Note that we 
+could also specify a custom configuration file location with the `-p --project` 
+option (e.g. if the jobs file was in a different location).
 
 
 Job options
 ***********
 
-The `Job` class is a light wrapper which allows the creation of 
-`.job` files using python dictionaries.
+The :class:`~azkaban.job.Job` class is a light wrapper which allows the 
+creation of `.job` files using python dictionaries.
 
 It also provides a convenient way to handle options shared across multiple 
 jobs: the constructor can take in multiple options dictionaries and the last 
@@ -162,6 +164,11 @@ we can create a new `Job` subclass to do it for us:
 
     def __init__(self, *options):
       super(FooJob, self).__init__(defaults, *options)
+
+Finally, since many Azkaban options are space- or comma-separated strings (e.g. 
+dependencies), the :class:`~azkaban.job.Job` class provides helpers to 
+conveniently transform python objects into these: 
+:meth:`~azkaban.job.Job.join_option` and :meth:`~azkaban.job.Job.join_prefix`.
 
 
 More
