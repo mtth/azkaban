@@ -5,16 +5,16 @@
 from azkaban import __version__
 from setuptools import find_packages, setup
 
+
 setup(
     name='azkaban',
     version=__version__,
-    description='AzkabanCLI',
+    description=__doc__,
     long_description=open('README.rst').read(),
     author='Matthieu Monsch',
     author_email='monsch@alum.mit.edu',
     url='http://azkabancli.readthedocs.org/',
     license='MIT',
-    # py_modules=['azkaban'],
     packages=find_packages(),
     classifiers=[
       'Development Status :: 4 - Beta',
