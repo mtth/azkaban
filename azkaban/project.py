@@ -3,14 +3,17 @@
 
 """Project definition module."""
 
-
 from os import sep
-from os.path import (abspath, basename, dirname, exists, isabs, isdir, join,
-  realpath, relpath, splitext)
+from os.path import (
+  abspath, basename, dirname, exists, isabs, isdir, join, realpath, relpath,
+  splitext
+)
 from traceback import format_exc
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
-from .util import AzkabanError, flatten, temppath, write_properties
+from .util import (
+  AzkabanError, InstanceLogger, flatten, temppath, write_properties
+)
 import logging
 import sys
 
@@ -69,7 +72,8 @@ class Project(object):
     self._jobs = {}
     self._files = {}
     self.properties = {}
-    logger.debug('%r instantiated.', self)
+    self.logger = InstanceLogger(self, logger)
+    self.logger.debug('Instantiated.')
 
   def __repr__(self):
     return '<Project(name=%r, root=%r)>' % (self.name, self.root)
@@ -126,7 +130,6 @@ class Project(object):
     destinations than the base root directory.
 
     """
-    logger.debug('Adding file %r as %r to %r.', path, archive_path, self)
     if not isabs(path):
       if not self.root:
         raise AzkabanError(
@@ -160,7 +163,7 @@ class Project(object):
     if not exists(path):
       raise AzkabanError('File not found: %r.' % (path, ))
     self._files[archive_path] = (path, frozen)
-    logger.info('Added file %r as %r to %r.', path, archive_path, self)
+    self.logger.info('Added file %r as %r.', path, archive_path)
 
   def add_job(self, name, job, **kwargs):
     """Include a job in the project.
@@ -179,7 +182,7 @@ class Project(object):
       raise AzkabanError('Inconsistent duplicate job: %r.' % (name, ))
     job.on_add(self, name, **kwargs)
     self._jobs[name] = job
-    logger.info('Added job %r to %r.', name, self)
+    self.logger.info('Added job %r.', name)
 
   def merge_into(self, project, overwrite=False, unregister=False):
     """Merge one project with another.
@@ -192,7 +195,7 @@ class Project(object):
     the current project's jobs and files.
 
     """
-    logger.debug('Merging %r into %r.', self, project)
+    self.logger.debug('Merging into %r.', project)
     for name, job in self._jobs.items():
       project.add_job(name, job, merging=self)
     for archive_path, (path, frozen) in self._files.items():
@@ -212,7 +215,7 @@ class Project(object):
     :param overwrite: Don't throw an error if a file already exists at `path`.
 
     """
-    logger.debug('Building %r.', self)
+    self.logger.debug('Building.')
     # not using a with statement for compatibility with older python versions
     if exists(path) and not overwrite:
       raise AzkabanError('Path %r already exists.' % (path, ))
@@ -232,7 +235,7 @@ class Project(object):
         writer.write(fpath, archive_path)
     finally:
       writer.close()
-    logger.info('%r successfully built as %r.', self, path)
+    self.logger.info('Built as %s.', path)
 
   @classmethod
   def load(cls, path, name=None):

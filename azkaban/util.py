@@ -29,8 +29,31 @@ class AzkabanError(Exception):
   """Base error class."""
 
   def __init__(self, message, *args):
-    logger.error(message, *args)
     super(AzkabanError, self).__init__(message % args if args else message)
+
+
+class InstanceLogger(lg.LoggerAdapter):
+
+  """Logger adapter that preprends the instance's `repr` to messages.
+
+  :param instance: Instance to prepend messages with.
+  :param logger: Logger instance where messages will be logged.
+  :param extra: Dictionary of contextual information, passed to the formatter.
+
+  """
+
+  def __init__(self, instance, logger, extra=None):
+    super(InstanceLogger, self).__init__(logger, extra)
+    self.instance = instance
+
+  def process(self, msg, kwargs):
+    """TODO: process docstring.
+
+    :param msg: TODO
+    :param kwargs: TODO
+
+    """
+    return '%r :: %s' % (self.instance, msg), kwargs
 
 
 class Config(object):
@@ -264,6 +287,7 @@ def catch(*error_classes):
       try:
         return func(*args, **kwargs)
       except error_classes as err:
+        logger.error(err)
         sys.stderr.write('%s\n' % (err, ))
         sys.exit(1)
       except Exception: # catch all

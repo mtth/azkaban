@@ -8,18 +8,18 @@ a remote Azkaban server.
 
 """
 
-from .util import AzkabanError, Config, MultipartForm, flatten
+from .util import AzkabanError, Config, InstanceLogger, MultipartForm, flatten
 from getpass import getpass, getuser
 from os.path import basename, exists
 from requests.exceptions import HTTPError
 from six import string_types
 from six.moves.configparser import NoOptionError, NoSectionError
 from time import sleep
-import logging
+import logging as lg
 import requests as rq
 
 
-logger = logging.getLogger(__name__)
+logger = lg.getLogger(__name__)
 
 def _azkaban_request(method, url, **kwargs):
   """Make request to azkaban server and catch common errors.
@@ -133,7 +133,8 @@ class Session(object):
       url = _resolve_alias(self.config, alias)
     self.user, self.url = _parse_url(url)
     self.id = _get_session_id(self.config, str(self).replace(':', '.'))
-    logger.debug('%r instantiated.', self)
+    self.logger = InstanceLogger(self, logger)
+    self.logger.debug('Instantiated.')
 
   def __repr__(self):
     return '<Session(url=\'%s@%s\')>' % (self.user, self.url)
@@ -148,20 +149,22 @@ class Session(object):
       validity of the session. Otherwise a simple test request will be emitted.
 
     """
-    # this request will return a 200 empty response if the current session
-    # ID is valid and a 500 response otherwise
-    response = response or _azkaban_request(
-      'POST',
-      '%s/manager' % (self.url, ),
-      data={'session.id': self.id},
-    )
+    if not response and self.id:
+      self.logger.debug('Checking if ID %s is valid.', self.id)
+      # this request will return a 200 empty response if the current session
+      # ID is valid and a 500 response otherwise
+      response = _azkaban_request(
+        'POST',
+        '%s/manager' % (self.url, ),
+        data={'session.id': self.id},
+      )
     if (
       response is None or # 500 responses evaluate to False
       '<!-- /.login -->' in response.text or # usual non API error response
       'Login error' in response.text or # special case for API
       '"error" : "session"' in response.text # error when running a flow's jobs
     ):
-      logger.warn('%r is invalid:\n%s', self, response.text)
+      self.logger.warning('ID %s is invalid:\n%s', self.id, response.text)
       return False
     else:
       return True
@@ -172,7 +175,7 @@ class Session(object):
     :param exec_id: Execution ID.
 
     """
-    logger.debug('Fetching execution status for ID %s.', exec_id)
+    self.logger.debug('Fetching status for execution %s.', exec_id)
     return _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -190,7 +193,7 @@ class Session(object):
     :param limit: Size of log to download.
 
     """
-    logger.debug('Fetching execution logs for ID %s.', exec_id)
+    self.logger.debug('Fetching logs for execution %s.', exec_id)
     return _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -211,7 +214,7 @@ class Session(object):
     :param limit: Size of log to download.
 
     """
-    logger.debug('Fetching execution job logs for ID %s, %s.', exec_id, job)
+    self.logger.debug('Fetching logs for execution %s, job %s.', exec_id, job)
     return _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -230,7 +233,7 @@ class Session(object):
     :param exec_id: Execution ID.
 
     """
-    logger.debug('Cancelling execution %s.', exec_id)
+    self.logger.debug('Cancelling execution %s.', exec_id)
     res = _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -240,7 +243,9 @@ class Session(object):
       },
     ))
     if 'error' in res:
-      raise AzkabanError('Execution %s is not running.' % (exec_id, ))
+      raise AzkabanError('Execution %s is not running.', exec_id)
+    else:
+      self.logger.info('Execution %s cancelled.', exec_id)
     return res
 
   def create_project(self, name, description):
@@ -250,7 +255,7 @@ class Session(object):
     :param description: Project description.
 
     """
-    logger.debug('Creating project %s.', name)
+    self.logger.debug('Creating project %s.', name)
     return _extract_json(self._request(
       method='POST',
       endpoint='manager',
@@ -267,7 +272,7 @@ class Session(object):
     :param name: Project name.
 
     """
-    logger.debug('Deleting project %s.', name)
+    self.logger.debug('Deleting project %s.', name)
     res = self._request(
       method='GET',
       endpoint='manager',
@@ -308,7 +313,7 @@ class Session(object):
     uploaded and the corresponding user must have permissions to run it.
 
     """
-    logger.debug('Starting project %s workflow %s.', name, flow)
+    self.logger.debug('Starting project %s workflow %s.', name, flow)
     if not jobs:
       disabled = '[]'
     else:
@@ -369,7 +374,7 @@ class Session(object):
       include_session='params',
       data=request_data,
     ))
-    logger.debug('Started project %s workflow %s.', name, flow)
+    self.logger.info('Started project %s workflow %s.', name, flow)
     return res
 
   def upload_project(self, name, path, archive_name=None, callback=None):
@@ -382,15 +387,16 @@ class Session(object):
     :param callback: Callback forwarded to the streaming upload.
 
     """
-    logger.debug('Uploading %r as %r to project %s.', path, archive_name, name)
+    self.logger.debug('Uploading archive %r to project %s.', path, name)
     if not exists(path):
       raise AzkabanError('Unable to find archive at %r.' % (path, ))
     if not self.is_valid():
       self._refresh() # ensure that the ID is valid
+    archive_name = archive_name or basename(path)
     form = MultipartForm(
       files=[{
         'path': path,
-        'name': archive_name or basename(path),
+        'name': archive_name,
         'type': 'application/zip' # force this (tempfiles don't have extension)
       }],
       params={
@@ -410,7 +416,9 @@ class Session(object):
       headers=form.headers,
       data=form,
     ))
-    logger.info('Archive for project %s successfully uploaded.', name)
+    self.logger.info(
+      'Archive %s for project %s uploaded as %s.', path, name, archive_name
+    )
     return res
 
   def get_workflow_info(self, name, flow):
@@ -420,7 +428,9 @@ class Session(object):
     :param flow: Name of flow in project.
 
     """
-    logger.debug('Gathering project %s workflow %s information.', name, flow)
+    self.logger.debug(
+      'Fetching infos for workflow %s in project %s', flow, name
+    )
     try:
       res = self._request(
         method='GET',
@@ -451,7 +461,7 @@ class Session(object):
     Also caches the session ID for future use.
 
     """
-    logger.debug('Refreshing %r.', self)
+    self.logger.debug('Refreshing.')
     attempts = self.attempts
     while True:
       password = password or getpass('Azkaban password for %s: ' % (self, ))
@@ -468,6 +478,7 @@ class Session(object):
       except AzkabanError as err:
         if not 'Incorrect Login.' in err.message:
           raise err
+        self.logger.warning('Invalid login attempt.')
         attempts -= 1
         password = None
         if attempts <= 0:
@@ -477,7 +488,7 @@ class Session(object):
     self.id = res['session.id']
     self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
     self.config.save()
-    logger.info('Refreshed %r.', self)
+    self.logger.info('Refreshed.')
 
   def _request(self, method, endpoint, include_session='cookies', **kwargs):
     """Make a request to Azkaban using this session.
@@ -494,7 +505,7 @@ class Session(object):
     full_url = '%s/%s' % (self.url, endpoint.lstrip('/'))
 
     if not self.id:
-      logger.debug('No ID found for %r.', self)
+      self.logger.debug('No ID found.')
       self._refresh()
 
     def _send_request():
@@ -520,7 +531,7 @@ class Session(object):
     try:
       response.raise_for_status() # check that we get a 2XX response back
     except HTTPError as err: # catch, log, and reraise
-      logger.warn(
+      self.logger.warning(
         'Received invalid response from %s:\n%s',
         response.request.url, response.content
       )
