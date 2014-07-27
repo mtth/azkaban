@@ -119,6 +119,10 @@ class Session(object):
   Azkaban API calls. The :class:`~azkaban.remote.Execution` class should be
   preferred for interacting with workflow executions.
 
+  Note that each session's ID is lazily updated. In particular, instantiating
+  the :class:`Session` doesn't guarantee that its current ID (e.g. loaded from
+  the configuration file) is valid.
+
   """
 
   def __init__(self, url=None, alias=None, attempts=3):
@@ -137,43 +141,6 @@ class Session(object):
   def __str__(self):
     return '%s@%s' % (self.user, self.url)
 
-  def _refresh(self, password=None):
-    """Refresh session ID.
-
-    :param password: Password used to log into Azkaban. If not specified,
-      will prompt for one.
-
-    Also caches the session ID for future use.
-
-    """
-    logger.debug('Refreshing %r.', self)
-    attempts = self.attempts
-    while True:
-      password = password or getpass('Azkaban password for %s: ' % (self, ))
-      try:
-        res = _extract_json(_azkaban_request(
-          'POST',
-          self.url,
-          data={
-            'action': 'login',
-            'username': self.user,
-            'password': password,
-          },
-        ))
-      except AzkabanError as err:
-        if not 'Incorrect Login.' in err.message:
-          raise err
-        attempts -= 1
-        password = None
-        if attempts <= 0:
-          raise AzkabanError('Too many unsuccessful login attempts. Aborting.')
-      else:
-        break
-    self.id = res['session.id']
-    self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
-    self.config.save()
-    logger.info('Refreshed %r.', self)
-
   def is_valid(self, response=None):
     """Check if the current session ID is valid.
 
@@ -181,7 +148,6 @@ class Session(object):
       validity of the session. Otherwise a simple test request will be emitted.
 
     """
-    logger.debug('Checking if %r is valid.', self)
     # this request will return a 200 empty response if the current session
     # ID is valid and a 500 response otherwise
     response = response or _azkaban_request(
@@ -199,52 +165,6 @@ class Session(object):
       return False
     else:
       return True
-
-  def _request(self, method, endpoint, include_session='cookies', **kwargs):
-    """Make a request to Azkaban using this session.
-
-    :param method: HTTP method.
-    :param endpoint: Server endpoint (e.g. manager).
-    :param include_session: Where to include the `session_id` (possible values:
-      `'cookies'`, `'params'`, `False`).
-    :param kwargs: Keyword arguments passed to :func:`_azkaban_request`.
-
-    If the session expired, will prompt for a password to refresh.
-
-    """
-    full_url = '%s/%s' % (self.url, endpoint.lstrip('/'))
-
-    if not self.id:
-      logger.debug('No ID found for %r.', self)
-      self._refresh()
-
-    def _send_request():
-      """Try sending the request with the appropriate credentials."""
-      if include_session == 'cookies':
-        kwargs.setdefault('cookies', {})['azkaban.browser.session.id'] = self.id
-      elif include_session == 'params':
-        kwargs.setdefault('data', {})['session.id'] = self.id
-      elif include_session:
-        raise ValueError('Invalid `include_session`: %r' % (include_session, ))
-      return _azkaban_request(method, full_url, **kwargs)
-
-    response = _send_request()
-    if not self.is_valid(response):
-      self._refresh()
-      response = _send_request()
-
-    assert self.is_valid(response)
-
-    try:
-      response.raise_for_status() # check that we get a 2XX response back
-    except HTTPError as err: # catch, log, and reraise
-      logger.warn(
-        'Received invalid response from %s:\n%s',
-        response.request.url, response.content
-      )
-      raise err
-    else:
-      return response
 
   def get_execution_status(self, exec_id):
     """Get status of an execution.
@@ -480,8 +400,9 @@ class Session(object):
       },
       callback=callback
     )
-    # note that we aren't using the `_request` method here (we check that the
-    # session ID is valid manually, to avoid having to reupload large files)
+    # note that we have made sure the ID is valid, for two reasons:
+    # + to avoid reuploading large files
+    # + to simplify the custom ID update process (form parameter)
     res = _extract_json(self._request(
       method='POST',
       endpoint='manager',
@@ -520,6 +441,92 @@ class Session(object):
       except ValueError:
         # but sends a 200 empty response if the project doesn't exist
         raise AzkabanError('Project %s not found.', name)
+
+  def _refresh(self, password=None):
+    """Refresh session ID.
+
+    :param password: Password used to log into Azkaban. If not specified,
+      will prompt for one.
+
+    Also caches the session ID for future use.
+
+    """
+    logger.debug('Refreshing %r.', self)
+    attempts = self.attempts
+    while True:
+      password = password or getpass('Azkaban password for %s: ' % (self, ))
+      try:
+        res = _extract_json(_azkaban_request(
+          'POST',
+          self.url,
+          data={
+            'action': 'login',
+            'username': self.user,
+            'password': password,
+          },
+        ))
+      except AzkabanError as err:
+        if not 'Incorrect Login.' in err.message:
+          raise err
+        attempts -= 1
+        password = None
+        if attempts <= 0:
+          raise AzkabanError('Too many unsuccessful login attempts. Aborting.')
+      else:
+        break
+    self.id = res['session.id']
+    self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
+    self.config.save()
+    logger.info('Refreshed %r.', self)
+
+  def _request(self, method, endpoint, include_session='cookies', **kwargs):
+    """Make a request to Azkaban using this session.
+
+    :param method: HTTP method.
+    :param endpoint: Server endpoint (e.g. manager).
+    :param include_session: Where to include the `session_id` (possible values:
+      `'cookies'`, `'params'`, `False`).
+    :param kwargs: Keyword arguments passed to :func:`_azkaban_request`.
+
+    If the session expired, will prompt for a password to refresh.
+
+    """
+    full_url = '%s/%s' % (self.url, endpoint.lstrip('/'))
+
+    if not self.id:
+      logger.debug('No ID found for %r.', self)
+      self._refresh()
+
+    def _send_request():
+      """Try sending the request with the appropriate credentials."""
+      if include_session == 'cookies':
+        kwargs.setdefault('cookies', {})['azkaban.browser.session.id'] = self.id
+      elif include_session == 'params':
+        kwargs.setdefault('data', {})['session.id'] = self.id
+      elif include_session:
+        raise ValueError('Invalid `include_session`: %r' % (include_session, ))
+      return _azkaban_request(method, full_url, **kwargs)
+
+    response = _send_request()
+    if not self.is_valid(response):
+      self._refresh()
+      response = _send_request()
+
+    # `_refresh` raises an exception rather than letting an unauthorized second
+    # request happen. this means that something is wrong with the server.
+    if not self.is_valid(response):
+      raise AzkabanError('Azkaban server is unavailable.')
+
+    try:
+      response.raise_for_status() # check that we get a 2XX response back
+    except HTTPError as err: # catch, log, and reraise
+      logger.warn(
+        'Received invalid response from %s:\n%s',
+        response.request.url, response.content
+      )
+      raise err
+    else:
+      return response
 
 
 class Execution(object):

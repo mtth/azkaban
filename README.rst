@@ -17,34 +17,29 @@ Sample
 ------
 
 Below is a simple configuration file for a project containing a workflow with 
-four pig scripts.
+three jobs:
 
 .. code-block:: python
 
-  from azkaban import PigJob, Project
+  from azkaban import Job, Project
   from getpass import getuser
 
-  PROJECT = Project('sample', root=__file__)
+  PROJECT = Project('sample')
 
   # properties available to all jobs
   PROJECT.properties = {
     'user.to.proxy': getuser(),
-    'param': {
-      'input_root': 'sample_dir/',
-      'n_reducers': 20,
-    },
   }
 
-  # list of pig jobs
-  JOBS = [
-    {'pig.script': 'first.pig'},
-    {'pig.script': 'second.pig', 'dependencies': 'first.pig'},
-    {'pig.script': 'third.pig', 'param': {'foo': 48}},
-    {'pig.script': 'fourth.pig', 'dependencies': 'second.pig,third.pig'},
-  ]
+  # dictionary of jobs
+  JOBS = {
+    'first': Job({'type': 'command', 'command': 'echo "Hello"'}),
+    'second': Job({'type': 'command', 'command': 'echo "World"'}),
+    'third': Job({'type': 'noop', 'dependencies': 'first,second'}),
+  }
 
-  for option in JOBS:
-    PROJECT.add_job(option['pig.script'], PigJob(option))
+  for name, job in JOBS.items():
+    PROJECT.add_job(name, job)
 
 The examples_ directory contains another sample project that uses Azkaban 
 properties to build a project with two configurations: production and test, 
