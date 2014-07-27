@@ -43,7 +43,8 @@ class InstanceLogger(lg.LoggerAdapter):
   """
 
   def __init__(self, instance, logger, extra=None):
-    super(InstanceLogger, self).__init__(logger, extra)
+    # not using super since `LoggerAdapter` is an old-style class in python 2.6
+    lg.LoggerAdapter.__init__(self, logger, extra)
     self.instance = instance
 
   def process(self, msg, kwargs):

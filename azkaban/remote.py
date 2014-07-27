@@ -21,6 +21,7 @@ import requests as rq
 
 logger = lg.getLogger(__name__)
 
+
 def _azkaban_request(method, url, **kwargs):
   """Make request to azkaban server and catch common errors.
 
