@@ -7,7 +7,7 @@ Usage:
   azkabanpig PATH ...
              [-j JAR] ... [-o OPTION] ...
              [-bp PROJECT] [-t TYPE] [-a ALIAS | -u URL]
-  azkabanpig -h | --help
+  azkabanpig -h | --help | -l | --log
 
 Arguments:
   PATH                          Path to pig script. If more than one path is
@@ -24,6 +24,7 @@ Options:
   -j JAR --jar=JAR              Path to jar file. It will be available on the
                                 class path when the pig script is run, no need
                                 to register it inside your scripts.
+  -l --log                      Show path to current log file and exit.
   -o OPTION --option=OPTION     Azkaban option. Can either be a path to a job
                                 file or a single option formatted as key=value.
                                 E.g. `-o param.foo=bar` will substitute
@@ -47,12 +48,12 @@ __all__ = ['PigJob']
 from docopt import docopt
 from os import sep
 from os.path import abspath, basename, exists
-from sys import stdout
 from ..job import Job
 from ..project import Project
 from ..remote import Execution, Session
 from ..util import AzkabanError, Config, catch, temppath
 import logging as lg
+import sys
 
 
 class PigJob(Job):
@@ -128,20 +129,29 @@ class _PigProject(Project):
       for line in execution.job_logs(job):
         yield line
       if not execution.status['status'] in ok_statuses:
-        raise AzkabanError('Pig script execution failed.')
+        raise AzkabanError('Job %s failed.', job)
+      else:
+        self._logger.info('Job %s finished.', job)
 
 
 @catch(AzkabanError)
 def main():
   """AzkabanPig entry point."""
+  args = docopt(__doc__)
   # activate logging
   logger = lg.getLogger()
   logger.setLevel(lg.DEBUG)
   handler = Config().get_file_handler('azkabanpig')
   if handler:
     logger.addHandler(handler)
-  # do things
-  args = docopt(__doc__)
+  # handle this command separately
+  if args['--log']:
+    if handler:
+      sys.stdout.write('%s\n' % (handler.baseFilename, ))
+      sys.exit(0)
+    else:
+      raise AzkabanError('No log file active.')
+  # create project
   paths = args['PATH']
   jars = args['--jar'] or []
   session = Session(args['--url'], args['--alias'])
@@ -182,19 +192,19 @@ def main():
   res = session.run_workflow(project, basename(paths[-1]))
   exe = Execution(session, res['execid'])
   if args['--background']:
-    stdout.write('Execution running at %s\n' % (exe.url, ))
+    sys.stdout.write('Execution running at %s\n' % (exe.url, ))
   else:
     try:
       for line in project.logs(exe):
-        stdout.write('%s\n' % (line.encode('utf-8'), ))
+        sys.stdout.write('%s\n' % (line.encode('utf-8'), ))
     except KeyboardInterrupt:
       choice = raw_input('\nCancel execution [yN]? ').lower()
       if choice and choice[0] == 'y':
-        stdout.write('Killing... ')
+        sys.stdout.write('Killing... ')
         exe.cancel()
-        stdout.write('Done.\n')
+        sys.stdout.write('Done.\n')
       else:
-        stdout.write('Execution still running at %s\n' % (exe.url, ))
+        sys.stdout.write('Execution still running at %s\n' % (exe.url, ))
 
 if __name__ == '__main__':
   main()

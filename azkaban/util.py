@@ -21,7 +21,7 @@ import sys
 import warnings as wr
 
 
-logger = lg.getLogger(__name__)
+_logger = lg.getLogger(__name__)
 
 
 class AzkabanError(Exception):
@@ -32,29 +32,29 @@ class AzkabanError(Exception):
     super(AzkabanError, self).__init__(message % args if args else message)
 
 
-class InstanceLogger(lg.LoggerAdapter):
+class Adapter(lg.LoggerAdapter):
 
-  """Logger adapter that preprends the instance's `repr` to messages.
+  """Logger adapter that includes a prefix to all messages.
 
-  :param instance: Instance to prepend messages with.
+  :param prefix: Prefix string.
   :param logger: Logger instance where messages will be logged.
   :param extra: Dictionary of contextual information, passed to the formatter.
 
   """
 
-  def __init__(self, instance, logger, extra=None):
+  def __init__(self, prefix, logger, extra=None):
     # not using super since `LoggerAdapter` is an old-style class in python 2.6
     lg.LoggerAdapter.__init__(self, logger, extra)
-    self.instance = instance
+    self.prefix = prefix
 
   def process(self, msg, kwargs):
-    """TODO: process docstring.
+    """Adds a prefix to each message.
 
-    :param msg: TODO
-    :param kwargs: TODO
+    :param msg: Original message.
+    :param kwargs: Keyword arguments that will be forwarded to the formatter.
 
     """
-    return '%r :: %s' % (self.instance, msg), kwargs
+    return '%s :: %s' % (self.prefix, msg), kwargs
 
 
 class Config(object):
@@ -288,11 +288,11 @@ def catch(*error_classes):
       try:
         return func(*args, **kwargs)
       except error_classes as err:
-        logger.error(err)
+        _logger.error(err)
         sys.stderr.write('%s\n' % (err, ))
         sys.exit(1)
       except Exception: # catch all
-        logger.exception('Unexpected exception.')
+        _logger.exception('Unexpected exception.')
         raise RuntimeError('See logs for details.')
     return wrapper
   return decorator

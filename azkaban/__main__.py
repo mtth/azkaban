@@ -7,9 +7,9 @@ Usage:
   azkaban build [-cp PROJECT] [-a ALIAS | -u URL | [-r] ZIP]
   azkaban info [-p PROJECT] [-f | -o OPTIONS | [-i] JOB ...]
   azkaban log [-a ALIAS | -u URL] EXECUTION [JOB]
-  azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAIL] WORKFLOW [JOB ...]
+  azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAILS] WORKFLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
-  azkaban -h | --help | -v | --version
+  azkaban -h | --help | -l | --log | -v | --version
 
 Commmands:
   build*                        Build project and upload to Azkaban or save
@@ -36,7 +36,7 @@ Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
                                 to reuse session IDs for later connections.
   -c --create                   Create the project if it does not exist.
-  -e EMAIL --email=EMAIL        Comma separated list of emails that will be
+  -e EMAILS --emails=EMAILS     Comma separated list of emails that will be
                                 notified when the workflow finishes.
   -f --files                    List project files instead of jobs. The first
                                 column is the local path of the file, the
@@ -44,6 +44,7 @@ Options:
   -h --help                     Show this message and exit.
   -i --include-properties       Include project properties with job options.
   -k --kill                     Kill worfklow on first job failure.
+  -l --log                      Show path to current log file and exit.
   -o OPTIONS --options=OPTIONS  Comma separated list of options that will be
                                 displayed next to each job. E.g. `-o type,foo`.
                                 The resulting output will be tab separated.
@@ -88,7 +89,7 @@ def _forward(args, names):
   """
   names = set(names)
   return dict(
-    (k.lower().lstrip('-').replace('-', '_'), v)
+    ('_%s' % (k.lower().lstrip('-').replace('-', '_'), ), v)
     for (k, v) in args.items() if k in names
   )
 
@@ -152,19 +153,19 @@ def _upload_callback(cur_bytes, tot_bytes, file_index):
     stdout.write('Validating project...    \r')
   stdout.flush()
 
-def view_info(project, files, options, job, include_properties):
+def view_info(project, _files, _options, _job, _include_properties):
   """List jobs in project."""
-  if job:
-    if include_properties:
+  if _job:
+    if _include_properties:
       write_properties(project.properties, header='project.properties')
-    for name in job:
+    for name in _job:
       project.jobs[name].build(header='%s.job' % (name, ))
-  elif files:
+  elif _files:
     for path, archive_path in sorted(project.files):
       stdout.write('%s\t%s\n' % (relpath(path), archive_path))
   else:
-    if options:
-      option_names = options.split(',')
+    if _options:
+      option_names = _options.split(',')
       for name, opts in sorted(project.jobs.items()):
         job_opts = '\t'.join(opts.get(o, '') for o in option_names)
         stdout.write('%s\t%s\n' % (name, job_opts))
@@ -172,54 +173,55 @@ def view_info(project, files, options, job, include_properties):
       for name in sorted(project.jobs):
         stdout.write('%s\n' % (name, ))
 
-def view_log(execution, job, url, alias):
+def view_log(_execution, _job, _url, _alias):
   """View workflow or job execution logs."""
-  session = Session(url, alias)
-  exc = Execution(session, execution)
-  logs = exc.job_logs(job[0]) if job else exc.logs()
+  session = Session(_url, _alias)
+  exc = Execution(session, _execution)
+  logs = exc.job_logs(_job[0]) if _job else exc.logs()
   try:
     for line in logs:
       stdout.write('%s\n' % (line.encode('utf-8'), ))
   except HTTPError:
     # Azkaban responds with 500 if the execution or job isn't found
-    if job:
+    if _job:
       raise AzkabanError(
-        'Execution %s and/or job %s not found.', execution, job
+        'Execution %s and/or job %s not found.', _execution, _job
       )
     else:
-      raise AzkabanError('Execution %s not found.', execution)
+      raise AzkabanError('Execution %s not found.', _execution)
 
-def run_flow(project_name, flow, job, url, alias, skip, kill, email):
+def run_flow(project_name, _workflow, _job, _url, _alias, _skip, _kill,
+  _emails):
   """Run workflow."""
-  session = Session(url, alias)
+  session = Session(_url, _alias)
   res = session.run_workflow(
     name=project_name,
-    flow=flow,
-    jobs=job,
-    concurrent=not skip,
-    on_failure='cancel' if kill else 'finish',
-    emails=email.split(',') if email else None,
+    flow=_workflow,
+    jobs=_job,
+    concurrent=not _skip,
+    on_failure='cancel' if _kill else 'finish',
+    emails=_emails.split(',') if _emails else None,
   )
   exec_id = res['execid']
-  job_names = ', jobs: %s' % (', '.join(job), ) if job else ''
+  job_names = ', jobs: %s' % (', '.join(_job), ) if _job else ''
   stdout.write(
     'Flow %s successfully submitted (execution id: %s%s).\n'
     'Details at %s/executor?execid=%s\n'
-    % (flow, exec_id, job_names, session.url, exec_id)
+    % (_workflow, exec_id, job_names, session.url, exec_id)
   )
 
-def upload_project(project_name, zip, url, alias, create):
+def upload_project(project_name, _zip, _url, _alias, _create):
   """Upload project."""
-  session = Session(url, alias)
+  session = Session(_url, _alias)
   while True:
     try:
       res = session.upload_project(
         name=project_name,
-        path=zip,
+        path=_zip,
         callback=_upload_callback
       )
     except AzkabanError as err:
-      if create:
+      if _create:
         session.create_project(project_name, project_name)
       else:
         raise err
@@ -231,38 +233,38 @@ def upload_project(project_name, zip, url, alias, create):
     % (
       project_name,
       res['projectId'],
-      human_readable(getsize(zip)),
+      human_readable(getsize(_zip)),
       res['version'],
       session.url,
       project_name,
     )
   )
 
-def build_project(project, zip, url, alias, replace, create):
+def build_project(project, _zip, _url, _alias, _replace, _create):
   """Build project."""
-  if zip:
-    if isdir(zip):
-      zip = join(zip, '%s.zip' % (project.versioned_name, ))
-    project.build(zip, overwrite=replace)
+  if _zip:
+    if isdir(_zip):
+      _zip = join(_zip, '%s.zip' % (project.versioned_name, ))
+    project.build(_zip, overwrite=_replace)
     stdout.write(
       'Project %s successfully built and saved as %r (size: %s).\n'
-      % (project, zip, human_readable(getsize(zip)))
+      % (project, _zip, human_readable(getsize(_zip)))
     )
   else:
-    with temppath() as zip:
-      project.build(zip)
+    with temppath() as _zip:
+      project.build(_zip)
       archive_name = '%s.zip' % (project.versioned_name, )
-      session = Session(url, alias)
+      session = Session(_url, _alias)
       while True:
         try:
           res = session.upload_project(
             name=project.name,
-            path=zip,
+            path=_zip,
             archive_name=archive_name,
             callback=_upload_callback
           )
         except AzkabanError as err:
-          if create and str(err).endswith("doesn't exist."):
+          if _create and str(err).endswith("doesn't exist."):
             session.create_project(project.name, project.name)
           else:
             raise err
@@ -275,7 +277,7 @@ def build_project(project, zip, url, alias, replace, create):
         % (
           project,
           res['projectId'],
-          human_readable(getsize(zip)),
+          human_readable(getsize(_zip)),
           res['version'],
           session.url,
           project,
@@ -285,6 +287,7 @@ def build_project(project, zip, url, alias, replace, create):
 @catch(AzkabanError)
 def main():
   """Command line argument parser."""
+  args = docopt(__doc__, version=__version__)
   # activate logging
   logger = lg.getLogger()
   logger.setLevel(lg.DEBUG)
@@ -292,8 +295,12 @@ def main():
   if handler:
     logger.addHandler(handler)
   # do things
-  args = docopt(__doc__, version=__version__)
-  if args['build']:
+  if args['--log']:
+    if handler:
+      stdout.write('%s\n' % (handler.baseFilename, ))
+    else:
+      raise AzkabanError('No log file active.')
+  elif args['build']:
     build_project(
       _load_project(args['--project']),
       **_forward(args, ['ZIP', '--url', '--alias', '--replace', '--create'])

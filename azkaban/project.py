@@ -4,21 +4,17 @@
 """Project definition module."""
 
 from os import sep
-from os.path import (
-  abspath, basename, dirname, exists, isabs, isdir, join, realpath, relpath,
-  splitext
-)
+from os.path import (abspath, basename, dirname, exists, isabs, isdir, join,
+  realpath, relpath, splitext)
 from traceback import format_exc
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
-from .util import (
-  AzkabanError, InstanceLogger, flatten, temppath, write_properties
-)
+from .util import AzkabanError, Adapter, flatten, temppath, write_properties
 import logging
 import sys
 
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class _JobDict(dict):
@@ -57,6 +53,9 @@ class Project(object):
   pass Azkaban options which will then be available to all jobs in the project.
   This can be used for example to set project wide defaults.
 
+  To avoid undefined behavior, both the `name` and `root` attributes should not
+  be altered after instantiation.
+
   """
 
   root = None
@@ -72,11 +71,13 @@ class Project(object):
     self._jobs = {}
     self._files = {}
     self.properties = {}
-    self.logger = InstanceLogger(self, logger)
-    self.logger.debug('Instantiated.')
+    self._logger = Adapter(repr(self), _logger)
+    self._logger.debug('Instantiated.')
 
   def __repr__(self):
-    return '<Project(name=%r, root=%r)>' % (self.name, self.root)
+    return '<%s(name=%r, root=%r)>' % (
+      self.__class__.__name__, self.name, self.root
+    )
 
   def __str__(self):
     return self.name
@@ -163,7 +164,7 @@ class Project(object):
     if not exists(path):
       raise AzkabanError('File not found: %r.' % (path, ))
     self._files[archive_path] = (path, frozen)
-    self.logger.info('Added file %r as %r.', path, archive_path)
+    self._logger.info('Added file %r as %r.', path, archive_path)
 
   def add_job(self, name, job, **kwargs):
     """Include a job in the project.
@@ -182,7 +183,7 @@ class Project(object):
       raise AzkabanError('Inconsistent duplicate job: %r.' % (name, ))
     job.on_add(self, name, **kwargs)
     self._jobs[name] = job
-    self.logger.info('Added job %r.', name)
+    self._logger.info('Added job %r.', name)
 
   def merge_into(self, project, overwrite=False, unregister=False):
     """Merge one project with another.
@@ -195,7 +196,7 @@ class Project(object):
     the current project's jobs and files.
 
     """
-    self.logger.debug('Merging into %r.', project)
+    self._logger.debug('Merging into %r.', project)
     for name, job in self._jobs.items():
       project.add_job(name, job, merging=self)
     for archive_path, (path, frozen) in self._files.items():
@@ -215,7 +216,7 @@ class Project(object):
     :param overwrite: Don't throw an error if a file already exists at `path`.
 
     """
-    self.logger.debug('Building.')
+    self._logger.debug('Building.')
     # not using a with statement for compatibility with older python versions
     if exists(path) and not overwrite:
       raise AzkabanError('Path %r already exists.' % (path, ))
@@ -235,7 +236,7 @@ class Project(object):
         writer.write(fpath, archive_path)
     finally:
       writer.close()
-    self.logger.info('Built as %s.', path)
+    self._logger.info('Built as %s.', path)
 
   @classmethod
   def load(cls, path, name=None):

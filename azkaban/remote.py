@@ -8,7 +8,7 @@ a remote Azkaban server.
 
 """
 
-from .util import AzkabanError, Config, InstanceLogger, MultipartForm, flatten
+from .util import AzkabanError, Config, Adapter, MultipartForm, flatten
 from getpass import getpass, getuser
 from os.path import basename, exists
 from requests.exceptions import HTTPError
@@ -19,7 +19,7 @@ import logging as lg
 import requests as rq
 
 
-logger = lg.getLogger(__name__)
+_logger = lg.getLogger(__name__)
 
 
 def _azkaban_request(method, url, **kwargs):
@@ -56,7 +56,7 @@ def _extract_json(response):
   try:
     json = response.json()
   except ValueError as err: # this should never happen
-    logger.error('No JSON decoded from response:\n%s', response.text)
+    _logger.error('No JSON decoded from response:\n%s', response.text)
     raise err
   else:
     if 'error' in json:
@@ -134,11 +134,13 @@ class Session(object):
       url = _resolve_alias(self.config, alias)
     self.user, self.url = _parse_url(url)
     self.id = _get_session_id(self.config, str(self).replace(':', '.'))
-    self.logger = InstanceLogger(self, logger)
-    self.logger.debug('Instantiated.')
+    self._logger = Adapter(repr(self), _logger)
+    self._logger.debug('Instantiated.')
 
   def __repr__(self):
-    return '<Session(url=\'%s@%s\')>' % (self.user, self.url)
+    return '<%s(url=\'%s@%s\')>' % (
+      self.__class__.__name__, self.user, self.url
+    )
 
   def __str__(self):
     return '%s@%s' % (self.user, self.url)
@@ -151,7 +153,7 @@ class Session(object):
 
     """
     if not response and self.id:
-      self.logger.debug('Checking if ID %s is valid.', self.id)
+      self._logger.debug('Checking if ID %s is valid.', self.id)
       # this request will return a 200 empty response if the current session
       # ID is valid and a 500 response otherwise
       response = _azkaban_request(
@@ -165,7 +167,7 @@ class Session(object):
       'Login error' in response.text or # special case for API
       '"error" : "session"' in response.text # error when running a flow's jobs
     ):
-      self.logger.warning('ID %s is invalid:\n%s', self.id, response.text)
+      self._logger.warning('ID %s is invalid:\n%s', self.id, response.text)
       return False
     else:
       return True
@@ -176,7 +178,7 @@ class Session(object):
     :param exec_id: Execution ID.
 
     """
-    self.logger.debug('Fetching status for execution %s.', exec_id)
+    self._logger.debug('Fetching status for execution %s.', exec_id)
     return _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -194,7 +196,7 @@ class Session(object):
     :param limit: Size of log to download.
 
     """
-    self.logger.debug('Fetching logs for execution %s.', exec_id)
+    self._logger.debug('Fetching logs for execution %s.', exec_id)
     return _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -215,7 +217,7 @@ class Session(object):
     :param limit: Size of log to download.
 
     """
-    self.logger.debug('Fetching logs for execution %s, job %s.', exec_id, job)
+    self._logger.debug('Fetching logs for execution %s, job %s.', exec_id, job)
     return _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -234,7 +236,7 @@ class Session(object):
     :param exec_id: Execution ID.
 
     """
-    self.logger.debug('Cancelling execution %s.', exec_id)
+    self._logger.debug('Cancelling execution %s.', exec_id)
     res = _extract_json(self._request(
       method='GET',
       endpoint='executor',
@@ -246,7 +248,7 @@ class Session(object):
     if 'error' in res:
       raise AzkabanError('Execution %s is not running.', exec_id)
     else:
-      self.logger.info('Execution %s cancelled.', exec_id)
+      self._logger.info('Execution %s cancelled.', exec_id)
     return res
 
   def create_project(self, name, description):
@@ -256,7 +258,7 @@ class Session(object):
     :param description: Project description.
 
     """
-    self.logger.debug('Creating project %s.', name)
+    self._logger.debug('Creating project %s.', name)
     return _extract_json(self._request(
       method='POST',
       endpoint='manager',
@@ -273,7 +275,7 @@ class Session(object):
     :param name: Project name.
 
     """
-    self.logger.debug('Deleting project %s.', name)
+    self._logger.debug('Deleting project %s.', name)
     res = self._request(
       method='GET',
       endpoint='manager',
@@ -314,7 +316,7 @@ class Session(object):
     uploaded and the corresponding user must have permissions to run it.
 
     """
-    self.logger.debug('Starting project %s workflow %s.', name, flow)
+    self._logger.debug('Starting project %s workflow %s.', name, flow)
     if not jobs:
       disabled = '[]'
     else:
@@ -375,7 +377,7 @@ class Session(object):
       include_session='params',
       data=request_data,
     ))
-    self.logger.info('Started project %s workflow %s.', name, flow)
+    self._logger.info('Started project %s workflow %s.', name, flow)
     return res
 
   def upload_project(self, name, path, archive_name=None, callback=None):
@@ -388,7 +390,7 @@ class Session(object):
     :param callback: Callback forwarded to the streaming upload.
 
     """
-    self.logger.debug('Uploading archive %r to project %s.', path, name)
+    self._logger.debug('Uploading archive %r to project %s.', path, name)
     if not exists(path):
       raise AzkabanError('Unable to find archive at %r.' % (path, ))
     if not self.is_valid():
@@ -417,7 +419,7 @@ class Session(object):
       headers=form.headers,
       data=form,
     ))
-    self.logger.info(
+    self._logger.info(
       'Archive %s for project %s uploaded as %s.', path, name, archive_name
     )
     return res
@@ -429,7 +431,7 @@ class Session(object):
     :param flow: Name of flow in project.
 
     """
-    self.logger.debug(
+    self._logger.debug(
       'Fetching infos for workflow %s in project %s', flow, name
     )
     try:
@@ -462,7 +464,7 @@ class Session(object):
     Also caches the session ID for future use.
 
     """
-    self.logger.debug('Refreshing.')
+    self._logger.debug('Refreshing.')
     attempts = self.attempts
     while True:
       password = password or getpass('Azkaban password for %s: ' % (self, ))
@@ -479,7 +481,7 @@ class Session(object):
       except AzkabanError as err:
         if not 'Incorrect Login.' in err.message:
           raise err
-        self.logger.warning('Invalid login attempt.')
+        self._logger.warning('Invalid login attempt.')
         attempts -= 1
         password = None
         if attempts <= 0:
@@ -489,7 +491,7 @@ class Session(object):
     self.id = res['session.id']
     self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
     self.config.save()
-    self.logger.info('Refreshed.')
+    self._logger.info('Refreshed.')
 
   def _request(self, method, endpoint, include_session='cookies', **kwargs):
     """Make a request to Azkaban using this session.
@@ -506,7 +508,7 @@ class Session(object):
     full_url = '%s/%s' % (self.url, endpoint.lstrip('/'))
 
     if not self.id:
-      self.logger.debug('No ID found.')
+      self._logger.debug('No ID found.')
       self._refresh()
 
     def _send_request():
@@ -532,7 +534,7 @@ class Session(object):
     try:
       response.raise_for_status() # check that we get a 2XX response back
     except HTTPError as err: # catch, log, and reraise
-      self.logger.warning(
+      self._logger.warning(
         'Received invalid response from %s:\n%s',
         response.request.url, response.content
       )
@@ -626,7 +628,7 @@ class Execution(object):
           if job in preparing_jobs:
             if not preparing:
               preparing = True
-              logger.debug(
+              _logger.debug(
                 'Job %s in execution %s is still preparing.', job, self.exec_id
               )
           else:
