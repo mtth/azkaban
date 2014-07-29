@@ -110,11 +110,12 @@ def _parse__project(_project):
     name = None
   location = location.rstrip(os.sep)
   if os.sep in location:
-    path, fpath = location.rsplit(os.sep, 1)
+    path, module = location.rsplit(os.sep, 1)
   else:
     path = None
-    fpath = location
-  module = osp.splitext(fpath)[0]
+    module = location
+  path = path or '.'
+  module = osp.splitext(module)[0]
   return module, path, name
 
 def _get_project_name(_project):
@@ -144,15 +145,14 @@ def _load_project(_project):
   except ImportError:
     if _project:
       msg = (
-        'This command requires a project configuration module which was not '
-        'found at `%s`.\nSpecify another project module location using the '
-        '`--project` option.'
+        'No project configuration module found at `%s`.\nThis command '
+        'requires one. You can another location using the `--project` option.'
       ) % (_project, )
     else:
       msg = (
         'This command requires a project configuration module which was not '
-        'found at the default\n`job` location. Specify another project module '
-        'location using the `--project` option.'
+        'found at the\ndefault `jobs` location. Specify another project '
+        'module location using the `--project` option.'
       )
     raise AzkabanError(msg)
 
