@@ -30,4 +30,4 @@ class TestParseProject(object):
 
 class TestMain(object):
 
-  pass # TODO
+  pass # TODO: add test for the CLI

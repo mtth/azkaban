@@ -169,6 +169,7 @@ def _upload_callback(cur_bytes, tot_bytes, file_index, _stdout=sys.stdout):
   :param cur_bytes: Total bytes uploaded so far.
   :param tot_bytes: Total bytes to be uploaded.
   :param file_index: (0-based) index of the file currently uploaded.
+  :param _stdout: Performance caching.
 
   """
   if cur_bytes != tot_bytes:
@@ -326,7 +327,7 @@ def main(argv=None):
   # parse arguments
   argv = argv or sys.argv[1:]
   args = docopt(__doc__, version=__version__)
-  _logger.debug('Running command: %r.', ' '.join(argv))
+  _logger.debug('Running command %r from %r.', ' '.join(argv), os.getcwd())
   # do things
   if args['--log']:
     if handler:
