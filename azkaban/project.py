@@ -3,18 +3,17 @@
 
 """Project definition module."""
 
-from os import sep
-from os.path import (abspath, basename, dirname, exists, isabs, isdir, join,
-  realpath, relpath, splitext)
 from traceback import format_exc
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
 from .util import AzkabanError, Adapter, flatten, temppath, write_properties
-import logging
+import logging as lg
+import os
+import os.path as osp
 import sys
 
 
-_logger = logging.getLogger(__name__)
+_logger = lg.getLogger(__name__)
 
 
 class _JobDict(dict):
@@ -65,7 +64,7 @@ class Project(object):
     self.name = name
     self.version = version
     if root:
-      self.root = abspath(root if isdir(root) else dirname(root))
+      self.root = osp.abspath(root if osp.isdir(root) else osp.dirname(root))
     if register:
       self._registry[name] = self
     self._jobs = {}
@@ -131,15 +130,15 @@ class Project(object):
     destinations than the base root directory.
 
     """
-    if not isabs(path):
+    if not osp.isabs(path):
       if not self.root:
         raise AzkabanError(
           'Relative path not allowed without specifying a project root: %r.'
           % (path, )
         )
-      path = join(self.root, path)
+      path = osp.join(self.root, path)
     # disambiguate (symlinks, pardirs, etc.)
-    path = realpath(path)
+    path = osp.realpath(path)
     if archive_path:
       frozen = True
     else:
@@ -150,7 +149,7 @@ class Project(object):
             'Cannot add a file outside of the project root directory without\n'
             'specifying an archive path: %r' % (path, )
           )
-        archive_path = relpath(path, self.root)
+        archive_path = osp.relpath(path, self.root)
       else:
         archive_path = path
     # leading separator meaningless inside archive (trimmed automatically)
@@ -161,7 +160,7 @@ class Project(object):
       not overwrite
     ):
       raise AzkabanError('Inconsistent duplicate file: %r.' % (path, ))
-    if not exists(path):
+    if not osp.exists(path):
       raise AzkabanError('File not found: %r.' % (path, ))
     self._files[archive_path] = (path, frozen)
     self._logger.info('Added file %r as %r.', path, archive_path)
@@ -218,7 +217,7 @@ class Project(object):
     """
     self._logger.debug('Building.')
     # not using a with statement for compatibility with older python versions
-    if exists(path) and not overwrite:
+    if osp.exists(path) and not overwrite:
       raise AzkabanError('Path %r already exists.' % (path, ))
     if not (len(self._jobs) or len(self._files)):
       raise AzkabanError('Building empty project.')
@@ -239,12 +238,10 @@ class Project(object):
     self._logger.info('Built as %s.', path)
 
   @classmethod
-  def load(cls, module, path=None, name=None):
+  def load(cls, path, name=None):
     """Load project from script.
 
-    :param module: Name of the module where the project is defined.
-    :param path: If the module isn't on the $PYTHONPATH, this argument can be
-      used to make the module accessible.
+    :param path: Path to python module.
     :param name: Project name. If not specified and a single project is found
       while loading the script, that project is returned. In any other case
       (no/multiple projects found), an error is thrown.
@@ -253,9 +250,14 @@ class Project(object):
     can be loaded via this method.
 
     """
-    if path:
-      sys.path.insert(0, path)
-    __import__(module)
+    if not path:
+      raise AzkabanError('Invalid project module path: %r', path)
+    path = osp.abspath(path)
+    head, tail = osp.split(path.rstrip(os.sep))
+    sys.path.insert(0, head)
+    # when run via the `azkaban` command (i.e. not `python -m azkaban`), the
+    # CWD doesn't seem to be in the PYTHONPATH
+    __import__(osp.splitext(tail)[0])
     if name:
       try:
         return cls._registry[name]
@@ -272,7 +274,6 @@ class Project(object):
         raise AzkabanError('No registered project found in %r.' % (path, ))
       else:
         raise AzkabanError(
-          'Multiple registered projects found in %r: %s.\n'
-          'Disambiguate using --project=%s:project_name.'
-          % (path, ', '.join(cls._registry), path)
+          'Multiple registered projects found: %s.'
+          % (', '.join(cls._registry), )
         )

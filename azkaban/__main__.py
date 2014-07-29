@@ -96,49 +96,53 @@ def _forward(args, names):
     for (k, v) in args.items() if k in names
   )
 
-def _parse_project(_project):
-  """Parse `--project` argument into `(module, path, name)`.
+def _parse_project(_project, require_project=False):
+  """Parse `--project` argument into `(name, project)`.
 
   :param _project: `--project` argument.
+  :param require_project: Fail if we fail to load the project.
 
-  Note that `module` is guaranteed to be non `None`. `path` and `name` can.
+  Note that `name` is guaranteed to be non-`None` (this function will throw an
+  exception otherwise) but `project` can be.
+
+  The rules are as follows:
+
+  + If at least one `':'` is found in `_project` then the rightmost one is
+    interpreted as delimitor between the path to the module and the project
+    name.
+
+  + Else:
+
+    + We first try to interpret `_project` as a module path and find a unique
+      project inside.
+
+    + If the above attempt raises an `ImportError`, we interpret it as a name.
 
   """
-  if _project and ':' in _project:
-    location, name = _project.split(':', 1)
+  _project= _project or Config().get_option('azkaban', 'project', 'jobs')
+  if ':' in _project:
+    path, name = _project.rsplit(':', 1)
+    project = Project.load(path, name)
   else:
-    location = _project
-    name = None
-  if location:
-    location = location.rstrip(os.sep)
-  else:
-    location = Config().get_option('azkaban', 'project', 'jobs')
-  if os.sep in location:
-    path, module = location.rsplit(os.sep, 1)
-  else:
-    path = None
-    module = location
-  path = path or '.'
-  module = osp.splitext(module)[0]
-  _logger.debug('Parsed `--project`: %r, %r, %r.', module, path, name)
-  return module, path, name
+    try:
+      project = Project.load(_project)
+    except ImportError as err:
+      if not require_project:
+        project = None
+        name = _project
+      else:
+        raise err
+    else:
+      name = project.name
+  return name, project
 
 def _get_project_name(_project):
   """Return project name.
 
   :param _project: `--project` argument.
 
-  This function will try to use the default path/module to infer a project name
-  if none is provided.
-
   """
-  if ':' not in _project:
-    # probably just the name
-    return name
-  else:
-    module, path, name = _parse_project(_project)
-    return Project.load(module, path=path, name=name).name
-    # checks that a project with that name does exist
+  return _parse_project(_project)[0]
 
 def _load_project(_project):
   """Resolve project from CLI argument.
@@ -146,22 +150,15 @@ def _load_project(_project):
   :param _project: `--project` argument.
 
   """
-  module, path, name = _parse_project(_project)
   try:
-    return Project.load(module, path=path, name=name)
+    name, project = _parse_project(_project, require_project=True)
   except ImportError:
-    if _project:
-      msg = (
-        'No project configuration module found at: %s.\nYou can specify '
-        'another location using the `--project` option.'
-      ) % (_project, )
-    else:
-      msg = ( # TODO: make this better
-        'This command requires a project configuration module which was not '
-        'found at the\ndefault `jobs` location. Specify another project '
-        'module location using the `--project` option.'
-      )
-    raise AzkabanError(msg)
+    raise AzkabanError(
+      'This command requires a project configuration module which was not '
+      'found.\nYou can specify another location using the `--project` option.'
+    )
+  else:
+    return project
 
 def _upload_callback(cur_bytes, tot_bytes, file_index, _stdout=sys.stdout):
   """Callback for streaming upload.
@@ -273,6 +270,8 @@ def upload_project(project_name, _zip, _url, _alias, _create):
 
 def build_project(project, _zip, _url, _alias, _replace, _create):
   """Build project."""
+  # TODO: add `--options` flag for this command (creating/overriding
+  # project properties)
   if _zip:
     if osp.isdir(_zip):
       _zip = osp.join(_zip, '%s.zip' % (project.versioned_name, ))
