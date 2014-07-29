@@ -71,13 +71,14 @@ Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 from azkaban import __version__
 from azkaban.project import Project
 from azkaban.remote import Execution, Session
-from azkaban.util import (AzkabanError, Config, catch, human_readable,
+from azkaban.util import (AzkabanError, Config, catch, flatten, human_readable,
   temppath, write_properties)
 from docopt import docopt
-from os.path import exists, getsize, isdir, join, relpath
 from requests.exceptions import HTTPError
 from sys import stdout
 import logging as lg
+import os
+import os.path as osp
 
 
 def _forward(args, names):
@@ -93,48 +94,67 @@ def _forward(args, names):
     for (k, v) in args.items() if k in names
   )
 
-def _get_project_name(project_arg):
+def _parse__project(_project):
+  """Parse `--project` argument into `(module, path, name)`.
+
+  :param _project: `--project` argument.
+
+  Note that `module` is guaranteed to be non `None`. `path` and `name` can.
+
+  """
+  _project = _project or Config().get_option('azkaban', 'project', 'jobs')
+  if ':' in _project:
+    location, name = _project.split(':', 1)
+  else:
+    location = _project
+    name = None
+  location = location.rstrip(os.sep)
+  if os.sep in location:
+    path, fpath = location.rsplit(os.sep, 1)
+  else:
+    path = None
+    fpath = location
+  module = osp.splitext(fpath)[0]
+  return module, path, name
+
+def _get_project_name(_project):
   """Return project name.
 
-  :param project_arg: `--project` argument.
+  :param _project: `--project` argument.
+
+  This function will try to use the default path/module to infer a project name
+  if none is provided.
 
   """
-  if not project_arg:
-    project_arg = Config().get_option('azkaban', 'project', 'jobs.py')
-  parts = project_arg.split(':', 1)
-  if len(parts) == 1:
-    if exists(parts[0]):
-      return Project.load(parts[0]).name
-    else:
-      return parts[0]
+  module, path, name = _parse__project(_project)
+  if name:
+    return name
   else:
-    return Project.load(*parts).name
+    return Project.load(module, path=path).name
 
-def _load_project(project_arg):
+def _load_project(_project):
   """Resolve project from CLI argument.
 
-  :param project_arg: `--project` argument.
+  :param _project: `--project` argument.
 
   """
-  default_script = Config().get_option('azkaban', 'project', 'jobs.py')
-  if not project_arg:
-    script = default_script
-    name = None
-  elif ':' in project_arg:
-    script, name = project_arg.split(':', 1)
-  elif exists(project_arg):
-    script = project_arg
-    name = None
-  else:
-    script = default_script
-    name = project_arg
-  if not exists(script):
-    raise AzkabanError(
-      'This command requires a project configuration file which was not found '
-      'at\n%slocation %r. Specify another path using the `--project` option.'
-      % ('default ' if script == default_script else '', script)
-    )
-  return Project.load(script, name)
+  module, path, name = _parse__project(_project)
+  try:
+    return Project.load(module, path=path, name=name)
+  except ImportError:
+    if _project:
+      msg = (
+        'This command requires a project configuration module which was not '
+        'found at `%s`.\nSpecify another project module location using the '
+        '`--project` option.'
+      ) % (_project, )
+    else:
+      msg = (
+        'This command requires a project configuration module which was not '
+        'found at the default\n`job` location. Specify another project module '
+        'location using the `--project` option.'
+      )
+    raise AzkabanError(msg)
 
 def _upload_callback(cur_bytes, tot_bytes, file_index):
   """Callback for streaming upload.
@@ -157,12 +177,15 @@ def view_info(project, _files, _options, _job, _include_properties):
   """List jobs in project."""
   if _job:
     if _include_properties:
-      write_properties(project.properties, header='project.properties')
+      write_properties(
+        flatten(project.properties),
+        header='project.properties'
+      )
     for name in _job:
       project.jobs[name].build(header='%s.job' % (name, ))
   elif _files:
     for path, archive_path in sorted(project.files):
-      stdout.write('%s\t%s\n' % (relpath(path), archive_path))
+      stdout.write('%s\t%s\n' % (osp.relpath(path), archive_path))
   else:
     if _options:
       option_names = _options.split(',')
@@ -233,7 +256,7 @@ def upload_project(project_name, _zip, _url, _alias, _create):
     % (
       project_name,
       res['projectId'],
-      human_readable(getsize(_zip)),
+      human_readable(osp.getsize(_zip)),
       res['version'],
       session.url,
       project_name,
@@ -243,12 +266,12 @@ def upload_project(project_name, _zip, _url, _alias, _create):
 def build_project(project, _zip, _url, _alias, _replace, _create):
   """Build project."""
   if _zip:
-    if isdir(_zip):
-      _zip = join(_zip, '%s.zip' % (project.versioned_name, ))
+    if osp.isdir(_zip):
+      _zip = osp.join(_zip, '%s.zip' % (project.versioned_name, ))
     project.build(_zip, overwrite=_replace)
     stdout.write(
       'Project %s successfully built and saved as %r (size: %s).\n'
-      % (project, _zip, human_readable(getsize(_zip)))
+      % (project, _zip, human_readable(osp.getsize(_zip)))
     )
   else:
     with temppath() as _zip:
@@ -277,7 +300,7 @@ def build_project(project, _zip, _url, _alias, _replace, _create):
         % (
           project,
           res['projectId'],
-          human_readable(getsize(_zip)),
+          human_readable(osp.getsize(_zip)),
           res['version'],
           session.url,
           project,

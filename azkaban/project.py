@@ -239,41 +239,40 @@ class Project(object):
     self._logger.info('Built as %s.', path)
 
   @classmethod
-  def load(cls, path, name=None):
+  def load(cls, module, path=None, name=None):
     """Load project from script.
 
-    :param path: Path to python module or package.
+    :param module: Name of the module where the project is defined.
+    :param path: If the module isn't on the $PYTHONPATH, this argument can be
+      used to make the module accessible.
     :param name: Project name. If not specified and a single project is found
       while loading the script, that project is returned. In any other case
       (no/multiple projects found), an error is thrown.
 
+    Note that only registered projects (i.e. instantiated with `register=True`)
+    can be loaded via this method.
+
     """
-    sys.path.insert(0, dirname(path))
-    module_name = splitext(basename(path.rstrip(sep)))[0]
-    try:
-      __import__(module_name)
-    except ImportError:
-      raise AzkabanError(
-        'Unable to import script %r.\n%s' % (path, format_exc())
+    if path:
+      sys.path.insert(0, path)
+    __import__(module)
+    if name:
+      try:
+        return cls._registry[name]
+      except KeyError:
+        raise AzkabanError(
+          'Unable to find a registered project with name %r in module %r.\n'
+          'Available projects: %s.'
+          % (name, path, ', '.join(cls._registry))
         )
     else:
-      if name:
-        try:
-          return cls._registry[name]
-        except KeyError:
-          raise AzkabanError(
-            'Unable to find project with name %r in script %r.\n'
-            'Available projects: %s.'
-            % (name, path, ', '.join(cls._registry))
-          )
+      if len(cls._registry) == 1:
+        return cls._registry.popitem()[1]
+      elif not cls._registry:
+        raise AzkabanError('No registered project found in %r.' % (path, ))
       else:
-        if len(cls._registry) == 1:
-          return cls._registry.popitem()[1]
-        elif not cls._registry:
-          raise AzkabanError('No project found in %r.' % (path, ))
-        else:
-          raise AzkabanError(
-            'Multiple projects found in %r: %s.\n'
-            'Disambiguate using --project=%s:project_name.'
-            % (path, ', '.join(cls._registry), path)
-          )
+        raise AzkabanError(
+          'Multiple registered projects found in %r: %s.\n'
+          'Disambiguate using --project=%s:project_name.'
+          % (path, ', '.join(cls._registry), path)
+        )
