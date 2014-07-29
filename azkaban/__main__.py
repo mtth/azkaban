@@ -67,7 +67,6 @@ Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 
 """
 
-
 from azkaban import __version__
 from azkaban.project import Project
 from azkaban.remote import Execution, Session
@@ -75,10 +74,13 @@ from azkaban.util import (AzkabanError, Config, catch, flatten, human_readable,
   temppath, write_properties)
 from docopt import docopt
 from requests.exceptions import HTTPError
-from sys import stdout
 import logging as lg
 import os
 import os.path as osp
+import sys
+
+
+_logger = lg.getLogger(__name__)
 
 
 def _forward(args, names):
@@ -94,7 +96,7 @@ def _forward(args, names):
     for (k, v) in args.items() if k in names
   )
 
-def _parse__project(_project):
+def _parse_project(_project):
   """Parse `--project` argument into `(module, path, name)`.
 
   :param _project: `--project` argument.
@@ -102,13 +104,15 @@ def _parse__project(_project):
   Note that `module` is guaranteed to be non `None`. `path` and `name` can.
 
   """
-  _project = _project or Config().get_option('azkaban', 'project', 'jobs')
-  if ':' in _project:
+  if _project and ':' in _project:
     location, name = _project.split(':', 1)
   else:
     location = _project
     name = None
-  location = location.rstrip(os.sep)
+  if location:
+    location = location.rstrip(os.sep)
+  else:
+    location = Config().get_option('azkaban', 'project', 'jobs')
   if os.sep in location:
     path, module = location.rsplit(os.sep, 1)
   else:
@@ -116,6 +120,7 @@ def _parse__project(_project):
     module = location
   path = path or '.'
   module = osp.splitext(module)[0]
+  _logger.debug('Parsed `--project`: %r, %r, %r.', module, path, name)
   return module, path, name
 
 def _get_project_name(_project):
@@ -127,11 +132,13 @@ def _get_project_name(_project):
   if none is provided.
 
   """
-  module, path, name = _parse__project(_project)
-  if name:
+  if ':' not in _project:
+    # probably just the name
     return name
   else:
-    return Project.load(module, path=path).name
+    module, path, name = _parse_project(_project)
+    return Project.load(module, path=path, name=name).name
+    # checks that a project with that name does exist
 
 def _load_project(_project):
   """Resolve project from CLI argument.
@@ -139,24 +146,24 @@ def _load_project(_project):
   :param _project: `--project` argument.
 
   """
-  module, path, name = _parse__project(_project)
+  module, path, name = _parse_project(_project)
   try:
     return Project.load(module, path=path, name=name)
   except ImportError:
     if _project:
       msg = (
-        'No project configuration module found at `%s`.\nThis command '
-        'requires one. You can another location using the `--project` option.'
+        'No project configuration module found at: %s.\nYou can specify '
+        'another location using the `--project` option.'
       ) % (_project, )
     else:
-      msg = (
+      msg = ( # TODO: make this better
         'This command requires a project configuration module which was not '
         'found at the\ndefault `jobs` location. Specify another project '
         'module location using the `--project` option.'
       )
     raise AzkabanError(msg)
 
-def _upload_callback(cur_bytes, tot_bytes, file_index):
+def _upload_callback(cur_bytes, tot_bytes, file_index, _stdout=sys.stdout):
   """Callback for streaming upload.
 
   :param cur_bytes: Total bytes uploaded so far.
@@ -165,13 +172,13 @@ def _upload_callback(cur_bytes, tot_bytes, file_index):
 
   """
   if cur_bytes != tot_bytes:
-    stdout.write(
+    _stdout.write(
       'Uploading project: %.1f%%\r'
       % (100. * cur_bytes / tot_bytes, )
     )
   else:
-    stdout.write('Validating project...    \r')
-  stdout.flush()
+    _stdout.write('Validating project...    \r')
+  _stdout.flush()
 
 def view_info(project, _files, _options, _job, _include_properties):
   """List jobs in project."""
@@ -185,16 +192,16 @@ def view_info(project, _files, _options, _job, _include_properties):
       project.jobs[name].build(header='%s.job' % (name, ))
   elif _files:
     for path, archive_path in sorted(project.files):
-      stdout.write('%s\t%s\n' % (osp.relpath(path), archive_path))
+      sys.stdout.write('%s\t%s\n' % (osp.relpath(path), archive_path))
   else:
     if _options:
       option_names = _options.split(',')
       for name, opts in sorted(project.jobs.items()):
         job_opts = '\t'.join(opts.get(o, '') for o in option_names)
-        stdout.write('%s\t%s\n' % (name, job_opts))
+        sys.stdout.write('%s\t%s\n' % (name, job_opts))
     else:
       for name in sorted(project.jobs):
-        stdout.write('%s\n' % (name, ))
+        sys.stdout.write('%s\n' % (name, ))
 
 def view_log(_execution, _job, _url, _alias):
   """View workflow or job execution logs."""
@@ -203,7 +210,7 @@ def view_log(_execution, _job, _url, _alias):
   logs = exc.job_logs(_job[0]) if _job else exc.logs()
   try:
     for line in logs:
-      stdout.write('%s\n' % (line.encode('utf-8'), ))
+      sys.stdout.write('%s\n' % (line.encode('utf-8'), ))
   except HTTPError:
     # Azkaban responds with 500 if the execution or job isn't found
     if _job:
@@ -227,7 +234,7 @@ def run_flow(project_name, _workflow, _job, _url, _alias, _skip, _kill,
   )
   exec_id = res['execid']
   job_names = ', jobs: %s' % (', '.join(_job), ) if _job else ''
-  stdout.write(
+  sys.stdout.write(
     'Flow %s successfully submitted (execution id: %s%s).\n'
     'Details at %s/executor?execid=%s\n'
     % (_workflow, exec_id, job_names, session.url, exec_id)
@@ -250,7 +257,7 @@ def upload_project(project_name, _zip, _url, _alias, _create):
         raise err
     else:
       break
-  stdout.write(
+  sys.stdout.write(
     'Project %s successfully uploaded (id: %s, size: %s, version: %s).\n'
     'Details at %s/manager?project=%s\n'
     % (
@@ -269,7 +276,7 @@ def build_project(project, _zip, _url, _alias, _replace, _create):
     if osp.isdir(_zip):
       _zip = osp.join(_zip, '%s.zip' % (project.versioned_name, ))
     project.build(_zip, overwrite=_replace)
-    stdout.write(
+    sys.stdout.write(
       'Project %s successfully built and saved as %r (size: %s).\n'
       % (project, _zip, human_readable(osp.getsize(_zip)))
     )
@@ -293,7 +300,7 @@ def build_project(project, _zip, _url, _alias, _replace, _create):
             raise err
         else:
           break
-      stdout.write(
+      sys.stdout.write(
         'Project %s successfully built and uploaded '
         '(id: %s, size: %s, upload: %s).\n'
         'Details at %s/manager?project=%s\n'
@@ -308,19 +315,22 @@ def build_project(project, _zip, _url, _alias, _replace, _create):
       )
 
 @catch(AzkabanError)
-def main():
-  """Command line argument parser."""
-  args = docopt(__doc__, version=__version__)
-  # activate logging
+def main(argv=None):
+  """Entry point."""
+  # enable general logging
   logger = lg.getLogger()
   logger.setLevel(lg.DEBUG)
   handler = Config().get_file_handler('azkaban')
   if handler:
     logger.addHandler(handler)
+  # parse arguments
+  argv = argv or sys.argv[1:]
+  args = docopt(__doc__, version=__version__)
+  _logger.debug('Running command: %r.', ' '.join(argv))
   # do things
   if args['--log']:
     if handler:
-      stdout.write('%s\n' % (handler.baseFilename, ))
+      sys.stdout.write('%s\n' % (handler.baseFilename, ))
     else:
       raise AzkabanError('No log file active.')
   elif args['build']:

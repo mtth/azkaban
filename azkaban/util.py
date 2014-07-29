@@ -294,6 +294,7 @@ def catch(*error_classes):
       except Exception: # catch all
         _logger.exception('Unexpected exception.')
         raise RuntimeError('See logs for details.')
+        # TODO: print traceback to stderr instead of raising this
     return wrapper
   return decorator
 
