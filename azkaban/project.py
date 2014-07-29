@@ -253,6 +253,10 @@ class Project(object):
     if not path:
       raise AzkabanError('Invalid project module path: %r', path)
     path = osp.abspath(path)
+    if name:
+      _logger.debug('Attempting to load project %r from %r.', name, path)
+    else:
+      _logger.debug('Attempting to load a project from %r.', path)
     head, tail = osp.split(path.rstrip(os.sep))
     sys.path.insert(0, head)
     # when run via the `azkaban` command (i.e. not `python -m azkaban`), the

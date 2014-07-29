@@ -136,7 +136,7 @@ def _parse_project(_project, require_project=False):
     + If the above attempt raises an `ImportError`, we interpret it as a name.
 
   """
-  _project= _project or Config().get_option('azkaban', 'project', 'jobs')
+  _project = _project or Config().get_option('azkaban', 'project', 'jobs')
   if ':' in _project:
     path, name = _project.rsplit(':', 1)
     project = Project.load(path, name)
