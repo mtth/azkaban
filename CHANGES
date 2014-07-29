@@ -10,10 +10,14 @@ Version 0.7.0 (?)
 * AzkabanPig now waits when the job is in a preparing stage, rather than
   erroring out (because it is unable to find the logs).
 * Cleaner error message when the Azkaban server is down (i.e. on 500 response).
+* Changed default `--project` CLI option to support both `jobs.py` and `jobs/`
+  as defaults.
+* Added `--option` flag to `build` to allow overriding of project properties.
 
 Breaking changes:
 
 * Removed `create` and `delete` CLI commands.
+* Changed `--options` handling for `info` command (and renamed it to `--option`).
 
 
 Version 0.6.0 (04/26/2014)

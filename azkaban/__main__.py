@@ -4,8 +4,8 @@
 """Azkaban CLI: a lightweight command line interface for Azkaban.
 
 Usage:
-  azkaban build [-cp PROJECT] [-a ALIAS | -u URL | [-r] ZIP]
-  azkaban info [-p PROJECT] [-f | -o OPTIONS | [-i] JOB ...]
+  azkaban build [-cp PROJECT] [-a ALIAS | -u URL | [-r] ZIP] [-o OPTION ...]
+  azkaban info [-p PROJECT] [-f | -o OPTION ... | [-i] JOB ...]
   azkaban log [-a ALIAS | -u URL] EXECUTION [JOB]
   azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAILS] WORKFLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
@@ -45,9 +45,13 @@ Options:
   -i --include-properties       Include project properties with job options.
   -k --kill                     Kill worfklow on first job failure.
   -l --log                      Show path to current log file and exit.
-  -o OPTIONS --options=OPTIONS  Comma separated list of options that will be
-                                displayed next to each job. E.g. `-o type,foo`.
-                                The resulting output will be tab separated.
+  -o OPTION --option=OPTION     Azkaban parameter. The format is `key=value`,
+                                e.g. `-o user.to.proxy=foo`. For the `build`
+                                command, these will be added to the project's
+                                properties (potentially overriding existing
+                                ones). For the `info` command, this will cause
+                                only jobs with that particular parameter set to
+                                this value to be displayed.
   -p PROJECT --project=PROJECT  Azkaban project. Can either be a project name
                                 or a path to a python module/package defining
                                 an `azkaban.Project` instance. Commands which
@@ -95,6 +99,19 @@ def _forward(args, names):
     ('_%s' % (k.lower().lstrip('-').replace('-', '_'), ), v)
     for (k, v) in args.items() if k in names
   )
+
+def _parse_option(_option):
+  """Parse `--option` argument.
+
+  :param _option: `--option` argument.
+
+  Returns a dictionary.
+
+  """
+  try:
+    return dict(s.split('=', 1) for s in _option)
+  except ValueError:
+    raise AzkabanError('Invalid `--option` flag.')
 
 def _parse_project(_project, require_project=False):
   """Parse `--project` argument into `(name, project)`.
@@ -178,7 +195,7 @@ def _upload_callback(cur_bytes, tot_bytes, file_index, _stdout=sys.stdout):
     _stdout.write('Validating project...    \r')
   _stdout.flush()
 
-def view_info(project, _files, _options, _job, _include_properties):
+def view_info(project, _files, _option, _job, _include_properties):
   """List jobs in project."""
   if _job:
     if _include_properties:
@@ -192,13 +209,9 @@ def view_info(project, _files, _options, _job, _include_properties):
     for path, archive_path in sorted(project.files):
       sys.stdout.write('%s\t%s\n' % (osp.relpath(path), archive_path))
   else:
-    if _options:
-      option_names = _options.split(',')
-      for name, opts in sorted(project.jobs.items()):
-        job_opts = '\t'.join(opts.get(o, '') for o in option_names)
-        sys.stdout.write('%s\t%s\n' % (name, job_opts))
-    else:
-      for name in sorted(project.jobs):
+    options = _parse_option(_option).items()
+    for name, job in sorted(project.jobs.items()):
+      if all(job.options.get(k) == v for k, v in options):
         sys.stdout.write('%s\n' % (name, ))
 
 def view_log(_execution, _job, _url, _alias):
@@ -268,10 +281,12 @@ def upload_project(project_name, _zip, _url, _alias, _create):
     )
   )
 
-def build_project(project, _zip, _url, _alias, _replace, _create):
+def build_project(project, _zip, _url, _alias, _replace, _create, _option):
   """Build project."""
-  # TODO: add `--options` flag for this command (creating/overriding
-  # project properties)
+  if _option:
+    project.properties = flatten(project.properties)
+    # to make sure we properly override nested options, we flatten first
+    project.properties.update(_parse_option(_option))
   if _zip:
     if osp.isdir(_zip):
       _zip = osp.join(_zip, '%s.zip' % (project.versioned_name, ))
@@ -336,7 +351,10 @@ def main(argv=None):
   elif args['build']:
     build_project(
       _load_project(args['--project']),
-      **_forward(args, ['ZIP', '--url', '--alias', '--replace', '--create'])
+      **_forward(
+        args,
+        ['ZIP', '--url', '--alias', '--replace', '--create', '--option']
+      )
     )
   elif args['log']:
     view_log(
@@ -345,7 +363,7 @@ def main(argv=None):
   elif args['info']:
     view_info(
       _load_project(args['--project']),
-      **_forward(args, ['--files', '--options', 'JOB', '--include-properties'])
+      **_forward(args, ['--files', '--option', 'JOB', '--include-properties'])
     )
   elif args['run']:
     run_flow(
