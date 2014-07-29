@@ -7,7 +7,7 @@ Usage:
   azkaban build [-cp PROJECT] [-a ALIAS | -u URL | [-r] ZIP] [-o OPTION ...]
   azkaban info [-p PROJECT] [-f | -o OPTION ... | [-i] JOB ...]
   azkaban log [-a ALIAS | -u URL] EXECUTION [JOB]
-  azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAILS] WORKFLOW [JOB ...]
+  azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...] FLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
   azkaban -h | --help | -l | --log | -v | --version
 
@@ -23,7 +23,7 @@ Commmands:
 Arguments:
   EXECUTION                     Execution ID.
   JOB                           Job name.
-  WORKFLOW                      Workflow name. Recall that in the Azkaban world
+  FLOW                          Workflow name. Recall that in the Azkaban world
                                 this is simply a job without children.
   ZIP                           For `upload` command, the path to an existing
                                 project zip archive. For `build`, the path
@@ -36,8 +36,8 @@ Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
                                 to reuse session IDs for later connections.
   -c --create                   Create the project if it does not exist.
-  -e EMAILS --emails=EMAILS     Comma separated list of emails that will be
-                                notified when the workflow finishes.
+  -e EMAIL --email=EMAIL        Email address to be notified when the workflow
+                                finishes (can be specified multiple times).
   -f --files                    List project files instead of jobs. The first
                                 column is the local path of the file, the
                                 second the path of the file in the archive.
@@ -56,7 +56,9 @@ Options:
                                 or a path to a python module/package defining
                                 an `azkaban.Project` instance. Commands which
                                 are followed by an asterisk will only work in
-                                the latter case.
+                                the latter case. If multiple projects are
+                                found, you can disambiguate using as follows:
+                                `--project=module:project_name`.
   -r --replace                  Overwrite any existing file.
   -s --skip                     Skip if workflow is already running.
   -u URL --url=URL              Azkaban endpoint (with protocol, and optionally
@@ -136,6 +138,8 @@ def _parse_project(_project, require_project=False):
     + If the above attempt raises an `ImportError`, we interpret it as a name.
 
   """
+  # TODO: improve the error messages here and allow project disambiguation
+  # using only the name of a project
   _project = _project or Config().get_option('azkaban', 'project', 'jobs')
   if ':' in _project:
     path, name = _project.rsplit(':', 1)
@@ -232,7 +236,7 @@ def view_log(_execution, _job, _url, _alias):
       raise AzkabanError('Execution %s not found.', _execution)
 
 def run_flow(project_name, _workflow, _job, _url, _alias, _skip, _kill,
-  _emails):
+  _email):
   """Run workflow."""
   session = Session(_url, _alias)
   res = session.run_workflow(
@@ -241,7 +245,7 @@ def run_flow(project_name, _workflow, _job, _url, _alias, _skip, _kill,
     jobs=_job,
     concurrent=not _skip,
     on_failure='cancel' if _kill else 'finish',
-    emails=_emails.split(',') if _emails else None,
+    emails=_email,
   )
   exec_id = res['execid']
   job_names = ', jobs: %s' % (', '.join(_job), ) if _job else ''
@@ -370,7 +374,7 @@ def main(argv=None):
       _get_project_name(args['--project']),
       **_forward(
         args,
-        ['WORKFLOW', 'JOB', '--skip', '--url', '--alias', '--kill', '--email']
+        ['FLOW', 'JOB', '--skip', '--url', '--alias', '--kill', '--email']
       )
     )
   elif args['upload']:
