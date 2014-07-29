@@ -15,6 +15,7 @@ from six import b, string_types
 from six.moves.configparser import (NoOptionError, NoSectionError,
   ParsingError, RawConfigParser)
 from tempfile import gettempdir, mkstemp
+from traceback import print_exc
 import logging as lg
 import os.path as osp
 import sys
@@ -293,8 +294,8 @@ def catch(*error_classes):
         sys.exit(1)
       except Exception: # catch all
         _logger.exception('Unexpected exception.')
-        raise RuntimeError('See logs for details.')
-        # TODO: print traceback to stderr instead of raising this
+        print_exc()
+        sys.exit(1)
     return wrapper
   return decorator
 
