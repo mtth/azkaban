@@ -7,7 +7,8 @@ Usage:
   azkaban build [-cp PROJECT] [-a ALIAS | -u URL | [-r] ZIP] [-o OPTION ...]
   azkaban info [-p PROJECT] [-f | -o OPTION ... | [-i] JOB ...]
   azkaban log [-a ALIAS | -u URL] EXECUTION [JOB]
-  azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...] FLOW [JOB ...]
+  azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
+              [-o OPTION ...] FLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
   azkaban -h | --help | -l | --log | -v | --version
 
@@ -45,13 +46,13 @@ Options:
   -i --include-properties       Include project properties with job options.
   -k --kill                     Kill worfklow on first job failure.
   -l --log                      Show path to current log file and exit.
-  -o OPTION --option=OPTION     Azkaban parameter. The format is `key=value`,
+  -o OPTION --option=OPTION     Azkaban properties. The format is `key=value`,
                                 e.g. `-o user.to.proxy=foo`. For the `build`
-                                command, these will be added to the project's
-                                properties (potentially overriding existing
-                                ones). For the `info` command, this will cause
-                                only jobs with that particular parameter to be
-                                displayed.
+                                and `run` commands, these will be added to the
+                                project's or run's properties respectively
+                                (potentially overriding existing ones). For the
+                                `info` command, this will cause only jobs with
+                                that particular parameter to be displayed.
   -p PROJECT --project=PROJECT  Azkaban project. Can either be a project name
                                 or a path to a python module/package defining
                                 an `azkaban.Project` instance. Commands which
@@ -273,17 +274,18 @@ def view_log(_execution, _job, _url, _alias):
     else:
       raise AzkabanError('Execution %s not found.', _execution)
 
-def run_flow(project_name, _workflow, _job, _url, _alias, _skip, _kill,
-  _email):
+def run_flow(project_name, _flow, _job, _url, _alias, _skip, _kill,
+  _email, _option):
   """Run workflow."""
   session = Session(_url, _alias)
   res = session.run_workflow(
     name=project_name,
-    flow=_workflow,
+    flow=_flow,
     jobs=_job,
     concurrent=not _skip,
     on_failure='cancel' if _kill else 'finish',
     emails=_email,
+    properties=_parse_option(_option),
   )
   exec_id = res['execid']
   job_names = ', jobs: %s' % (', '.join(_job), ) if _job else ''
@@ -412,7 +414,10 @@ def main(argv=None):
       _get_project_name(args['--project']),
       **_forward(
         args,
-        ['FLOW', 'JOB', '--skip', '--url', '--alias', '--kill', '--email']
+        [
+          'FLOW', 'JOB', '--skip', '--url', '--alias', '--kill', '--email',
+          '--option',
+        ]
       )
     )
   elif args['upload']:
