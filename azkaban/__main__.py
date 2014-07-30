@@ -255,7 +255,10 @@ def view_info(project, _files, _option, _job, _include_properties):
     options = _parse_option(_option).items()
     for name, job in sorted(project.jobs.items()):
       if all(job.options.get(k) == v for k, v in options):
-        sys.stdout.write('%s\n' % (name, ))
+        sys.stdout.write(
+          '%s\t%s\n'
+          % ('J' if job.options.get('dependencies') else 'F', name, )
+        )
 
 def view_log(_execution, _job, _url, _alias):
   """View workflow or job execution logs."""
@@ -292,7 +295,7 @@ def run_flow(project_name, _flow, _job, _url, _alias, _skip, _kill,
   sys.stdout.write(
     'Flow %s successfully submitted (execution id: %s%s).\n'
     'Details at %s/executor?execid=%s\n'
-    % (_workflow, exec_id, job_names, session.url, exec_id)
+    % (_flow, exec_id, job_names, session.url, exec_id)
   )
 
 def upload_project(project_name, _zip, _url, _alias, _create):
