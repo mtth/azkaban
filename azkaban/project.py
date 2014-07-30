@@ -238,46 +238,57 @@ class Project(object):
     self._logger.info('Built as %s.', path)
 
   @classmethod
-  def load(cls, path, name=None):
-    """Load project from script.
+  def load(cls, path, new=False):
+    """Load Azkaban projects from script.
 
     :param path: Path to python module.
-    :param name: Project name. If not specified and a single project is found
-      while loading the script, that project is returned. In any other case
-      (no/multiple projects found), an error is thrown.
+    :param new: If set to `True`, only projects loaded as a consequence of
+      calling this method will be returned.
 
-    Note that only registered projects (i.e. instantiated with `register=True`)
-    can be loaded via this method.
+    Returns a dictionary of :class:`~azkaban.project.Project`'s keyed by
+    project name. Only registered projects (i.e. instantiated with
+    `register=True`) can be discovered via this method.
 
     """
     if not path:
-      raise AzkabanError('Invalid project module path: %r', path)
+      raise ImportError('Invalid project module path: %r', path)
     path = osp.abspath(path)
-    if name:
-      _logger.debug('Attempting to load project %r from %r.', name, path)
-    else:
-      _logger.debug('Attempting to load a project from %r.', path)
+    _logger.debug('Attempting to load projects from: %r', path)
     head, tail = osp.split(path.rstrip(os.sep))
     sys.path.insert(0, head)
-    # when run via the `azkaban` command (i.e. not `python -m azkaban`), the
-    # CWD doesn't seem to be in the PYTHONPATH
-    __import__(osp.splitext(tail)[0])
-    if name:
-      try:
-        return cls._registry[name]
-      except KeyError:
-        raise AzkabanError(
-          'Unable to find a registered project with name %r in module %r.\n'
-          'Available projects: %s.'
-          % (name, path, ', '.join(cls._registry))
+    # make sure we can load the module
+    _registry = cls._registry
+    cls._registry = {}
+    # reset the registry to let us find out exactly how many projects are
+    # loaded, even if there are name clashes
+    try:
+      __import__(osp.splitext(tail)[0])
+      _logger.debug(
+        'Found %s projects from loading %s: %s',
+        len(cls._registry), path, ', '.join(cls._registry),
+      )
+      collisions = set(cls._registry) & set(_registry)
+      if collisions:
+        _logger.warn(
+          '%s project name collisions detected by loading %s: %s',
+          len(collisions), path, ', '.join(collisions)
         )
+      registry = cls._registry.copy()
+      # shallow copy of registry
+    finally:
+      for name, project in _registry.items():
+        cls._registry.setdefault(name, project)
+        # restore registry, keeping the latest definition of each project if a
+        # newer project had the same name
+    if new:
+      _logger.info(
+        '%s new projects were loaded from %s: %s',
+        len(registry), path, ', '.join(registry)
+      )
+      return registry
     else:
-      if len(cls._registry) == 1:
-        return cls._registry.popitem()[1]
-      elif not cls._registry:
-        raise AzkabanError('No registered project found in %r.' % (path, ))
-      else:
-        raise AzkabanError(
-          'Multiple registered projects found: %s.'
-          % (', '.join(cls._registry), )
-        )
+      _logger.info(
+        '%s total projects are now registered after loading %s: %s',
+        len(cls._registry), path, ', '.join(cls._registry)
+      )
+      return cls._registry.copy()

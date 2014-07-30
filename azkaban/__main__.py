@@ -50,14 +50,14 @@ Options:
                                 command, these will be added to the project's
                                 properties (potentially overriding existing
                                 ones). For the `info` command, this will cause
-                                only jobs with that particular parameter set to
-                                this value to be displayed.
+                                only jobs with that particular parameter to be
+                                displayed.
   -p PROJECT --project=PROJECT  Azkaban project. Can either be a project name
                                 or a path to a python module/package defining
                                 an `azkaban.Project` instance. Commands which
                                 are followed by an asterisk will only work in
                                 the latter case. If multiple projects are
-                                found, you can disambiguate using as follows:
+                                registered, you can disambiguate as follows:
                                 `--project=module:project_name`.
   -r --replace                  Overwrite any existing file.
   -s --skip                     Skip if workflow is already running.
@@ -138,24 +138,62 @@ def _parse_project(_project, require_project=False):
     + If the above attempt raises an `ImportError`, we interpret it as a name.
 
   """
-  # TODO: improve the error messages here and allow project disambiguation
-  # using only the name of a project
-  _project = _project or Config().get_option('azkaban', 'project', 'jobs')
-  if ':' in _project:
+  projects = {}
+  default_module = Config().get_option('azkaban', 'module', 'jobs')
+  if _project and ':' in _project:
+    # unambiguous case
     path, name = _project.rsplit(':', 1)
-    project = Project.load(path, name)
-  else:
     try:
-      project = Project.load(_project)
-    except ImportError as err:
-      if not require_project:
-        project = None
-        name = _project
-      else:
-        raise err
+      projects = Project.load(path or default_module)
+      # adding the default here lets options like `-p :name` work as intended
+    except ImportError:
+      pass
+  else:
+    # the option could be a name or module
+    try:
+      # try first as a module
+      projects = Project.load(_project)
+    except ImportError:
+      # if that fails, try as a name: load the default module and look there
+      name = _project
+      try:
+        projects = Project.load(default_module)
+      except ImportError:
+        pass
     else:
-      name = project.name
-  return name, project
+      name = None
+  if name:
+    if name in projects:
+      return name, projects[name]
+    elif projects:
+      # harder consistency requirement
+      raise AzkabanError(
+        'Project %r not found. Available projects: %s\n'
+        'You can also specify another location using the `--project` option.'
+        % (name, ', '.join(projects))
+      )
+    elif require_project:
+      raise AzkabanError(
+        'This command requires a project configuration module.\n'
+        'You can specify another location using the `--project` option.'
+      )
+    else:
+      return name, None
+  else:
+    if not projects:
+      raise AzkabanError(
+        'No registered project found in %r.\n'
+        'You can also specify another location using the `--project` option.'
+        % (_project, )
+      )
+    elif len(projects) > 1:
+      raise AzkabanError(
+        'Multiple registered projects found: %s\n'
+        'You can use the `--project` option to disambiguate.'
+        % (', '.join(projects), )
+      )
+    else:
+      return projects.popitem()
 
 def _get_project_name(_project):
   """Return project name.
