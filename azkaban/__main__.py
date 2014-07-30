@@ -253,11 +253,17 @@ def view_info(project, _files, _option, _job, _include_properties):
       sys.stdout.write('%s\t%s\n' % (osp.relpath(path), archive_path))
   else:
     options = _parse_option(_option).items()
-    for name, job in sorted(project.jobs.items()):
+    jobs = sorted(project.jobs.items())
+    dependencies = set(
+      dep
+      for _, job in jobs
+      for dep in job.options.get('dependencies', '').split(',')
+    )
+    for name, job in jobs:
       if all(job.options.get(k) == v for k, v in options):
         sys.stdout.write(
           '%s\t%s\n'
-          % ('J' if job.options.get('dependencies') else 'F', name, )
+          % ('J' if name in dependencies else 'F', name, )
         )
 
 def view_log(_execution, _job, _url, _alias):

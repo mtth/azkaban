@@ -4,7 +4,7 @@
 """Azkaban python library."""
 
 __all__ = ['Project', 'Job', 'PigJob']
-__version__ = '0.6.36'
+__version__ = '0.6.37'
 
 try:
   from .ext.pig import PigJob
