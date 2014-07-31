@@ -139,9 +139,10 @@ def _parse_project(_project, require_project=False):
     + If the above attempt raises an `ImportError`, we interpret it as a name.
 
   """
+  default_module = Config().get_option('azkaban', 'project', 'jobs')
   projects = {}
-  default_module = Config().get_option('azkaban', 'module', 'jobs')
-  if _project and ':' in _project:
+  _project = _project or default_module
+  if ':' in _project:
     # unambiguous case
     path, name = _project.rsplit(':', 1)
     try:
