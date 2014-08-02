@@ -18,6 +18,7 @@ from tempfile import gettempdir, mkstemp
 from traceback import print_exc
 import logging as lg
 import os.path as osp
+import re
 import sys
 import warnings as wr
 
@@ -348,6 +349,43 @@ def write_properties(options, path=None, header=None):
   else:
     for line in lines:
       sys.stdout.write(line)
+
+def read_properties(*paths):
+  """Read options from a properties file and return them as a dictionary.
+
+  :param \*paths: Paths to properties file. In the case of multiple definitions
+    of the same option, the latest takes precedence.
+
+  Note that not all features of `.properties` files are guaranteed to be
+  supported.
+
+  """
+  comment_p = re.compile(r'\s*(?:#|!)')
+  continuation_whitespace_p = re.compile(r'\\\n\s*')
+  separator_p = re.compile(r'(?<!\\)\s*(?::|=|\s)\s*')
+  separator_replacement_p = re.compile(r'\\(:|=|\s)')
+  opts = {}
+  for path in paths:
+    if not osp.exists(path):
+      raise AzkabanError('No properties file found at %s.', path)
+    try:
+      with open(path) as reader:
+        contents = continuation_whitespace_p.sub('', reader.read())
+        lines = (
+          tuple(s.strip() for s in separator_p.split(line, 1))
+          for line in contents.split('\n')
+          if line.strip() and not comment_p.match(line)
+        )
+        opts.update(dict(
+          (
+            separator_replacement_p.sub(lambda m: m.group(1), t[0]),
+            t[1] if len(t) == 2 else ''
+          )
+          for t in lines
+        ))
+    except Exception:
+      raise AzkabanError('Unsupported properties file: %r', path)
+  return opts
 
 def stream_file(path, chunksize):
   """Get iterator over a file's contents.

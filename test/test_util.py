@@ -4,6 +4,7 @@
 """Test Azkaban util module."""
 
 from azkaban.util import *
+from contextlib import contextmanager
 from nose.tools import eq_, ok_, raises, nottest
 from six import u
 
@@ -107,3 +108,39 @@ class TestMultipartForm(object):
       content = self.get_form_content(form)
       ok_(b'name="foo"' in content)
       ok_(b'bar' in content)
+
+
+class TestReadProperties(object):
+
+  @staticmethod
+  @contextmanager
+  def temp_properties(contents):
+    with temppath() as tpath:
+      with open(tpath, 'w') as writer:
+        writer.write(contents)
+      yield tpath
+
+  def test_separators(self):
+    contents = 'a=1\nb=2\nc  4'
+    with self.temp_properties(contents) as path:
+      eq_(read_properties(path), {'a': '1', 'b': '2', 'c': '4'})
+
+  def test_comments(self):
+    contents = '# fee\na=1\nb=2\n   !faye\n'
+    with self.temp_properties(contents) as path:
+      eq_(read_properties(path), {'a': '1', 'b': '2'})
+
+  def test_escaped_newline(self):
+    contents = 'a = bo\\\n    hi\nb = 2\n'
+    with self.temp_properties(contents) as path:
+      eq_(read_properties(path), {'a': 'bohi', 'b': '2'})
+
+  def test_empty_value(self):
+    contents = 'a = b\nc\nd : 4'
+    with self.temp_properties(contents) as path:
+      eq_(read_properties(path), {'a': 'b', 'c': '', 'd': '4'})
+
+  def test_escaped_separators(self):
+    contents = 'a\=b = 5\nfoo\ bar :ja\n'
+    with self.temp_properties(contents) as path:
+      eq_(read_properties(path), {'a=b': '5', 'foo bar': 'ja'})

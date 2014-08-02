@@ -46,13 +46,15 @@ Options:
   -i --include-properties       Include project properties with job options.
   -k --kill                     Kill worfklow on first job failure.
   -l --log                      Show path to current log file and exit.
-  -o OPTION --option=OPTION     Azkaban properties. The format is `key=value`,
-                                e.g. `-o user.to.proxy=foo`. For the `build`
-                                and `run` commands, these will be added to the
-                                project's or run's properties respectively
-                                (potentially overriding existing ones). For the
-                                `info` command, this will cause only jobs with
-                                that particular parameter to be displayed.
+  -o OPTION --option=OPTION     Azkaban properties. Can either be the path to
+                                a properties file or a single parameter
+                                formatted as `key=value`, e.g. `-o
+                                user.to.proxy=foo`. For the `build` and `run`
+                                commands, these will be added to the project's
+                                or run's properties respectively (potentially
+                                overriding existing ones). For the `info`
+                                command, this will cause only jobs with these
+                                exact parameters to be displayed.
   -p PROJECT --project=PROJECT  Azkaban project. Can either be a project name
                                 or a path to a python module/package defining
                                 an `azkaban.Project` instance. Commands which
@@ -78,7 +80,7 @@ from azkaban import __version__
 from azkaban.project import Project
 from azkaban.remote import Execution, Session
 from azkaban.util import (AzkabanError, Config, catch, flatten, human_readable,
-  temppath, write_properties)
+  temppath, read_properties, write_properties)
 from docopt import docopt
 from requests.exceptions import HTTPError
 import logging as lg
@@ -111,10 +113,13 @@ def _parse_option(_option):
   Returns a dictionary.
 
   """
+  paths = (opt for opt in _option if not '=' in opt)
+  opts = read_properties(*paths)
   try:
-    return dict(s.split('=', 1) for s in _option)
+    opts.update(dict(s.split('=', 1) for s in _option if '=' in s))
   except ValueError:
     raise AzkabanError('Invalid `--option` flag.')
+  return opts
 
 def _parse_project(_project, require_project=False):
   """Parse `--project` argument into `(name, project)`.
