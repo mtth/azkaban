@@ -25,11 +25,11 @@ Options:
                                 class path when the pig script is run, no need
                                 to register it inside your scripts.
   -l --log                      Show path to current log file and exit.
-  -o OPTION --option=OPTION     Azkaban option. Can either be a path to a job
-                                file or a single option formatted as key=value.
-                                E.g. `-o param.foo=bar` will substitute
-                                parameter `$foo` with `'bar'` in the pig
-                                script.
+  -o OPTION --option=OPTION     Azkaban option. Can either be a path to a
+                                properties file or a single option formatted as
+                                key=value. E.g. `-o param.foo=bar` will
+                                substitute parameter `$foo` with `'bar'` in the
+                                pig script.
   -p PROJECT --project=PROJECT  Project name under which to run the pig script.
   -t TYPE --type=TYPE           Pig job type used.
   -u URL --url=URL              Cf. `azkaban --help`.

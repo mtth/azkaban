@@ -152,24 +152,30 @@ class Session(object):
       validity of the session. Otherwise a simple test request will be emitted.
 
     """
-    if not response and self.id:
+    self._logger.debug('Checking if current session is valid.')
+    if not self.id:
+      self._logger.debug('No previous ID found.')
+      return False
+    if response is None:
+      # issue a request to check if the ID is valid (note the explicit `None`
+      # check as 500 responses are falsish).
       self._logger.debug('Checking if ID %s is valid.', self.id)
-      # this request will return a 200 empty response if the current session
-      # ID is valid and a 500 response otherwise
       response = _azkaban_request(
         'POST',
         '%s/manager' % (self.url, ),
         data={'session.id': self.id},
       )
+      # the above request will return a 200 empty response if the current
+      # session ID is valid and a 500 response otherwise
     if (
-      response is None or # 500 responses evaluate to False
       '<!-- /.login -->' in response.text or # usual non API error response
       'Login error' in response.text or # special case for API
       '"error" : "session"' in response.text # error when running a flow's jobs
     ):
-      self._logger.warning('ID %s is invalid:\n%s', self.id, response.text)
+      self._logger.debug('ID %s is invalid:\n%s', self.id, response.text)
       return False
     else:
+      self._logger.debug('ID %s is valid.', self.id)
       return True
 
   def get_execution_status(self, exec_id):
