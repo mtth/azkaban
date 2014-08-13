@@ -320,6 +320,7 @@ class Session(object):
 
     Note that in order to run a workflow on Azkaban, it must already have been
     uploaded and the corresponding user must have permissions to run it.
+
     """
     self._logger.debug('Starting project %s workflow %s.', name, flow)
     request_data = {
@@ -347,7 +348,7 @@ class Session(object):
     return res
 
   def schedule_workflow(self, name, flow, schedule_date, schedule_time,
-    recurring, period=None, **kwargs):
+    recurring=True, period=None, **kwargs):
     """Schedule a workflow.
 
     :param name: Project name.
@@ -358,9 +359,9 @@ class Session(object):
       `'9,21,PM,PDT'`, `'10,30,AM,PDT'`).
     :param recurring: Indicate if schedule should repeat (possible values:
       `True`, `False`).
-    :param period: Frequency to repeat if it is recurring. Consists of a number
-      and a unit (possible values: `'1s'`, `'2m'`, `'3h'`, `'2M'`).
-    :param kwargs: Keyword arguments passed to :func:`_run_options`.
+    :param period: Frequency to repeat if `recurring` is `True`. Consists
+      of a number and a unit (possible values: `'1s'`, `'2m'`, `'3h'`, `'2M'`).
+    :param \*\*kwargs: See :meth:`run_workflow` for documentation.
 
     """
     self._logger.debug('Scheduling project %s workflow %s.', flow, name)
@@ -373,8 +374,11 @@ class Session(object):
       'scheduleTime': schedule_time,
       'is_recurring': 'on' if recurring else 'off',
     }
-    if recurring and period:
-      request_data['period'] = period
+    if period:
+      if recurring:
+        request_data['period'] = period
+      else:
+        raise ValueError('Recurring must be `True` when specifying `period`.')
     request_data.update(self._run_options(name, flow, **kwargs))
     res = _extract_json(self._request(
       method='POST',
@@ -577,7 +581,7 @@ class Session(object):
     properties=None, on_failure='finish', notify_early=False, emails=None):
     """Construct data dict for run related actions.
 
-    See :func:`run_workflow` for parameter documentation.
+    See :meth:`run_workflow` for parameter documentation.
 
     """
     if not jobs:
