@@ -321,23 +321,77 @@ class Session(object):
     self._logger.info('Started project %s workflow %s.', name, flow)
     return res
 
-  def create_schedule(self, name, flow):
+  def create_schedule(self, name, flow, schedule_date, schedule_time,
+    recurring, period, **kwargs):
     """Schedule a workflow.
 
     :param name: Project name.
     :param flow: Name of flow in project.
+    :param schedule_date: Date of the first run (possible values:
+      `'08/07/2014'`, `'12/11/2015'`).
+    :param schedule_time: Time of the schedule (possible values:
+      `'9,21,PM,PDT'`, `'10,30,AM,PDT'`).
+    :param recurring: Indicate if schedule should repeat (possible values:
+      `True`, `False`).
+    :param period: Frequency to repeat if it is recurring. Consists of a number
+      and a unit (possible values: `'1s'`, `'2m'`, `'3h'`, `'2M'`).
+    :param kwargs: Keyword arguments passed to :func:`_run_options`.
+
     """
     self._logger.debug('Scheduling project %s workflow %s.', flow, name)
+    request_data = {
+      'ajax': 'executeFlow',
+      'projectName': name,
+      'projectId': self.get_project_id(name),
+      'flow': flow,
+      'scheduleDate': schedule_date,
+      'scheduleTime': schedule_time,
+      'is_recurring': 'on' if recurring else 'off',
+      'period': period,
+    }
+    request_data.update(self._run_options(name, flow, **kwargs))
+    res = _extract_json(self._request(
+      method='POST',
+      endpoint='schedule',
+      data=request_data,
+    ))
     self._logger.debug('Scheduled project %s workflow %s.', flow, name)
+    return res
 
   def remove_schedule(self, name, flow):
     """Schedule a workflow.
 
     :param name: Project name.
     :param flow: Name of flow in project.
+    :param kwargs: Keyword arguments passed to :func:`_run_options`.
+
     """
     self._logger.debug('Removing schedule project %s workflow %s.', flow, name)
     self._logger.debug('Removed schedule project %s workflow %s.', flow, name)
+
+  def get_project_id(self, name):
+    """Fetch the id of a project.
+
+    :param name: Project name.
+
+    """
+    self._logger.debug('Retrieving id for project %s.', name)
+    try:
+      res = _extract_json(self._request(
+        method='GET',
+        endpoint='manager',
+        params={
+          # there is no endpoint to get the project id, getPermissions is
+          # the least expensive endpoint whose response contains the id
+          'ajax': 'getPermissions',
+          'project': name,
+        },
+      ))
+    except ValueError:
+      # Azkaban server sends a 200 empty response if the project doesn't exist
+      raise AzkabanError('Failed to get project id. Check that project exists')
+    self._logger.debug('Retrieved id for project %s.', name)
+    return res['projectId']
 
   def upload_project(self, name, path, archive_name=None, callback=None):
     """Upload project archive.
@@ -474,6 +528,7 @@ class Session(object):
       the worfklow. If a single list is passed, the emails will be used for
       both success and failure events. If a pair of lists is passed, the first
       will receive failure emails, the second success emails.
+
     """
     if not jobs:
       disabled = '[]'

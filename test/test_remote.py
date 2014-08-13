@@ -191,6 +191,21 @@ class TestGetWorkflowInfo(_TestSession):
     eq_(sorted(self.get_job_names(info)), ['bar', 'foo'])
 
 
+class TestGetProjectInfo(_TestSession):
+
+  project_name = 'azkaban_cli_test_project_info'
+
+  def test_valid_name(self):
+    project_id = self.session.get_project_id(self.project_name)
+    project_id2 = self.session.get_project_id(self.project_name)
+    ok_(isinstance(project_id, int))
+    eq_(project_id, project_id2)
+
+  @raises(AzkabanError)
+  def test_missing_name(self):
+    self.session.get_project_id('DoesNotExist')
+
+
 class TestRun(_TestSession):
 
   project_name = 'azkaban_cli_run'
