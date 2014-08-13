@@ -295,12 +295,28 @@ class Session(object):
       raise AzkabanError('Delete failed. Check permissions and existence.')
     return res
 
-  def run_workflow(self, name, flow, **kwargs):
+  def run_workflow(self, name, flow, jobs=None, concurrent=True,
+    properties=None, on_failure='finish', notify_early=False, emails=None):
     """Launch a workflow.
 
     :param name: Name of the project.
     :param flow: Name of the workflow.
-    :param kwargs: Keyword arguments passed to :func:`_run_options`.
+    :param jobs: List of names of jobs to run (run entire workflow by default).
+    :param concurrent: Run workflow concurrently with any previous executions.
+    :param properties: Dictionary that will override global properties in this
+      execution of the workflow. This dictionary will be flattened similarly to
+      how :class:`~azkaban.job.Job` options are handled.
+    :param on_failure: Set the execution behavior on job failure. Available
+      options: `'finish'` (finish currently running jobs, but do not start any
+      others), `'continue'` (continue executing jobs as long as dependencies
+      are met),`'cancel'` (cancel all jobs immediately).
+    :param notify_early: Send any notification emails when the first job fails
+      rather than when the entire workflow finishes.
+    :param emails: List of emails or pair of list of emails to be notified
+      when the flow fails. Note that this will override any properties set in
+      the worfklow. If a single list is passed, the emails will be used for
+      both success and failure events. If a pair of lists is passed, the first
+      will receive failure emails, the second success emails.
 
     Note that in order to run a workflow on Azkaban, it must already have been
     uploaded and the corresponding user must have permissions to run it.
@@ -311,7 +327,16 @@ class Session(object):
       'project': name,
       'flow': flow
     }
-    request_data.update(self._run_options(name, flow, **kwargs))
+    request_data.update(self._run_options(
+      name,
+      flow,
+      jobs=jobs,
+      concurrent=concurrent,
+      properties=properties,
+      on_failure=on_failure,
+      notify_early=notify_early,
+      emails=emails
+    ))
     res = _extract_json(self._request(
       method='POST',
       endpoint='executor',
@@ -552,24 +577,7 @@ class Session(object):
     properties=None, on_failure='finish', notify_early=False, emails=None):
     """Construct data dict for run related actions.
 
-    :param name: Name of the project.
-    :param flow: Name of the workflow.
-    :param jobs: List of names of jobs to run (run entire workflow by default).
-    :param concurrent: Run workflow concurrently with any previous executions.
-    :param properties: Dictionary that will override global properties in this
-      execution of the workflow. This dictionary will be flattened similarly to
-      how :class:`~azkaban.job.Job` options are handled.
-    :param on_failure: Set the execution behavior on job failure. Available
-      options: `'finish'` (finish currently running jobs, but do not start any
-      others), `'continue'` (continue executing jobs as long as dependencies
-      are met),`'cancel'` (cancel all jobs immediately).
-    :param notify_early: Send any notification emails when the first job fails
-      rather than when the entire workflow finishes.
-    :param emails: List of emails or pair of list of emails to be notified
-      when the flow fails. Note that this will override any properties set in
-      the worfklow. If a single list is passed, the emails will be used for
-      both success and failure events. If a pair of lists is passed, the first
-      will receive failure emails, the second success emails.
+    See :func:`run_workflow` for parameter documentation.
 
     """
     if not jobs:
