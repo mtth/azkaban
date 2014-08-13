@@ -339,7 +339,7 @@ def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
     properties=_parse_option(_option),
   )
   sys.stdout.write(
-    'Scheduled project %s flow %s successfully.\n' % (project_name, _flow)
+    'Flow %s scheduled successfully.\n' % (_flow, )
   )
 
 def upload_project(project_name, _zip, _url, _alias, _create):
