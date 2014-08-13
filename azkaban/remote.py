@@ -321,7 +321,7 @@ class Session(object):
     self._logger.info('Started project %s workflow %s.', name, flow)
     return res
 
-  def create_schedule(self, name, flow, schedule_date, schedule_time,
+  def schedule_workflow(self, name, flow, schedule_date, schedule_time,
     recurring, period=None, **kwargs):
     """Schedule a workflow.
 
@@ -342,7 +342,7 @@ class Session(object):
     request_data = {
       'ajax': 'scheduleFlow',
       'projectName': name,
-      'projectId': self.get_project_id(name),
+      'projectId': self._get_project_id(name),
       'flow': flow,
       'scheduleDate': schedule_date,
       'scheduleTime': schedule_time,
@@ -356,21 +356,58 @@ class Session(object):
       endpoint='schedule',
       data=request_data,
     ))
-    self._logger.debug('Scheduled project %s workflow %s.', flow, name)
+    self._logger.info('Scheduled project %s workflow %s.', name, flow)
     return res
 
-  def remove_schedule(self, name, flow):
-    """Remove a schedule.
+  def unschedule_workflow(self, name, flow):
+    """Unschedule a workflow.
 
     :param name: Project name.
     :param flow: Name of flow in project.
-    :param kwargs: Keyword arguments passed to :func:`_run_options`.
 
     """
-    self._logger.debug('Removing schedule project %s workflow %s.', flow, name)
-    self._logger.debug('Removed schedule project %s workflow %s.', flow, name)
+    self._logger.debug('Unscheduling project %s workflow %s.', flow, name)
+    request_data = {
+      'action': 'removeSched',
+      'scheduleId': self.get_schedule(name, flow)['scheduleId'],
+    }
+    res = _extract_json(self._request(
+      method='POST',
+      endpoint='schedule',
+      data=request_data,
+    ))
+    self._logger.info('Unscheduled project %s workflow %s.', name, flow)
+    return res
 
-  def get_project_id(self, name):
+  def get_schedule(self, name, flow):
+    """Get schedule information.
+
+    :param name: Project name.
+    :param flow: Name of flow in project.
+
+    """
+    self._logger.debug(
+      'Retrieving schedule for project %s workflow %s.', flow, name
+    )
+    res = _extract_json(self._request(
+      method='GET',
+      endpoint='schedule',
+      params={
+        'ajax': 'fetchSchedule',
+        'projectId': self._get_project_id(name),
+        'flowId': flow,
+      },
+    ))
+    self._logger.info(
+      'Retrieved schedule for project %s workflow %s.', name, flow
+    )
+    if 'schedule' not in res:
+      raise AzkabanError(
+        'Failed to get schedule. Check that the schedule exists.'
+      )
+    return res['schedule']
+
+  def _get_project_id(self, name):
     """Fetch the id of a project.
 
     :param name: Project name.
@@ -390,9 +427,13 @@ class Session(object):
       ))
     except ValueError:
       # Azkaban server sends a 200 empty response if the project doesn't exist
-      raise AzkabanError('Failed to get project id. Check that project exists')
-    self._logger.debug('Retrieved id for project %s.', name)
-    return res['projectId']
+      raise AzkabanError(
+        'Failed to get project id. Check that the project exists.'
+      )
+    else:
+      project_id = res['projectId']
+    self._logger.info('Retrieved id for project %s: %s.', name, project_id)
+    return project_id
 
   def upload_project(self, name, path, archive_name=None, callback=None):
     """Upload project archive.
