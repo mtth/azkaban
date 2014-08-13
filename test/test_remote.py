@@ -354,6 +354,40 @@ class TestExecution(_TestSession):
     ok_('Submitting job \'foo\' to run.' in logs)
 
 
+class TestSchedule(_TestSession):
+
+  project_name = 'azkabancli_test_schedule'
+
+  def setup(self):
+    super(TestSchedule, self).setup()
+    options = {'type': 'command', 'command': 'sleep 4'}
+    self.project.add_job('foo', Job(options))
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+
+  def test_create_schedule(self):
+    res = self.session.create_schedule(
+      self.project_name,
+      'foo',
+      '08/07/2014',
+      '9,21,PM,PDT',
+      True,
+      '1d'
+    )
+    ok_(res['status'] == 'success')
+
+  @raises(AzkabanError)
+  def test_invalid_schedule(self):
+    res = self.session.create_schedule(
+      self.project_name,
+      'foo',
+      '08/07/2014',
+      '9,21PM,PDT',
+      True,
+      '1d'
+    )
+
 class TestProperties(_TestSession):
 
   project_name = 'azkabancli_test_properties'

@@ -322,7 +322,7 @@ class Session(object):
     return res
 
   def create_schedule(self, name, flow, schedule_date, schedule_time,
-    recurring, period, **kwargs):
+    recurring, period=None, **kwargs):
     """Schedule a workflow.
 
     :param name: Project name.
@@ -340,15 +340,16 @@ class Session(object):
     """
     self._logger.debug('Scheduling project %s workflow %s.', flow, name)
     request_data = {
-      'ajax': 'executeFlow',
+      'ajax': 'scheduleFlow',
       'projectName': name,
       'projectId': self.get_project_id(name),
       'flow': flow,
       'scheduleDate': schedule_date,
       'scheduleTime': schedule_time,
       'is_recurring': 'on' if recurring else 'off',
-      'period': period,
     }
+    if recurring and period:
+      request_data['period'] = period
     request_data.update(self._run_options(name, flow, **kwargs))
     res = _extract_json(self._request(
       method='POST',
@@ -359,7 +360,7 @@ class Session(object):
     return res
 
   def remove_schedule(self, name, flow):
-    """Schedule a workflow.
+    """Remove a schedule.
 
     :param name: Project name.
     :param flow: Name of flow in project.
