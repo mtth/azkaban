@@ -295,88 +295,23 @@ class Session(object):
       raise AzkabanError('Delete failed. Check permissions and existence.')
     return res
 
-  def run_workflow(self, name, flow, jobs=None, concurrent=True,
-    properties=None, on_failure='finish', notify_early=False, emails=None):
+  def run_workflow(self, name, flow, **kwargs):
     """Launch a workflow.
 
     :param name: Name of the project.
     :param flow: Name of the workflow.
-    :param jobs: List of names of jobs to run (run entire workflow by default).
-    :param concurrent: Run workflow concurrently with any previous executions.
-    :param properties: Dictionary that will override global properties in this
-      execution of the workflow. This dictionary will be flattened similarly to
-      how :class:`~azkaban.job.Job` options are handled.
-    :param on_failure: Set the execution behavior on job failure. Available
-      options: `'finish'` (finish currently running jobs, but do not start any
-      others), `'continue'` (continue executing jobs as long as dependencies
-      are met),`'cancel'` (cancel all jobs immediately).
-    :param notify_early: Send any notification emails when the first job fails
-      rather than when the entire workflow finishes.
-    :param emails: List of emails or pair of list of emails to be notified
-      when the flow fails. Note that this will override any properties set in
-      the worfklow. If a single list is passed, the emails will be used for
-      both success and failure events. If a pair of lists is passed, the first
-      will receive failure emails, the second success emails.
+    :param kwargs: Keyword arguments passed to :func:`_run_options`.
 
     Note that in order to run a workflow on Azkaban, it must already have been
     uploaded and the corresponding user must have permissions to run it.
-
     """
     self._logger.debug('Starting project %s workflow %s.', name, flow)
-    if not jobs:
-      disabled = '[]'
-    else:
-      all_names = set(
-        n['id']
-        for n in self.get_workflow_info(name, flow)['nodes']
-      )
-      run_names = set(jobs)
-      missing_names = run_names - all_names
-      if missing_names:
-        raise AzkabanError(
-          'Jobs not found in flow %r: %s.' %
-          (flow, ', '.join(missing_names))
-        )
-      else:
-        disabled = (
-          '[%s]'
-          % (','.join('"%s"' % (n, ) for n in all_names - run_names), )
-        )
-    try:
-      failure_action = {
-        'finish': 'finishCurrent',
-        'continue': 'finishPossible',
-        'cancel': 'cancelImmediately',
-      }[on_failure]
-    except KeyError:
-      raise ValueError('Invalid `on_failure` value: %r.' % (on_failure, ))
     request_data = {
       'ajax': 'executeFlow',
       'project': name,
-      'flow': flow,
-      'disabled': disabled,
-      'concurrentOption': 'concurrent' if concurrent else 'skip',
-      'failureAction': failure_action,
-      'notifyFailureFirst': 'true' if notify_early else 'false',
+      'flow': flow
     }
-    if properties:
-      request_data.update(dict(
-        ('flowOverride[%s]' % (key, ), value)
-        for key, value in flatten(properties).items()
-      ))
-    if emails:
-      if isinstance(emails[0], string_types):
-        failure_emails = ','.join(emails)
-        success_emails = failure_emails
-      else:
-        failure_emails = ','.join(emails[0])
-        success_emails = ','.join(emails[1])
-      request_data.update({
-        'failureEmails': failure_emails,
-        'failureEmailsOverride': 'true',
-        'successEmails': success_emails,
-        'successEmailsOverride': 'true',
-      })
+    request_data.update(self._run_options(name, flow, **kwargs))
     res = _extract_json(self._request(
       method='POST',
       endpoint='executor',
@@ -385,6 +320,24 @@ class Session(object):
     ))
     self._logger.info('Started project %s workflow %s.', name, flow)
     return res
+
+  def create_schedule(self, name, flow):
+    """Schedule a workflow.
+
+    :param name: Project name.
+    :param flow: Name of flow in project.
+    """
+    self._logger.debug('Scheduling project %s workflow %s.', flow, name)
+    self._logger.debug('Scheduled project %s workflow %s.', flow, name)
+
+  def remove_schedule(self, name, flow):
+    """Schedule a workflow.
+
+    :param name: Project name.
+    :param flow: Name of flow in project.
+    """
+    self._logger.debug('Removing schedule project %s workflow %s.', flow, name)
+    self._logger.debug('Removed schedule project %s workflow %s.', flow, name)
 
   def upload_project(self, name, path, archive_name=None, callback=None):
     """Upload project archive.
@@ -498,6 +451,82 @@ class Session(object):
     self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
     self.config.save()
     self._logger.info('Refreshed.')
+
+  def _run_options(self, name, flow, jobs=None, concurrent=True,
+    properties=None, on_failure='finish', notify_early=False, emails=None):
+    """Construct data dict for run related actions.
+
+    :param name: Name of the project.
+    :param flow: Name of the workflow.
+    :param jobs: List of names of jobs to run (run entire workflow by default).
+    :param concurrent: Run workflow concurrently with any previous executions.
+    :param properties: Dictionary that will override global properties in this
+      execution of the workflow. This dictionary will be flattened similarly to
+      how :class:`~azkaban.job.Job` options are handled.
+    :param on_failure: Set the execution behavior on job failure. Available
+      options: `'finish'` (finish currently running jobs, but do not start any
+      others), `'continue'` (continue executing jobs as long as dependencies
+      are met),`'cancel'` (cancel all jobs immediately).
+    :param notify_early: Send any notification emails when the first job fails
+      rather than when the entire workflow finishes.
+    :param emails: List of emails or pair of list of emails to be notified
+      when the flow fails. Note that this will override any properties set in
+      the worfklow. If a single list is passed, the emails will be used for
+      both success and failure events. If a pair of lists is passed, the first
+      will receive failure emails, the second success emails.
+    """
+    if not jobs:
+      disabled = '[]'
+    else:
+      all_names = set(
+        n['id']
+        for n in self.get_workflow_info(name, flow)['nodes']
+      )
+      run_names = set(jobs)
+      missing_names = run_names - all_names
+      if missing_names:
+        raise AzkabanError(
+          'Jobs not found in flow %r: %s.' %
+          (flow, ', '.join(missing_names))
+        )
+      else:
+        disabled = (
+          '[%s]'
+          % (','.join('"%s"' % (n, ) for n in all_names - run_names), )
+        )
+    try:
+      failure_action = {
+        'finish': 'finishCurrent',
+        'continue': 'finishPossible',
+        'cancel': 'cancelImmediately',
+      }[on_failure]
+    except KeyError:
+      raise ValueError('Invalid `on_failure` value: %r.' % (on_failure, ))
+    request_data = {
+      'disabled': disabled,
+      'concurrentOption': 'concurrent' if concurrent else 'skip',
+      'failureAction': failure_action,
+      'notifyFailureFirst': 'true' if notify_early else 'false',
+    }
+    if properties:
+      request_data.update(dict(
+        ('flowOverride[%s]' % (key, ), value)
+        for key, value in flatten(properties).items()
+      ))
+    if emails:
+      if isinstance(emails[0], string_types):
+        failure_emails = ','.join(emails)
+        success_emails = failure_emails
+      else:
+        failure_emails = ','.join(emails[0])
+        success_emails = ','.join(emails[1])
+      request_data.update({
+        'failureEmails': failure_emails,
+        'failureEmailsOverride': 'true',
+        'successEmails': success_emails,
+        'successEmailsOverride': 'true',
+      })
+    return request_data
 
   def _request(self, method, endpoint, include_session='cookies', **kwargs):
     """Make a request to Azkaban using this session.
