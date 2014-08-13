@@ -7,8 +7,11 @@ Usage:
   azkaban build [-cp PROJECT] [-a ALIAS | -u URL | [-r] ZIP] [-o OPTION ...]
   azkaban info [-p PROJECT] [-f | -o OPTION ... | [-i] JOB ...]
   azkaban log [-a ALIAS | -u URL] EXECUTION [JOB]
-  azkaban run [-ksp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
+  azkaban run [-bkp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
               [-o OPTION ...] FLOW [JOB ...]
+  azkaban schedule [-bkp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
+                   [-o OPTION ...] (-d DATE) (-t TIME) [-s SPAN]
+                   FLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
   azkaban -h | --help | -l | --log | -v | --version
 
@@ -36,7 +39,10 @@ Arguments:
 Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
                                 to reuse session IDs for later connections.
+  -b --bounce                   Skip execution if workflow is already running.
   -c --create                   Create the project if it does not exist.
+  -d DATE --date=DATE           Date used for first run of a schedule. It must
+                                be in the format `MM/DD/YYYY`.
   -e EMAIL --email=EMAIL        Email address to be notified when the workflow
                                 finishes (can be specified multiple times).
   -f --files                    List project files instead of jobs. The first
@@ -63,7 +69,12 @@ Options:
                                 registered, you can disambiguate as follows:
                                 `--project=module:project_name`.
   -r --replace                  Overwrite any existing file.
-  -s --skip                     Skip if workflow is already running.
+  -s SPAN --span=SPAN           Period to repeat the scheduled flow. Must be
+                                in format `1d`, a combination of magnitude and
+                                unit of repetition. If not specified, the flow
+                                will be run only once.
+  -t TIME --time=TIME           Time when a schedule should be run. Must be of
+                                the format `hh,mm,(AM|PM),(PDT|UTC|..)`.
   -u URL --url=URL              Azkaban endpoint (with protocol, and optionally
                                 a username): '[user@]protocol:endpoint'. E.g.
                                 'http://azkaban.server'. The username defaults
@@ -289,7 +300,7 @@ def view_log(_execution, _job, _url, _alias):
     else:
       raise AzkabanError('Execution %s not found.', _execution)
 
-def run_flow(project_name, _flow, _job, _url, _alias, _skip, _kill,
+def run_workflow(project_name, _flow, _job, _url, _alias, _bounce, _kill,
   _email, _option):
   """Run workflow."""
   session = Session(_url, _alias)
@@ -297,7 +308,7 @@ def run_flow(project_name, _flow, _job, _url, _alias, _skip, _kill,
     name=project_name,
     flow=_flow,
     jobs=_job,
-    concurrent=not _skip,
+    concurrent=not _bounce,
     on_failure='cancel' if _kill else 'finish',
     emails=_email,
     properties=_parse_option(_option),
@@ -308,6 +319,27 @@ def run_flow(project_name, _flow, _job, _url, _alias, _skip, _kill,
     'Flow %s successfully submitted (execution id: %s%s).\n'
     'Details at %s/executor?execid=%s\n'
     % (_flow, exec_id, job_names, session.url, exec_id)
+  )
+
+def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
+  _alias, _bounce, _kill, _email, _option):
+  """Schedule workflow."""
+  session = Session(_url, _alias)
+  res = session.schedule_workflow(
+    name=project_name,
+    flow=_flow,
+    date=_date,
+    time=_time,
+    recurring=True if _span else False,
+    period=_span,
+    jobs=_job,
+    concurrent=not _bounce,
+    on_failure='cancel' if _kill else 'finish',
+    emails=_email,
+    properties=_parse_option(_option),
+  )
+  sys.stdout.write(
+    'Scheduled project %s flow %s successfully.\n' % (project_name, _flow)
   )
 
 def upload_project(project_name, _zip, _url, _alias, _create):
@@ -425,13 +457,24 @@ def main(argv=None):
       **_forward(args, ['--files', '--option', 'JOB', '--include-properties'])
     )
   elif args['run']:
-    run_flow(
+    run_workflow(
       _get_project_name(args['--project']),
       **_forward(
         args,
         [
-          'FLOW', 'JOB', '--skip', '--url', '--alias', '--kill', '--email',
+          'FLOW', 'JOB', '--bounce', '--url', '--alias', '--kill', '--email',
           '--option',
+        ]
+      )
+    )
+  elif args['schedule']:
+    schedule_workflow(
+      _get_project_name(args['--project']),
+      **_forward(
+        args,
+        [
+          'FLOW', 'JOB', '--bounce', '--url', '--alias', '--kill',
+          '--email', '--option', '--date', '--time', '--span'
         ]
       )
     )

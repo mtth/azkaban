@@ -347,15 +347,15 @@ class Session(object):
     self._logger.info('Started project %s workflow %s.', name, flow)
     return res
 
-  def schedule_workflow(self, name, flow, schedule_date, schedule_time,
+  def schedule_workflow(self, name, flow, date, time,
     recurring=True, period=None, **kwargs):
     """Schedule a workflow.
 
     :param name: Project name.
     :param flow: Name of flow in project.
-    :param schedule_date: Date of the first run (possible values:
+    :param date: Date of the first run (possible values:
       `'08/07/2014'`, `'12/11/2015'`).
-    :param schedule_time: Time of the schedule (possible values:
+    :param time: Time of the schedule (possible values:
       `'9,21,PM,PDT'`, `'10,30,AM,PDT'`).
     :param recurring: Indicate if schedule should repeat (possible values:
       `True`, `False`).
@@ -370,8 +370,8 @@ class Session(object):
       'projectName': name,
       'projectId': self._get_project_id(name),
       'flow': flow,
-      'scheduleDate': schedule_date,
-      'scheduleTime': schedule_time,
+      'scheduleDate': date,
+      'scheduleTime': time,
       'is_recurring': 'on' if recurring else 'off',
     }
     if period:
