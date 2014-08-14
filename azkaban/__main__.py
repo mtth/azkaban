@@ -22,6 +22,8 @@ Commmands:
   log                           View workflow or job execution logs.
   run                           Run jobs or workflows. If no job is specified,
                                 the entire workflow will be executed.
+  schedule                      Schedule a workflow to be run at a specified
+                                date and time.
   upload                        Upload archive to Azkaban server.
 
 Arguments:
