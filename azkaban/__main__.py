@@ -10,7 +10,7 @@ Usage:
   azkaban run [-bkp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
               [-o OPTION ...] FLOW [JOB ...]
   azkaban schedule [-bkp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
-                   [-o OPTION ...] (-d DATE) (-t TIME) [-s SPAN]
+                   [-o OPTION ...] [-s SPAN] (-d DATE) (-t TIME)
                    FLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
   azkaban -h | --help | -l | --log | -v | --version
