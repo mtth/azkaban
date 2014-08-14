@@ -372,8 +372,7 @@ class TestSchedule(_TestSession):
       'foo',
       '08/07/2014',
       '9,21,PM,PDT',
-      True,
-      '1d'
+      '1d',
     )
     ok_(res['status'] == 'success')
     res = self.session.unschedule_workflow(self.project_name, 'foo')
@@ -390,8 +389,7 @@ class TestSchedule(_TestSession):
       'foo',
       '08/07/2014',
       '9,21PM,PDT',
-      True,
-      '1d'
+      '1d',
     )
 
 

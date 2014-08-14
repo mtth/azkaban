@@ -347,8 +347,7 @@ class Session(object):
     self._logger.info('Started project %s workflow %s.', name, flow)
     return res
 
-  def schedule_workflow(self, name, flow, date, time,
-    recurring=True, period=None, **kwargs):
+  def schedule_workflow(self, name, flow, date, time, period=None, **kwargs):
     """Schedule a workflow.
 
     :param name: Project name.
@@ -357,10 +356,9 @@ class Session(object):
       `'08/07/2014'`, `'12/11/2015'`).
     :param time: Time of the schedule (possible values:
       `'9,21,PM,PDT'`, `'10,30,AM,PDT'`).
-    :param recurring: Indicate if schedule should repeat (possible values:
-      `True`, `False`).
-    :param period: Frequency to repeat if `recurring` is `True`. Consists
-      of a number and a unit (possible values: `'1s'`, `'2m'`, `'3h'`, `'2M'`).
+    :param period: Frequency to repeat. Consists of a number and a unit
+      (possible values: `'1s'`, `'2m'`, `'3h'`, `'2M'`). If not specified
+      the flow will be run only once.
     :param \*\*kwargs: See :meth:`run_workflow` for documentation.
 
     """
@@ -372,13 +370,10 @@ class Session(object):
       'flow': flow,
       'scheduleDate': date,
       'scheduleTime': time,
-      'is_recurring': 'on' if recurring else 'off',
+      'is_recurring': 'on' if period else 'off',
     }
     if period:
-      if recurring:
-        request_data['period'] = period
-      else:
-        raise ValueError('Recurring must be `True` when specifying `period`.')
+      request_data['period'] = period
     request_data.update(self._run_options(name, flow, **kwargs))
     res = _extract_json(self._request(
       method='POST',
