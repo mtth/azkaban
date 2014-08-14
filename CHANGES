@@ -13,11 +13,15 @@ Version 0.7.0 (?)
 * Changed default `--project` CLI option to support both `jobs.py` and `jobs/`
   as defaults.
 * Added `--option` flag to `build` to allow overriding of project properties.
+* Added `schedule` command for workflows.
+* Added `schedule_workflow`, `unschedule_workflow`, `get_schedule` methods for
+  working with azkaban scheduling.
 
 Breaking changes:
 
 * Removed `create` and `delete` CLI commands.
 * Changed `--options` handling for `info` command (and renamed it to `--option`).
+* Renamed `--skip` option for running flow to `--bounce`
 
 
 Version 0.6.0 (04/26/2014)
