@@ -3,7 +3,6 @@
 
 """Project definition module."""
 
-from traceback import format_exc
 from weakref import WeakValueDictionary
 from zipfile import ZipFile
 from .util import AzkabanError, Adapter, flatten, temppath, write_properties

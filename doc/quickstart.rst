@@ -13,18 +13,23 @@ existing Azkaban project:
 
 * `azkaban run [options] WORKFLOW [JOB ...]`
 
-  Launch (asynchronously) an entire workflow or specific jobs in a given 
-  workflow. This command will print the corresponding execution's URL to 
-  standard out.
+  Launch a workflow (asynchronously). By default the entire workflow will be 
+  run, but you can specify specific jobs to only run those. This command will 
+  print the corresponding execution's URL to standard out.
 
 * `azkaban upload [options] ZIP`
 
-  Upload an existing project zip archive.
+  Upload an existing project zip archive to the Azkaban server.
+
+* `azkaban schedule [options] (-d DATE) (-t TIME) [-s SPAN]`
+
+  Schedule a workflow to be run on a particular day and time. An optional span 
+  argument can also be specified to enable recurring runs.
 
 * `azkaban log [options] EXECUTION [JOB]`
 
-  View execution logs. If the execution is still running, the command will 
-  return on completion.
+  View execution logs for a workflow or single job. If the execution is still 
+  running, the command will return on completion.
 
 The second require a project configuration file (cf. `building projects`_):
 
@@ -37,10 +42,12 @@ The second require a project configuration file (cf. `building projects`_):
 * `azkaban info [options]`
 
   View information about all the jobs inside a project, its static 
-  dependencies, or a specific job's options.
+  dependencies, or a specific job's options. In the former case, each job will 
+  be prefixed by `W` if it has no children (i.e. it "commands" a workflow), or 
+  `J` otherwise (regular job).
 
-Running `azkaban --help` shows the full list of options available for each 
-command.
+Running `azkaban --help` will show the full list of commands and options 
+available for each.
 
 
 URLs and aliases
@@ -244,15 +251,3 @@ Next steps
 Any valid python code can go inside a jobs configuration file. This includes 
 using loops to add jobs, subclassing the base `Job` class to better suit a 
 project's needs (e.g. by implementing the `on_add` handler), etc.
-
-Finally, the `info` command becomes quite powerful when combined with other 
-Unix tools. Here are a few examples:
-
-* Counting the number of jobs per type: `azkaban info -o type | cut -f 2 | 
-  sort | uniq -c`
-
-* Viewing the list of jobs of a certain type, along with their dependencies: 
-  `azkaban info -o type,dependencies | awk -F '\t' '($2 == "job_type")'`
-
-* Viewing the size of each file in the project: `azkaban info -f | xargs -n 1 
-  du -h`

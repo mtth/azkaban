@@ -327,7 +327,7 @@ def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
   _alias, _bounce, _kill, _email, _option):
   """Schedule workflow."""
   session = Session(_url, _alias)
-  res = session.schedule_workflow(
+  session.schedule_workflow(
     name=project_name,
     flow=_flow,
     date=_date,
