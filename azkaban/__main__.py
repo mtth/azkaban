@@ -89,7 +89,7 @@ Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 
 """
 
-from azkaban import __version__
+from azkaban import __version__, CLI_ARGS
 from azkaban.project import Project
 from azkaban.remote import Execution, Session
 from azkaban.util import (AzkabanError, Config, catch, flatten, human_readable,
@@ -432,8 +432,9 @@ def main(argv=None):
     logger.addHandler(handler)
   # parse arguments
   argv = argv or sys.argv[1:]
-  args = docopt(__doc__, version=__version__)
   _logger.debug('Running command %r from %r.', ' '.join(argv), os.getcwd())
+  args = docopt(__doc__, version=__version__)
+  CLI_ARGS.update(args)
   # do things
   if args['--log']:
     if handler:

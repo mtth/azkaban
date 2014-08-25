@@ -4,7 +4,7 @@
 """Azkaban python library."""
 
 __all__ = ['Project', 'Job', 'PigJob']
-__version__ = '0.6.42'
+__version__ = '0.6.43'
 
 try:
   from .ext.pig import PigJob
@@ -15,6 +15,9 @@ except ImportError:
 
 import logging as lg
 
+
+# docopt arguments are made available here by the CLI
+CLI_ARGS = {}
 
 class NullHandler(lg.Handler):
 
