@@ -131,7 +131,7 @@ class _PigProject(Project):
       while execution.status['status'] == 'PREPARING':
         # Delay log query until job is done preparing otherwise the log file
         # won't exist yet (and the server will send a 500 back).
-        self._logger.warn('Job %s preparing.', job)
+        self._logger.warning('Job %s preparing.', job)
         sleep(delay)
       for line in execution.job_logs(job):
         yield line
