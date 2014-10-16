@@ -48,6 +48,7 @@ __all__ = ['PigJob']
 from docopt import docopt
 from os import sep
 from os.path import abspath, basename, exists
+from time import sleep
 from ..job import Job
 from ..project import Project
 from ..remote import Execution, Session
@@ -118,14 +119,20 @@ class _PigProject(Project):
       options['dependencies'] = dep or '' # override key if exists
       self.add_job(basename(path), PigJob(options))
 
-  def logs(self, execution):
+  def logs(self, execution, delay=10):
     """Jobs logs. In order.
 
     :param execution: `azkaban.remote.Execution`
+    :param delay: Poll delay (in seconds) while job is preparing.
 
     """
     ok_statuses = set(['RUNNING', 'SUCCEEDED'])
     for job in self.ordered_jobs:
+      while execution.status['status'] == 'PREPARING':
+        # Delay log query until job is done preparing otherwise the log file
+        # won't exist yet (and the server will send a 500 back).
+        self._logger.warn('Job %s preparing.', job)
+        sleep(delay)
       for line in execution.job_logs(job):
         yield line
       if not execution.status['status'] in ok_statuses:
