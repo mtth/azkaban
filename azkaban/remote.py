@@ -8,7 +8,7 @@ a remote Azkaban server.
 
 """
 
-from .util import AzkabanError, Config, Adapter, MultipartForm, flatten
+from azkaban.util import AzkabanError, Config, Adapter, MultipartForm, flatten
 from getpass import getpass, getuser
 from os.path import basename, exists
 from requests.exceptions import HTTPError
@@ -60,6 +60,7 @@ def _extract_json(response):
     raise err
   else:
     if 'error' in json:
+      print json
       raise AzkabanError(json['error'])
     elif json.get('status') == 'error':
       raise AzkabanError(json['message'])
@@ -177,6 +178,47 @@ class Session(object):
     else:
       self._logger.debug('ID %s is valid.', self.id)
       return True
+
+  
+  def fetch_flow_executions(self, project, flow, start=0, length=10):
+    """Fetch executions of a flow.
+    
+    :param project: Project name
+    :param flow: Flow name
+    :param start: Start index (inclusive) of the returned list. 
+    :param length: Max length of the returned listf.
+    """
+    self._logger.debug('Fetching executions of a flow %s/%s.', project, flow)
+    return _extract_json(self._request(
+      method='GET',
+      endpoint='manager',
+      params={
+        'ajax': 'fetchFlowExecutions',
+        'project': project,
+        'flow': flow,
+        'start': start,
+        'length': length
+      },
+    ))
+
+
+  def get_running(self, project, flow):
+    """Get running executions of a flow.
+    
+    :param project: Project name
+    :param flow: Flow name
+    """
+    self._logger.debug('Fetching running executions of %s/%s.', project, flow)
+    return _extract_json(self._request(
+      method='GET',
+      endpoint='executor',
+      params={
+        'ajax': 'getRunning',
+        'project': project,
+        'flow': flow,        
+      },
+    ))
+
 
   def get_execution_status(self, exec_id):
     """Get status of an execution.
