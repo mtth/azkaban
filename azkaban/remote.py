@@ -60,7 +60,6 @@ def _extract_json(response):
     raise err
   else:
     if 'error' in json:
-      print json
       raise AzkabanError(json['error'])
     elif json.get('status') == 'error':
       raise AzkabanError(json['message'])
