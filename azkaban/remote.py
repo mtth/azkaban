@@ -8,15 +8,17 @@ a remote Azkaban server.
 
 """
 
-from azkaban.util import AzkabanError, Config, Adapter, MultipartForm, flatten
+from .util import AzkabanError, Config, Adapter, MultipartForm, flatten
 from getpass import getpass, getuser
 from os.path import basename, exists
 from requests.exceptions import HTTPError
 from six import string_types
 from six.moves.configparser import NoOptionError, NoSectionError
+from six.moves.urllib.parse import urlparse
 from time import sleep
 import logging as lg
 import requests as rq
+import re
 
 
 _logger = lg.getLogger(__name__)
@@ -66,22 +68,53 @@ def _extract_json(response):
     else:
       return json
 
+
 def _parse_url(url):
-  """Parse url.
-
-  :param url: HTTP endpoint (including protocol, port and optional user).
-
+  """Parse url, returning tuple of (username, password, address)
+  
+  :param url: HTTP endpoint (including protocol, port, optional user and password).
+    
+  Supported url formats:
+  
+  protocol://host:port
+  protocol://user@host:port
+  protocol://user:password@host:port
+  user@protocol://host:port (compatibility with older versions)
+  user:password@protocol://host:port (compatibility with older versions)
   """
-  parsed_url = url.rstrip('/').split('@')
-  if len(parsed_url) == 1:
-    user = getuser()
-    url = parsed_url[0]
-  elif len(parsed_url) == 2:
-    user = parsed_url[0]
-    url = parsed_url[1]
-  else:
-    raise AzkabanError('Malformed url: %r' % (url, ))
-  return (user, url)
+  if not re.match(r'[a-zA-Z]+://', url) and not re.search(r'@[a-zA-Z]+://', url):
+    # no scheme specified, default to http://
+    url = 'http://' + url
+  if re.search(r'@[a-zA-Z]+://', url):
+    # compatibility mode
+    # user@protocol://host:port
+    # or 
+    # user:password@protocol://host:port
+    splitted = url.rstrip('/').split('@')
+    if len(splitted) == 1:
+      address = splitted[0]
+      user = None
+      password = None
+    elif len(splitted) == 2:
+      address = splitted[1]
+      creds = splitted[0].split(':')
+      if len(creds) == 1:
+        user = creds[0]
+        password = None
+      elif len(creds) > 1:
+        # urllib allows another ":" in password, so we do the same
+        user = creds[0]
+        password = ':'.join(creds[1:])
+      else: 
+        raise AzkabanError('Malformed url: %r' % (url, ))
+    else: 
+      raise AzkabanError('Malformed url: %r' % (url, ))
+    return user, password, address
+  else:        
+    parsed = urlparse(url)        
+    return (parsed.username, parsed.password, 
+            '%s://%s:%s' % (parsed.scheme, parsed.hostname, parsed.port))
+
 
 def _resolve_alias(config, alias):
   """Get url associated with an alias.
@@ -132,9 +165,13 @@ class Session(object):
     if not url:
       alias = alias or self.config.get_option('azkaban', 'alias')
       url = _resolve_alias(self.config, alias)
-    self.user, self.url = _parse_url(url)
-    self.id = _get_session_id(self.config, str(self).replace(':', '.'))
+    self.user, password, self.url = _parse_url(url)
+    if not self.user:
+      self.user = getuser()
+    self.id = _get_session_id(self.config, str(self).replace(':', '.'))    
     self._logger = Adapter(repr(self), _logger)
+    if password:
+      self._refresh(password)
     self._logger.debug('Instantiated.')
 
   def __repr__(self):
@@ -185,7 +222,7 @@ class Session(object):
     :param project: Project name
     :param flow: Flow name
     :param start: Start index (inclusive) of the returned list. 
-    :param length: Max length of the returned listf.
+    :param length: Max length of the returned list.
     """
     self._logger.debug('Fetching executions of a flow %s/%s.', project, flow)
     return _extract_json(self._request(

@@ -7,7 +7,7 @@
 from azkaban.ext.pig import PigJob
 from azkaban.project import Project
 from azkaban.job import Job
-from azkaban.remote import Execution, Session
+from azkaban.remote import Execution, Session, _parse_url
 from azkaban.util import AzkabanError, Config, temppath
 from six.moves.configparser import NoOptionError, NoSectionError
 from nose.tools import eq_, ok_, raises, nottest
@@ -502,3 +502,34 @@ class TestProperties(_TestSession):
     self._add_flow_job('bar', 'foo', msg=self.message)
     exe = self._run_workflow('bar')
     ok_(self.override in '\n'.join(exe.job_logs('bar:foo', 1)))
+
+
+class TestParseUrl(object):
+
+  project_name = 'azkabancli_test_parse_url'
+    
+  def test_good_url(self):
+    eq_(_parse_url('http://admin:abc123@server:8081'), 
+        ('admin', 'abc123', 'http://server:8081'))
+    eq_(_parse_url('http://admin@server:8081'), 
+        ('admin', None, 'http://server:8081'))
+    eq_(_parse_url('http://server:8081'), 
+        (None, None, 'http://server:8081'))
+    
+  def test_cred_first_url(self):
+    eq_(_parse_url('admin:abc123@http://server:8081'), 
+        ('admin', 'abc123', 'http://server:8081'))
+    eq_(_parse_url('admin@http://server:8081'), 
+        ('admin', None, 'http://server:8081'))
+    
+  def test_no_scheme_url(self):
+    eq_(_parse_url('admin:abc123@server:8081'), 
+        ('admin', 'abc123', 'http://server:8081'))
+
+  @raises(AzkabanError)
+  def test_bad_cred_url(self):
+    _parse_url('admin:abc123@http://bad:server:name:8081')
+
+  @raises(Exception)
+  def test_bad_cred_url(self):
+    _parse_url('http://admin:abc123@bad:server:name:8081')
