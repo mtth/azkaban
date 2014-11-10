@@ -1,8 +1,8 @@
 Azkaban
 =======
 
-Version 0.7.0 (?)
------------------
+Version 0.7.0 (11/10/2014)
+--------------------------
 
 * Display progress percentage during project upload.
 * Added `log` CLI command to view flow and job execution logs.
@@ -16,6 +16,8 @@ Version 0.7.0 (?)
 * Added `schedule` command for workflows.
 * Added `schedule_workflow`, `unschedule_workflow`, `get_schedule` methods for
   working with azkaban scheduling.
+* Added `get_workflow_executions`, and `get_running_workflows` methods.
+* Enhanced URL parsing support from `.azkabanrc`.
 
 Breaking changes:
 

@@ -3,7 +3,6 @@
 
 """Test Azkaban remote module."""
 
-
 from azkaban.ext.pig import PigJob
 from azkaban.project import Project
 from azkaban.job import Job
@@ -338,7 +337,7 @@ class TestExecution(_TestSession):
     exe = Execution.start(self.session, self.project, 'foo')
     sleep(2)
     eq_(exe.status['status'], 'RUNNING')
-    sleep(2)
+    sleep(4)
     eq_(exe.status['status'],'SUCCEEDED')
 
   def test_execution_cancel(self):
@@ -352,6 +351,77 @@ class TestExecution(_TestSession):
     exe = Execution.start(self.session, self.project, 'foo')
     logs = '\n'.join(exe.logs(2))
     ok_('Submitting job \'foo\' to run.' in logs)
+
+
+class TestGetWorkflowExecutions(_TestSession):
+
+  project_name = 'azkabancli_test_get_workflow_executions'
+
+  def setup(self):
+    super(TestGetWorkflowExecutions, self).setup()
+    options = {'type': 'command', 'command': 'sleep 4'}
+    self.project.add_job('foo', Job(options))
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+
+  @raises(AzkabanError)
+  def test_missing_project(self):
+    self.session.get_workflow_executions('missing_project', 'foobar')
+
+  def test_missing_flow(self):
+    d = self.session.get_workflow_executions(self.project, 'foobar')
+    eq_(len(d['executions']), 0)
+    eq_(d['project'], self.project_name)
+    eq_(d['flow'], 'foobar')
+
+  def test_show_executions(self):
+    exe = Execution.start(self.session, self.project, 'foo')
+    sleep(5)
+    d = self.session.get_workflow_executions(self.project, 'foo')
+    ok_(len(d['executions']))
+    executions = [e for e in d['executions'] if e['execId'] == exe.exec_id]
+    eq_(len(executions), 1)
+    eq_(executions[0]['status'], 'SUCCEEDED')
+
+  def test_show_running_executions(self):
+    exe = Execution.start(self.session, self.project, 'foo')
+    sleep(2)
+    d = self.session.get_workflow_executions(self.project, 'foo')
+    running = [e for e in d['executions'] if e['status'] == 'RUNNING']
+    eq_(len(running), 1)
+    eq_(running[0]['execId'], exe.exec_id)
+
+
+class TestGetRunningWorkflows(_TestSession):
+
+  project_name = 'azkabancli_test_get_running_workflows'
+
+  def setup(self):
+    super(TestGetRunningWorkflows, self).setup()
+    options = {'type': 'command', 'command': 'sleep 4'}
+    self.project.add_job('foo', Job(options))
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+
+  @raises(AzkabanError)
+  def test_missing_project(self):
+    self.session.get_running_workflows('missing_project', 'foobar')
+
+  def test_missing_flow(self):
+    d = self.session.get_running_workflows(self.project, 'foobar')
+    eq_(d, {})
+
+  def test_no_running(self):
+    d = self.session.get_running_workflows(self.project, 'foo')
+    eq_(d, {})
+
+  def test_running(self):
+    exe = Execution.start(self.session, self.project, 'foo')
+    sleep(2)
+    d = self.session.get_running_workflows(self.project, 'foo')
+    eq_(d, {'execIds': [exe.exec_id]})
 
 
 class TestSchedule(_TestSession):
@@ -507,23 +577,23 @@ class TestProperties(_TestSession):
 class TestParseUrl(object):
 
   project_name = 'azkabancli_test_parse_url'
-    
+
   def test_good_url(self):
-    eq_(_parse_url('http://admin:abc123@server:8081'), 
+    eq_(_parse_url('http://admin:abc123@server:8081'),
         ('admin', 'abc123', 'http://server:8081'))
-    eq_(_parse_url('http://admin@server:8081'), 
+    eq_(_parse_url('http://admin@server:8081'),
         ('admin', None, 'http://server:8081'))
-    eq_(_parse_url('http://server:8081'), 
+    eq_(_parse_url('http://server:8081'),
         (None, None, 'http://server:8081'))
-    
+
   def test_cred_first_url(self):
-    eq_(_parse_url('admin:abc123@http://server:8081'), 
+    eq_(_parse_url('admin:abc123@http://server:8081'),
         ('admin', 'abc123', 'http://server:8081'))
-    eq_(_parse_url('admin@http://server:8081'), 
+    eq_(_parse_url('admin@http://server:8081'),
         ('admin', None, 'http://server:8081'))
-    
+
   def test_no_scheme_url(self):
-    eq_(_parse_url('admin:abc123@server:8081'), 
+    eq_(_parse_url('admin:abc123@server:8081'),
         ('admin', 'abc123', 'http://server:8081'))
 
   @raises(AzkabanError)

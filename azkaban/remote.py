@@ -68,28 +68,27 @@ def _extract_json(response):
     else:
       return json
 
-
 def _parse_url(url):
   """Parse url, returning tuple of (username, password, address)
-  
-  :param url: HTTP endpoint (including protocol, port, optional user and password).
-    
+
+  :param url: HTTP endpoint (including protocol, port, and optional user /
+    password).
+
   Supported url formats:
-  
-  protocol://host:port
-  protocol://user@host:port
-  protocol://user:password@host:port
-  user@protocol://host:port (compatibility with older versions)
-  user:password@protocol://host:port (compatibility with older versions)
+
+  + protocol://host:port
+  + protocol://user@host:port
+  + protocol://user:password@host:port
+  + user@protocol://host:port (compatibility with older versions)
+  + user:password@protocol://host:port (compatibility with older versions)
+
   """
   if not re.match(r'[a-zA-Z]+://', url) and not re.search(r'@[a-zA-Z]+://', url):
     # no scheme specified, default to http://
     url = 'http://' + url
   if re.search(r'@[a-zA-Z]+://', url):
-    # compatibility mode
-    # user@protocol://host:port
-    # or 
-    # user:password@protocol://host:port
+    # compatibility mode: `user@protocol://host:port` or
+    # `user:password@protocol://host:port`
     splitted = url.rstrip('/').split('@')
     if len(splitted) == 1:
       address = splitted[0]
@@ -101,18 +100,15 @@ def _parse_url(url):
       if len(creds) == 1:
         user = creds[0]
         password = None
-      elif len(creds) > 1:
+      else:
         user, password = creds
-      else: 
-        raise AzkabanError('Malformed url: %r' % (url, ))
-    else: 
+    else:
       raise AzkabanError('Malformed url: %r' % (url, ))
     return user, password, address
-  else:        
-    parsed = urlparse(url)        
-    return (parsed.username, parsed.password, 
+  else:
+    parsed = urlparse(url)
+    return (parsed.username, parsed.password,
             '%s://%s:%s' % (parsed.scheme, parsed.hostname, parsed.port))
-
 
 def _resolve_alias(config, alias):
   """Get url associated with an alias.
@@ -166,7 +162,7 @@ class Session(object):
     self.user, self.password, self.url = _parse_url(url)
     if not self.user:
       self.user = getuser()
-    self.id = _get_session_id(self.config, str(self).replace(':', '.'))    
+    self.id = _get_session_id(self.config, str(self).replace(':', '.'))
     self._logger = Adapter(repr(self), _logger)
     self._logger.debug('Instantiated.')
 
@@ -211,17 +207,17 @@ class Session(object):
       self._logger.debug('ID %s is valid.', self.id)
       return True
 
-  
-  def get_flow_executions(self, project, flow, start=0, length=10):
+  def get_workflow_executions(self, project, flow, start=0, length=10):
     """Fetch executions of a flow.
-    
-    :param project: Project name
-    :param flow: Flow name
-    :param start: Start index (inclusive) of the returned list. 
+
+    :param project: Project name.
+    :param flow: Flow name.
+    :param start: Start index (inclusive) of the returned list.
     :param length: Max length of the returned list.
+
     """
-    self._logger.debug('Fetching executions of a flow %s/%s.', project, flow)
-    return _extract_json(self._request(
+    self._logger.debug('Fetching executions of %s/%s.', project, flow)
+    res = self._request(
       method='GET',
       endpoint='manager',
       params={
@@ -231,14 +227,27 @@ class Session(object):
         'start': start,
         'length': length
       },
-    ))
+    )
+    if not res.text:
+      # Azkaban returns a 200 empty response if the project doesn't exist so
+      # we throw an explicit error here, rather than letting `_extract_json`
+      # fail generically.
+      raise AzkabanError(
+        'Unable to fetch executions. Check that project %r exists.', project
+      )
+    else:
+      return _extract_json(res)
 
-
-  def get_running(self, project, flow):
+  def get_running_workflows(self, project, flow):
     """Get running executions of a flow.
-    
-    :param project: Project name
-    :param flow: Flow name
+
+    :param project: Project name.
+    :param flow: Flow name.
+
+    Note that if the project doesn't exist, the Azkaban server will return a
+    somewhat cryptic error `Project 'null' not found.`, even though the name of
+    the project isn't `null`.
+
     """
     self._logger.debug('Fetching running executions of %s/%s.', project, flow)
     return _extract_json(self._request(
@@ -247,10 +256,9 @@ class Session(object):
       params={
         'ajax': 'getRunning',
         'project': project,
-        'flow': flow,        
+        'flow': flow,
       },
     ))
-
 
   def get_execution_status(self, exec_id):
     """Get status of an execution.
@@ -619,9 +627,9 @@ class Session(object):
     """
     self._logger.debug('Refreshing.')
     attempts = self.attempts
+    password = password or self.password
     while True:
-      password = (password or self.password or
-                  getpass('Azkaban password for %s: ' % (self, )))
+      password = password or getpass('Azkaban password for %s: ' % (self, ))
       try:
         res = _extract_json(_azkaban_request(
           'POST',
