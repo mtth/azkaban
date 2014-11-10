@@ -97,14 +97,12 @@ def _parse_url(url):
       password = None
     elif len(splitted) == 2:
       address = splitted[1]
-      creds = splitted[0].split(':')
+      creds = splitted[0].split(':', 1)
       if len(creds) == 1:
         user = creds[0]
         password = None
       elif len(creds) > 1:
-        # urllib allows another ":" in password, so we do the same
-        user = creds[0]
-        password = ':'.join(creds[1:])
+        user, password = creds
       else: 
         raise AzkabanError('Malformed url: %r' % (url, ))
     else: 
@@ -165,13 +163,11 @@ class Session(object):
     if not url:
       alias = alias or self.config.get_option('azkaban', 'alias')
       url = _resolve_alias(self.config, alias)
-    self.user, password, self.url = _parse_url(url)
+    self.user, self.password, self.url = _parse_url(url)
     if not self.user:
       self.user = getuser()
     self.id = _get_session_id(self.config, str(self).replace(':', '.'))    
     self._logger = Adapter(repr(self), _logger)
-    if password:
-      self._refresh(password)
     self._logger.debug('Instantiated.')
 
   def __repr__(self):
@@ -216,7 +212,7 @@ class Session(object):
       return True
 
   
-  def fetch_flow_executions(self, project, flow, start=0, length=10):
+  def get_flow_executions(self, project, flow, start=0, length=10):
     """Fetch executions of a flow.
     
     :param project: Project name
@@ -624,7 +620,8 @@ class Session(object):
     self._logger.debug('Refreshing.')
     attempts = self.attempts
     while True:
-      password = password or getpass('Azkaban password for %s: ' % (self, ))
+      password = (password or self.password or
+                  getpass('Azkaban password for %s: ' % (self, )))
       try:
         res = _extract_json(_azkaban_request(
           'POST',
