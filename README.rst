@@ -1,11 +1,14 @@
 .. default-role:: code
 
 
-AzkabanCLI |build_image|
-------------------------
+AzkabanCLI |build_image| |coverage_image|
+-----------------------------------------
 
 .. |build_image| image:: https://travis-ci.org/mtth/azkaban.png?branch=master
   :target: https://travis-ci.org/mtth/azkaban
+
+.. |coverage_image| image:: https://coveralls.io/repos/mtth/azkaban/badge.png
+  :target: https://coveralls.io/r/mtth/azkaban
 
 A lightweight Azkaban_ client providing:
 
