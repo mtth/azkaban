@@ -151,6 +151,8 @@ def main():
   handler = Config().get_file_handler('azkabanpig')
   if handler:
     logger.addHandler(handler)
+  # capture pesky unverified requests warnings
+  lg.captureWarnings(True)
   # handle this command separately
   if args['--log']:
     if handler:

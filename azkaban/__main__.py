@@ -430,6 +430,8 @@ def main(argv=None):
   handler = Config().get_file_handler('azkaban')
   if handler:
     logger.addHandler(handler)
+  # capture pesky unverified requests warnings
+  lg.captureWarnings(True)
   # parse arguments
   argv = argv or sys.argv[1:]
   _logger.debug('Running command %r from %r.', ' '.join(argv), os.getcwd())
