@@ -155,10 +155,6 @@ class MultipartForm(object):
   def __init__(self, files, params=None, callback=None, chunksize=4096):
     self._boundary = choose_boundary()
     self._params = params
-    self._files = [
-      {'path': o} if isinstance(o, string_types) else o
-      for o in files
-    ]
     self._callback = callback
     self._chunksize = chunksize
     # generate content type header
