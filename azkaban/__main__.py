@@ -93,7 +93,7 @@ from azkaban import __version__, CLI_ARGS
 from azkaban.project import Project
 from azkaban.remote import Execution, Session
 from azkaban.util import (AzkabanError, Config, catch, flatten, human_readable,
-  temppath, read_properties, write_properties)
+temppath, read_properties, suppress_urllib_warnings, write_properties)
 from docopt import docopt
 from requests.exceptions import HTTPError
 import logging as lg
@@ -431,7 +431,7 @@ def main(argv=None):
   if handler:
     logger.addHandler(handler)
   # capture pesky unverified requests warnings
-  lg.captureWarnings(True)
+  suppress_urllib_warnings()
   # parse arguments
   argv = argv or sys.argv[1:]
   _logger.debug('Running command %r from %r.', ' '.join(argv), os.getcwd())

@@ -401,3 +401,11 @@ def stream_file(path, chunksize):
         yield chunk
       else:
         break
+
+def suppress_urllib_warnings():
+  """Capture urllib warnings if possible, else disable them (python 2.6)."""
+  try:
+    lg.captureWarnings(True)
+  except AttributeError:
+    import urllib3
+    urllib3.disable_warnings()

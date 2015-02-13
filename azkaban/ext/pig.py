@@ -52,7 +52,8 @@ from time import sleep
 from ..job import Job
 from ..project import Project
 from ..remote import Execution, Session
-from ..util import AzkabanError, Config, catch, temppath
+from ..util import (AzkabanError, Config, catch, suppress_urllib_warnings,
+temppath)
 import logging as lg
 import sys
 
@@ -152,7 +153,7 @@ def main():
   if handler:
     logger.addHandler(handler)
   # capture pesky unverified requests warnings
-  lg.captureWarnings(True)
+  suppress_urllib_warnings()
   # handle this command separately
   if args['--log']:
     if handler:
