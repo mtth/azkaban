@@ -2,5 +2,3 @@
 # encoding: utf-8
 
 """Extensions."""
-
-
