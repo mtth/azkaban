@@ -10,6 +10,7 @@ from logging.handlers import TimedRotatingFileHandler
 from mimetypes import guess_type
 from os import close, remove
 from os.path import exists, expanduser
+from requests.packages.urllib3 import disable_warnings
 from requests.packages.urllib3.filepost import choose_boundary
 from six import b, string_types
 from six.moves.configparser import (NoOptionError, NoSectionError,
@@ -403,5 +404,4 @@ def suppress_urllib_warnings():
   try:
     lg.captureWarnings(True)
   except AttributeError:
-    import urllib3
-    urllib3.disable_warnings()
+    disable_warnings()

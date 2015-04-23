@@ -7,12 +7,15 @@ from azkaban.ext.pig import PigJob
 from azkaban.project import Project
 from azkaban.job import Job
 from azkaban.remote import Execution, Session, _parse_url
-from azkaban.util import AzkabanError, Config, temppath
+from azkaban.util import (AzkabanError, Config, suppress_urllib_warnings,
+  temppath)
 from six.moves.configparser import NoOptionError, NoSectionError
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
 from time import sleep
 
+
+suppress_urllib_warnings()
 
 class _TestSession(object):
 
