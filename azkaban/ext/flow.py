@@ -29,11 +29,11 @@ class FlowProperty(object):
   __register = {}
 
   def __init__(self, **kwargs):
-    self.key = '${flow.property.%s}' % (len(self.__register), )
+    self.key = 'flow.property.%s' % (len(self.__register), )
     self.__register[self.key] = kwargs
 
   def __str__(self):
-    return self.key
+    return '${%s}' % (self.key, )
 
   @classmethod
   def get_options(cls, mode):

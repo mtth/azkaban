@@ -20,8 +20,8 @@ class TestFlowProperty(object):
   def test_init(self):
     p1 = FlowProperty(mode1='a', mode2='b')
     p2 = FlowProperty(mode1='A', mode3='C')
-    eq_(p1.key, '${flow.property.0}')
-    eq_(p2.key, '${flow.property.1}')
+    eq_(p1.key, 'flow.property.0')
+    eq_(p2.key, 'flow.property.1')
 
   def test_str(self):
     job = Job({'foo': {'bar': FlowProperty(mode1='a', mode2='b')}})
@@ -55,6 +55,6 @@ class TestFlowJob(object):
       eq_(read_properties(tpath), {
         'type': 'flow',
         'flow.name': 'foo',
-        '${flow.property.0}': 'a',
-        '${flow.property.1}': 'A',
+        'flow.property.0': 'a',
+        'flow.property.1': 'A',
       })
