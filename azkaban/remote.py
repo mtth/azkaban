@@ -157,7 +157,7 @@ class Session(object):
     self.attempts = attempts
     self.config = Config()
     if not url:
-      alias = alias or self.config.get_option('azkaban', 'alias')
+      alias = alias or self.config.get_option('azkaban', 'default.alias')
       url = _resolve_alias(self.config, alias)
     self.user, self.password, self.url = _parse_url(url)
     if not self.user:

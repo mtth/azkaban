@@ -52,7 +52,7 @@ class TestConfig(object):
   def test_get_default_option_when_exists(self):
     with temppath() as path:
       with open(path, 'w') as writer:
-        writer.write('[cmd]\ndefault.opt = foo\ndefault.bar = hi\n')
+        writer.write('[cmd]\nopt = foo\nbar = hi\n')
       config = Config(path)
       eq_(config.get_option('cmd', 'opt'), 'foo')
 
@@ -60,7 +60,7 @@ class TestConfig(object):
   def test_get_default_option_when_option_is_missing(self):
     with temppath() as path:
       with open(path, 'w') as writer:
-        writer.write('[cmd]\ndefault.opt = foo\ndefault.bar = hi\n')
+        writer.write('[cmd]\nopt = foo\nbar = hi\n')
       config = Config(path)
       config.get_option('cmd', 'opt2')
 
@@ -68,7 +68,7 @@ class TestConfig(object):
   def test_get_default_option_when_section_is_missing(self):
     with temppath() as path:
       with open(path, 'w') as writer:
-        writer.write('[cmd]\ndefault.opt = foo\ndefault.bar = hi\n')
+        writer.write('[cmd]\nopt = foo\nbar = hi\n')
       config = Config(path)
       config.get_option('cmd2', 'opt2')
 

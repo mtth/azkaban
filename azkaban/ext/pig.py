@@ -82,7 +82,7 @@ class PigJob(Job):
 
   def __init__(self, *options):
     super(PigJob, self).__init__(
-      {'type': Config().get_option('azkabanpig', 'type', 'pig')},
+      {'type': Config().get_option('azkabanpig', 'default.type', 'pig')},
       *options
     )
     try:
@@ -146,10 +146,11 @@ class _PigProject(Project):
 def main():
   """AzkabanPig entry point."""
   args = docopt(__doc__)
+  cfg = Config()
   # activate logging
   logger = lg.getLogger()
   logger.setLevel(lg.DEBUG)
-  handler = Config().get_file_handler('azkabanpig')
+  handler = cfg.get_file_handler('azkabanpig')
   if handler:
     logger.addHandler(handler)
   # capture pesky unverified requests warnings
@@ -166,7 +167,7 @@ def main():
   jars = args['--jar'] or []
   session = Session(args['--url'], args['--alias'])
   project = _PigProject(
-    name=args['--project'] or Config().get_option('azkabanpig', 'project'),
+    name=args['--project'] or cfg.get_option('azkabanpig', 'default.project'),
     paths=paths,
     pig_type=args['--type'],
   )

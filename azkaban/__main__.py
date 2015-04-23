@@ -157,7 +157,7 @@ def _parse_project(_project, require_project=False):
     + If the above attempt raises an `ImportError`, we interpret it as a name.
 
   """
-  default_module = Config().get_option('azkaban', 'project', 'jobs')
+  default_module = Config().get_option('azkaban', 'default.project', 'jobs')
   projects = {}
   _project = _project or default_module
   if ':' in _project:

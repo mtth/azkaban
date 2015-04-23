@@ -83,7 +83,7 @@ class Config(object):
       self.parser.write(writer)
 
   def get_option(self, command, name, default=None):
-    """Get default option value for a command.
+    """Get option value for a command.
 
     :param command: Command the option should be looked up for.
     :param name: Name of the option.
@@ -93,14 +93,14 @@ class Config(object):
 
     """
     try:
-      return self.parser.get(command, 'default.%s' % (name, ))
+      return self.parser.get(command, name)
     except (NoOptionError, NoSectionError):
-      if default:
+      if default is not None:
         return default
       else:
         raise AzkabanError(
-          'No default %(name)s found in %(path)r for %(command)s.\n'
-          'You can specify one by adding a `default.%(name)s` option in the '
+          'No %(name)s found in %(path)r for %(command)s.\n'
+          'You can specify one by adding a `%(name)s` option in the '
           '`%(command)s` section.'
           % {'command': command, 'name': name, 'path': self.path}
         )
@@ -117,7 +117,7 @@ class Config(object):
     handler_path = osp.join(gettempdir(), '%s.log' % (command, ))
     try:
       handler = TimedRotatingFileHandler(
-        self.get_option(command, 'log', handler_path),
+        self.get_option(command, 'default.log', handler_path),
         when='midnight', # daily backups
         backupCount=1,
         encoding='utf-8',
