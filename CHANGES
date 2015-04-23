@@ -1,6 +1,18 @@
 Azkaban
 =======
 
+Version 0.8.0 (04/23/2015)
+--------------------------
+
+* Add flow extension.
+* Improve `urllib3` warning suppression.
+
+Breaking changes:
+
+* Change behavior of `Config.get_option` method to not preprend the `"default"`
+* prefix when looking up the option.
+
+
 Version 0.7.0 (11/10/2014)
 --------------------------
 
