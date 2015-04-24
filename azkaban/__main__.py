@@ -274,7 +274,7 @@ def view_info(project, _files, _option, _job, _include_properties):
     options = _parse_option(_option).items()
     jobs = sorted(project.jobs.items())
     dependencies = set(
-      dep
+      dep.strip()
       for _, job in jobs
       for dep in job.options.get('dependencies', '').split(',')
     )

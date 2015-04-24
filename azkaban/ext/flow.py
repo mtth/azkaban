@@ -78,9 +78,10 @@ class FlowJob(Job):
     self.options['type'] = 'flow'
     self.options['flow.name'] = subflow
 
-  def build(self, **kwargs):
+  def build(self, *args, **kwargs):
     """Build job options.
 
+    :param \*args: Positional arguments passed to the base `build` function.
     :param \*\*kwargs: Keyword arguments passed to the base `build` function.
 
     We delay the full expansion of options until now to make sure that all
@@ -89,4 +90,4 @@ class FlowJob(Job):
 
     """
     self.options.update(FlowProperty.get_options(self.mode))
-    super(FlowJob, self).build(**kwargs)
+    super(FlowJob, self).build(*args, **kwargs)
