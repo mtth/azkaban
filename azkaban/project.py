@@ -237,12 +237,14 @@ class Project(object):
     self._logger.info('Built as %s.', path)
 
   @classmethod
-  def load(cls, path, new=False):
+  def load(cls, path, new=False, propagate=False):
     """Load Azkaban projects from script.
 
     :param path: Path to python module.
     :param new: If set to `True`, only projects loaded as a consequence of
       calling this method will be returned.
+    :param propagate: Propagate any exception raised while importing the module
+      at `path`.
 
     Returns a dictionary of :class:`~azkaban.project.Project`'s keyed by
     project name. Only registered projects (i.e. instantiated with
@@ -274,6 +276,11 @@ class Project(object):
         )
       registry = cls._registry.copy()
       # shallow copy of registry
+    except Exception as exc:
+      if propagate:
+        raise exc
+      else:
+        _logger.exception('Error while loading %s:' % (path, ))
     finally:
       for name, project in _registry.items():
         cls._registry.setdefault(name, project)
