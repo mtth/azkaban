@@ -195,7 +195,7 @@ def _parse_project(_project, require_project=False):
       path = _project
 
   if exceptions:
-    footer = 'Errors occurred while loading the following modules:\n'
+    footer = '\nErrors occurred while loading the following modules:\n'
     for t in exceptions.items():
       footer += '\n> %r\n\n%s' % t
   else:
@@ -208,14 +208,14 @@ def _parse_project(_project, require_project=False):
       # harder consistency requirement
       raise AzkabanError(
         'Project %r not found. Available projects: %s\n'
-        'You can also specify another location using the `--project` option.\n'
+        'You can also specify another location using the `--project` option.'
         '%s'
         % (name, ', '.join(projects), footer)
       )
     elif require_project:
       raise AzkabanError(
         'This command requires a project configuration module.\n'
-        'You can specify another location using the `--project` option.\n'
+        'You can specify another location using the `--project` option.'
         '%s'
         % (footer, )
       )
@@ -225,14 +225,14 @@ def _parse_project(_project, require_project=False):
     if not projects:
       raise AzkabanError(
         'No registered project found in %r.\n'
-        'You can specify another location using the `--project` option.\n'
+        'You can specify another location using the `--project` option.'
         '%s'
         % (path, footer)
       )
     elif len(projects) > 1:
       raise AzkabanError(
-        'Multiple registered projects found: %s\n%s'
-        'You can use the `--project` option to disambiguate.\n'
+        'Multiple registered projects found: %s\n'
+        'You can use the `--project` option to disambiguate.'
         '%s'
         % (', '.join(projects), footer)
       )
