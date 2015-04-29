@@ -95,6 +95,7 @@ from azkaban.remote import Execution, Session
 from azkaban.util import (AzkabanError, Config, catch, flatten, human_readable,
 temppath, read_properties, suppress_urllib_warnings, write_properties)
 from docopt import docopt
+from traceback import format_exc
 from requests.exceptions import HTTPError
 import logging as lg
 import os
@@ -157,31 +158,49 @@ def _parse_project(_project, require_project=False):
     + If the above attempt raises an `ImportError`, we interpret it as a name.
 
   """
-  default_module = Config().get_option('azkaban', 'default.project', 'jobs')
+  default_project = Config().get_option('azkaban', 'default.project', 'jobs')
+  exceptions = {}
   projects = {}
-  _project = _project or default_module
+
+  def try_load(path):
+    try:
+      projects.update(Project.load(path))
+      return True
+    except ImportError:
+      exceptions[path] = format_exc()
+      return False
+
+  _project = _project or default_project
   if ':' in _project:
     # unambiguous case
     path, name = _project.rsplit(':', 1)
-    try:
-      projects = Project.load(path or default_module)
+    if ':' in default_project:
+      try_load(Project.load(path))
+    else:
       # adding the default here lets options like `-p :name` work as intended
-    except ImportError:
-      pass
+      try_load(path or default_project)
   else:
     # the option could be a name or module
-    try:
-      # try first as a module
-      projects = Project.load(_project)
-    except ImportError:
-      # if that fails, try as a name: load the default module and look there
+    if not try_load(_project): # try first as a module
+      # if that fails, try as a name
       name = _project
-      try:
-        projects = Project.load(default_module)
-      except ImportError:
-        pass
+      if not ':' in default_project:
+        path = default_project
+      else:
+        path = default_project.rsplit(':', 1)[0]
+        # if the default project could be a mdule, try loading it
+      try_load(path)
     else:
       name = None
+      path = _project
+
+  if exceptions:
+    footer = 'Errors occurred while loading the following modules:\n'
+    for t in exceptions.items():
+      footer += '\n> %r\n\n%s' % t
+  else:
+    footer = ''
+
   if name:
     if name in projects:
       return name, projects[name]
@@ -189,13 +208,16 @@ def _parse_project(_project, require_project=False):
       # harder consistency requirement
       raise AzkabanError(
         'Project %r not found. Available projects: %s\n'
-        'You can also specify another location using the `--project` option.'
-        % (name, ', '.join(projects))
+        'You can also specify another location using the `--project` option.\n'
+        '%s'
+        % (name, ', '.join(projects), footer)
       )
     elif require_project:
       raise AzkabanError(
         'This command requires a project configuration module.\n'
-        'You can specify another location using the `--project` option.'
+        'You can specify another location using the `--project` option.\n'
+        '%s'
+        % (footer, )
       )
     else:
       return name, None
@@ -203,14 +225,16 @@ def _parse_project(_project, require_project=False):
     if not projects:
       raise AzkabanError(
         'No registered project found in %r.\n'
-        'You can also specify another location using the `--project` option.'
-        % (_project, )
+        'You can specify another location using the `--project` option.\n'
+        '%s'
+        % (path, footer)
       )
     elif len(projects) > 1:
       raise AzkabanError(
-        'Multiple registered projects found: %s\n'
-        'You can use the `--project` option to disambiguate.'
-        % (', '.join(projects), )
+        'Multiple registered projects found: %s\n%s'
+        'You can use the `--project` option to disambiguate.\n'
+        '%s'
+        % (', '.join(projects), footer)
       )
     else:
       return projects.popitem()

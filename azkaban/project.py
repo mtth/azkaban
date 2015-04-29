@@ -237,7 +237,7 @@ class Project(object):
     self._logger.info('Built as %s.', path)
 
   @classmethod
-  def load(cls, path, new=False, propagate=False):
+  def load(cls, path, new=False):
     """Load Azkaban projects from script.
 
     :param path: Path to python module.
@@ -276,11 +276,6 @@ class Project(object):
         )
       registry = cls._registry.copy()
       # shallow copy of registry
-    except Exception as exc:
-      if propagate:
-        raise exc
-      else:
-        _logger.exception('Error while loading %s:' % (path, ))
     finally:
       for name, project in _registry.items():
         cls._registry.setdefault(name, project)
