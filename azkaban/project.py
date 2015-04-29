@@ -191,7 +191,8 @@ class Project(object):
     :param unregister: Unregister project after merging it.
 
     The current project remains unchanged while the target project gains all
-    the current project's jobs and files.
+    the current project's jobs and files. Note that project properties are not
+    carried over.
 
     """
     self._logger.debug('Merging into %r.', project)

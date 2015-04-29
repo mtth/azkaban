@@ -166,7 +166,7 @@ def _parse_project(_project, require_project=False):
     try:
       projects.update(Project.load(path))
       return True
-    except ImportError:
+    except Exception:
       exceptions[path] = format_exc()
       return False
 
