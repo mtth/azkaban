@@ -263,23 +263,50 @@ def _load_project(_project):
   else:
     return project
 
-def _upload_callback(cur_bytes, tot_bytes, file_index, _stdout=sys.stdout):
-  """Callback for streaming upload.
+def _upload_zip(session, name, path, create=False, archive_name=None):
+  """Upload zip to project in Azkaban.
 
-  :param cur_bytes: Total bytes uploaded so far.
-  :param tot_bytes: Total bytes to be uploaded.
-  :param file_index: (0-based) index of the file currently uploaded.
-  :param _stdout: Performance caching.
+  :param session: Remote Azkaban session.
+  :param name: Project name
+  :param path: Path to zip file.
+  :param create: Create project if it doesn't exist.
+  :param archive_name: Optional zip file name (used by Azkaban).
 
   """
-  if cur_bytes != tot_bytes:
-    _stdout.write(
-      'Uploading project: %.1f%%\r'
-      % (100. * cur_bytes / tot_bytes, )
-    )
-  else:
-    _stdout.write('Validating project...    \r')
-  _stdout.flush()
+
+  def _callback(cur_bytes, tot_bytes, file_index, _stdout=sys.stdout):
+    """Callback for streaming upload.
+
+    :param cur_bytes: Total bytes uploaded so far.
+    :param tot_bytes: Total bytes to be uploaded.
+    :param file_index: (0-based) index of the file currently uploaded.
+    :param _stdout: Performance caching.
+
+    """
+    if cur_bytes != tot_bytes:
+      _stdout.write(
+        'Uploading project: %.1f%%\r'
+        % (100. * cur_bytes / tot_bytes, )
+      )
+    else:
+      _stdout.write('Validating project...    \r')
+    _stdout.flush()
+
+  while True:
+    try:
+      res = session.upload_project(
+        name=name,
+        path=path,
+        archive_name=archive_name,
+        callback=_callback,
+      )
+    except AzkabanError as err:
+      if create and str(err).endswith("doesn't exist."):
+        session.create_project(name, name)
+      else:
+        raise err
+    else:
+      return res
 
 def view_info(project, _files, _option, _job, _include_properties):
   """List jobs in project."""
@@ -370,20 +397,7 @@ def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
 def upload_project(project_name, _zip, _url, _alias, _create):
   """Upload project."""
   session = Session(_url, _alias)
-  while True:
-    try:
-      res = session.upload_project(
-        name=project_name,
-        path=_zip,
-        callback=_upload_callback
-      )
-    except AzkabanError as err:
-      if _create:
-        session.create_project(project_name, project_name)
-      else:
-        raise err
-    else:
-      break
+  res = _upload_zip(session, project_name, _zip, _create)
   sys.stdout.write(
     'Project %s successfully uploaded (id: %s, size: %s, version: %s).\n'
     'Details at %s/manager?project=%s\n'
@@ -416,21 +430,7 @@ def build_project(project, _zip, _url, _alias, _replace, _create, _option):
       project.build(_zip)
       archive_name = '%s.zip' % (project.versioned_name, )
       session = Session(_url, _alias)
-      while True:
-        try:
-          res = session.upload_project(
-            name=project.name,
-            path=_zip,
-            archive_name=archive_name,
-            callback=_upload_callback
-          )
-        except AzkabanError as err:
-          if _create and str(err).endswith("doesn't exist."):
-            session.create_project(project.name, project.name)
-          else:
-            raise err
-        else:
-          break
+      res = _upload_zip(session, project.name, _zip, _create, archive_name)
       sys.stdout.write(
         'Project %s successfully built and uploaded '
         '(id: %s, size: %s, upload: %s).\n'
