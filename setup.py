@@ -27,9 +27,9 @@ setup(
       'Programming Language :: Python :: 3.3',
     ],
     install_requires=[
-      'six',
+      'six>=1.6.1',
       'docopt',
-      'requests>=2.0.1',
+      'requests>=2.4.0',
       'urllib3',
     ],
     entry_points={'console_scripts': [
