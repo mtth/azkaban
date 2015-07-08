@@ -41,7 +41,7 @@ class _TestSession(object):
       except (NoOptionError, NoSectionError):
         pass
       else:
-        cls.session = Session(alias=alias)
+        cls.session = Session.from_alias(alias)
         try:
           cls.session.create_project(cls.project_name, 'Testing project.')
         except AzkabanError:
@@ -77,7 +77,7 @@ class TestCreateDelete(_TestSession):
       except (NoOptionError, NoSectionError):
         pass
       else:
-        cls.session = Session(alias=alias)
+        cls.session = Session.from_alias(alias)
 
   def project_exists(self, project):
     try:

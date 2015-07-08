@@ -65,18 +65,24 @@ class Config(object):
   """Configuration class.
 
   :param path: path to configuration file. If no file exists at that location,
-    the configuration parser will be empty.
+    the configuration parser will be empty. Defaults to `~/.azkabanrc`.
 
   """
 
-  def __init__(self, path=expanduser('~/.azkabanrc')):
+  def __init__(self, path=None):
     self.parser = RawConfigParser()
-    self.path = path
-    if exists(path):
+    self.path = path or expanduser('~/.azkabanrc')
+    # TODO: make the default path be configurable via an environment variable.
+    if exists(self.path):
       try:
         self.parser.read(self.path)
       except ParsingError:
-        raise AzkabanError('Invalid configuration file %r.', path)
+        raise AzkabanError('Invalid configuration file %r.', self.path)
+      else:
+        # TODO: remove this in 1.0.
+        self._convert_aliases()
+        self.save()
+        self.parser.read(self.path)
 
   def save(self):
     """Save configuration parser back to file."""
@@ -129,6 +135,19 @@ class Config(object):
       handler_format = '[%(levelname)s] %(asctime)s :: %(name)s :: %(message)s'
       handler.setFormatter(lg.Formatter(handler_format))
       return handler
+
+  def _convert_aliases(self):
+    """Convert old-style aliases to new-style."""
+    parser = self.parser
+    if parser.has_section('alias'):
+      for alias, url in parser.items('alias'):
+        section = 'alias.%s' % (alias, )
+        if not parser.has_section(section):
+          # Only update if the alias doesn't yet.
+          parser.add_section(section)
+          parser.set(section, 'url', url)
+          parser.set(section, 'verify', 'false') # Backwards compatibility.
+      parser.remove_section('alias')
 
 
 class MultipartForm(object):

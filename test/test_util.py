@@ -35,19 +35,19 @@ class TestConfig(object):
   def test_parser_get(self):
     with temppath() as path:
       with open(path, 'w') as writer:
-        writer.write('[alias]\nfoo = 1\n')
+        writer.write('[foo]\nbar = 1\n')
       config = Config(path)
-      eq_(config.parser.get('alias', 'foo'), '1')
+      eq_(config.parser.get('foo', 'bar'), '1')
 
   def test_save(self):
     with temppath() as path:
       with open(path, 'w') as writer:
-        writer.write('[alias]\nfoo = 1\n')
+        writer.write('[foo]\nbar = 1\n')
       config = Config(path)
-      config.parser.set('alias', 'bar', 'hello')
+      config.parser.set('foo', 'bar', 'hello')
       config.save()
       same_config = Config(path)
-      eq_(same_config.parser.get('alias', 'bar'), 'hello')
+      eq_(same_config.parser.get('foo', 'bar'), 'hello')
 
   def test_get_default_option_when_exists(self):
     with temppath() as path:
@@ -71,6 +71,16 @@ class TestConfig(object):
         writer.write('[cmd]\nopt = foo\nbar = hi\n')
       config = Config(path)
       config.get_option('cmd2', 'opt2')
+
+  def test_convert_aliases(self):
+    with temppath() as path:
+      with open(path, 'w') as writer:
+        writer.write('[alias]\nfoo = 1\nbar = hello')
+      config = Config(path)
+      ok_(not config.parser.has_section('alias'))
+      eq_(config.parser.get('alias.foo', 'url'), '1')
+      ok_(not config.parser.getboolean('alias.foo', 'verify'))
+      eq_(config.parser.get('alias.bar', 'url'), 'hello')
 
 
 class TestMultipartForm(object):

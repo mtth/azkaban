@@ -165,7 +165,11 @@ def main():
   # create project
   paths = args['PATH']
   jars = args['--jar'] or []
-  session = Session(args['--url'], args['--alias'])
+  if args['--url']:
+    session = Session(url=args['--url'], config=cfg)
+  else:
+    alias = args['--alias'] or cfg.get_option('azkabanpig', 'default.alias')
+    session = Session.from_alias(alias=alias, config=cfg)
   project = _PigProject(
     name=args['--project'] or cfg.get_option('azkabanpig', 'default.project'),
     paths=paths,

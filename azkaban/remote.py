@@ -16,6 +16,7 @@ from six import string_types
 from six.moves.configparser import NoOptionError, NoSectionError
 from six.moves.urllib.parse import urlparse
 from time import sleep
+from warnings import warn
 import logging as lg
 import requests as rq
 import re
@@ -36,18 +37,13 @@ def _azkaban_request(method, url, **kwargs):
 
   """
   try:
-    handler = getattr(rq, method.lower())
-  except AttributeError:
-    raise ValueError('Invalid HTTP method: %r.' % (method, ))
+    response = rq.request(url=url, method=method, **kwargs)
+  except rq.ConnectionError as err:
+    raise AzkabanError('Unable to connect to Azkaban server %r: %s', url, err)
+  except rq.exceptions.MissingSchema:
+    raise AzkabanError('Invalid Azkaban server url: %r.', url)
   else:
-    try:
-      response = handler(url, verify=False, **kwargs)
-    except rq.ConnectionError:
-      raise AzkabanError('Unable to connect to Azkaban server %r.', url)
-    except rq.exceptions.MissingSchema:
-      raise AzkabanError('Invalid Azkaban server url: %r.', url)
-    else:
-      return response
+    return response
 
 def _extract_json(response):
   """Extract JSON from Azkaban response, gracefully handling errors.
@@ -110,30 +106,6 @@ def _parse_url(url):
     return (parsed.username, parsed.password,
             '%s://%s:%s' % (parsed.scheme, parsed.hostname, parsed.port))
 
-def _resolve_alias(config, alias):
-  """Get url associated with an alias.
-
-  :param alias: Alias name.
-
-  """
-  try:
-    return config.parser.get('alias', alias)
-  except (NoOptionError, NoSectionError):
-    raise AzkabanError('Alias %r not found.', alias)
-
-def _get_session_id(config, url):
-  """Retrieve session id associated with url.
-
-  :param url: HTTP endpoint (including protocol, port and optional user).
-
-  """
-  try:
-    return config.parser.get('session_id', url)
-  except NoSectionError:
-    config.parser.add_section('session_id')
-  except NoOptionError:
-    pass
-
 
 class Session(object):
 
@@ -141,7 +113,9 @@ class Session(object):
 
   :param url: HTTP endpoint (including protocol, port and optional user).
   :param alias: Alias name.
+  :param config: Configuration object used to store session IDs.
   :param attempts: Maximum number of attempts to refresh session.
+  :param verify: Whether or not to verify HTTPS requests.
 
   This class contains mostly low-level methods that translate directly into
   Azkaban API calls. The :class:`~azkaban.remote.Execution` class should be
@@ -153,16 +127,32 @@ class Session(object):
 
   """
 
-  def __init__(self, url=None, alias=None, attempts=3):
+  def __init__(
+    self, url=None, alias=None, config=None, attempts=3, verify=True
+  ):
     self.attempts = attempts
-    self.config = Config()
+    self.verify = verify
+    self.config = config
     if not url:
-      alias = alias or self.config.get_option('azkaban', 'default.alias')
-      url = _resolve_alias(self.config, alias)
+      warn(DeprecationWarning(
+        'Session constructor support for aliases is going away in 1.0. '
+        'Please use `Session.from_alias` instead.',
+      ))
+      config = config or Config() # Temporary hack for backwards compatibility.
+      alias = alias or config.get_option('azkaban', 'default.alias')
+      try:
+        url = config.parser.get('alias', alias)
+      except (NoOptionError, NoSectionError):
+        raise AzkabanError('Alias %r not found.', alias)
     self.user, self.password, self.url = _parse_url(url)
     if not self.user:
       self.user = getuser()
-    self.id = _get_session_id(self.config, str(self).replace(':', '.'))
+    if self.config:
+      try:
+        key = str(self).replace(':', '.')
+        self.id = self.config.parser.get('session_id', key)
+      except (NoOptionError, NoSectionError):
+        self.id = None # No previous ID found.
     self._logger = Adapter(repr(self), _logger)
     self._logger.debug('Instantiated.')
 
@@ -193,6 +183,7 @@ class Session(object):
         'POST',
         '%s/manager' % (self.url, ),
         data={'session.id': self.id},
+        verify=self.verify,
       )
       # the above request will return a 200 empty response if the current
       # session ID is valid and a 500 response otherwise
@@ -639,6 +630,7 @@ class Session(object):
             'username': self.user,
             'password': password,
           },
+          verify=self.verify,
         ))
       except AzkabanError as err:
         if not 'Incorrect Login.' in err.message:
@@ -651,8 +643,15 @@ class Session(object):
       else:
         break
     self.id = res['session.id']
-    self.config.parser.set('session_id', str(self).replace(':', '.'), self.id)
-    self.config.save()
+    if self.config:
+      if not self.config.parser.has_section('session_id'):
+        self.config.parser.add_section('session_id')
+      self.config.parser.set(
+        'session_id',
+        str(self).replace(':', '.'),
+        self.id
+      )
+      self.config.save()
     self._logger.info('Refreshed.')
 
   def _run_options(self, name, flow, jobs=None, concurrent=True,
@@ -741,7 +740,7 @@ class Session(object):
         kwargs.setdefault('data', {})['session.id'] = self.id
       elif include_session:
         raise ValueError('Invalid `include_session`: %r' % (include_session, ))
-      return _azkaban_request(method, full_url, **kwargs)
+      return _azkaban_request(method, full_url, verify=self.verify, **kwargs)
 
     response = _send_request()
     if not self.is_valid(response):
@@ -763,6 +762,30 @@ class Session(object):
       raise err
     else:
       return response
+
+  @classmethod
+  def from_alias(cls, alias, config=None):
+    """Create configured session from an alias.
+
+    :param alias: Alias name.
+    :param config: Azkaban configuration object.
+
+    """
+    config = config or Config()
+    section_name = 'alias.%s' % (alias, )
+    try:
+      url = config.parser.get(section_name, 'url')
+    except NoSectionError:
+      raise AzkabanError('Alias not found: %r' % (alias, ))
+    except NoOptionError:
+      raise AzkabanError('No url defined for alias %r.' % (alias, ))
+    else:
+      opts = {'url': url, 'config': config}
+      if config.parser.has_option(section_name, 'verify'):
+        opts['verify'] = config.parser.getboolean(section_name, 'verify')
+      if config.parser.has_option(section_name, 'attempts'):
+        opts['attempts'] = config.parser.getint(section_name, 'attempts')
+    return Session(**opts)
 
 
 class Execution(object):

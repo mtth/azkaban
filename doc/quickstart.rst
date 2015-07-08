@@ -65,11 +65,14 @@ defines aliases in `~/.azkabanrc`:
 
 .. code-block:: cfg
 
-  [alias]
-  foo = http://url.to.foo.server:port
-  bar = baruser@http://url.to.bar.server
   [azkaban]
   default.alias = foo
+  [alias.foo]
+  url = http://url.to.foo.server:port
+  [alias.bar]
+  url = http://baruser@url.to.bar.server
+  verify = false # Disable request verification (on by default).
+  attempts = 5 # Number of retries after unsuccessful requests (defaults to 3).
 
 We can now interact directly with each of these URLs using the `--alias` option 
 followed by their corresponding alias. In particular, note that since we also 

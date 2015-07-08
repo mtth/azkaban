@@ -263,6 +263,20 @@ def _load_project(_project):
   else:
     return project
 
+def _get_session(url, alias):
+  """Get appropriate session.
+
+  :param url: URL (has precedence over alias).
+  :param alias: Alias name.
+
+  """
+  config = Config()
+  if url:
+    return Session(url=url, config=config)
+  else:
+    alias = alias or config.get_option('azkaban', 'default.alias')
+    return Session.from_alias(alias=alias, config=config)
+
 def _upload_zip(session, name, path, create=False, archive_name=None):
   """Upload zip to project in Azkaban.
 
@@ -338,7 +352,7 @@ def view_info(project, _files, _option, _job, _include_properties):
 
 def view_log(_execution, _job, _url, _alias):
   """View workflow or job execution logs."""
-  session = Session(_url, _alias)
+  session = _get_session(_url, _alias)
   exc = Execution(session, _execution)
   logs = exc.job_logs(_job[0]) if _job else exc.logs()
   try:
@@ -356,7 +370,7 @@ def view_log(_execution, _job, _url, _alias):
 def run_workflow(project_name, _flow, _job, _url, _alias, _bounce, _kill,
   _email, _option):
   """Run workflow."""
-  session = Session(_url, _alias)
+  session = _get_session(_url, _alias)
   res = session.run_workflow(
     name=project_name,
     flow=_flow,
@@ -377,7 +391,7 @@ def run_workflow(project_name, _flow, _job, _url, _alias, _bounce, _kill,
 def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
   _alias, _bounce, _kill, _email, _option):
   """Schedule workflow."""
-  session = Session(_url, _alias)
+  session = _get_session(_url, _alias)
   session.schedule_workflow(
     name=project_name,
     flow=_flow,
@@ -396,7 +410,7 @@ def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
 
 def upload_project(project_name, _zip, _url, _alias, _create):
   """Upload project."""
-  session = Session(_url, _alias)
+  session = _get_session(_url, _alias)
   res = _upload_zip(session, project_name, _zip, _create)
   sys.stdout.write(
     'Project %s successfully uploaded (id: %s, size: %s, version: %s).\n'
@@ -429,7 +443,7 @@ def build_project(project, _zip, _url, _alias, _replace, _create, _option):
     with temppath() as _zip:
       project.build(_zip)
       archive_name = '%s.zip' % (project.versioned_name, )
-      session = Session(_url, _alias)
+      session = _get_session(_url, _alias)
       res = _upload_zip(session, project.name, _zip, _create, archive_name)
       sys.stdout.write(
         'Project %s successfully built and uploaded '
