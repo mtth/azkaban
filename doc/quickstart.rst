@@ -71,8 +71,9 @@ defines aliases in `~/.azkabanrc`:
   url = http://url.to.foo.server:port
   [alias.bar]
   url = http://baruser@url.to.bar.server
-  verify = false # Disable request verification (on by default).
-  attempts = 5 # Number of retries after unsuccessful requests (defaults to 3).
+  # Optional keys (see corresponding `Session` argument for details):
+  verify = false
+  attempts = 5
 
 We can now interact directly with each of these URLs using the `--alias` option 
 followed by their corresponding alias. In particular, note that since we also 
