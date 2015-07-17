@@ -147,12 +147,13 @@ class Session(object):
     self.user, self.password, self.url = _parse_url(url)
     if not self.user:
       self.user = getuser()
+    self.id = None
     if self.config:
       try:
         key = str(self).replace(':', '.')
         self.id = self.config.parser.get('session_id', key)
       except (NoOptionError, NoSectionError):
-        self.id = None # No previous ID found.
+        pass
     self._logger = Adapter(repr(self), _logger)
     self._logger.debug('Instantiated.')
 
