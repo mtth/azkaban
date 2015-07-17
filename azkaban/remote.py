@@ -370,12 +370,15 @@ class Session(object):
     return res
 
   def run_workflow(self, name, flow, jobs=None, concurrent=True,
-    properties=None, on_failure='finish', notify_early=False, emails=None):
+    properties=None, on_failure='finish', notify_early=False, emails=None,
+    disabled_jobs=None):
     """Launch a workflow.
 
     :param name: Name of the project.
     :param flow: Name of the workflow.
     :param jobs: List of names of jobs to run (run entire workflow by default).
+    :param disabled_jobs: Inverse of jobs. List of names of jobs not to run.
+      Cannot be used if jobs is also provided as input.
     :param concurrent: Run workflow concurrently with any previous executions.
     :param properties: Dictionary that will override global properties in this
       execution of the workflow. This dictionary will be flattened similarly to
@@ -410,7 +413,8 @@ class Session(object):
       properties=properties,
       on_failure=on_failure,
       notify_early=notify_early,
-      emails=emails
+      emails=emails,
+      disabled_jobs=disabled_jobs
     ))
     res = _extract_json(self._request(
       method='POST',
@@ -656,14 +660,20 @@ class Session(object):
     self._logger.info('Refreshed.')
 
   def _run_options(self, name, flow, jobs=None, concurrent=True,
-    properties=None, on_failure='finish', notify_early=False, emails=None):
+    properties=None, on_failure='finish', notify_early=False, emails=None,
+    disabled_jobs=None):
     """Construct data dict for run related actions.
 
     See :meth:`run_workflow` for parameter documentation.
 
     """
-    if not jobs:
-      disabled = '[]'
+    if jobs is not None and disabled_jobs is not None:
+        raise ValueError("jobs and disabled_jobs options are incompatible")
+    if not jobs and not disabled_jobs:
+        disabled = '[]'
+    elif not jobs:
+      disabled = '[%s]' % (",".join(['"%s"' % x
+                                     for x in disabled_jobs]))
     else:
       all_names = set(
         n['id']
