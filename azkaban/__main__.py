@@ -7,9 +7,9 @@ Usage:
   azkaban build [-cp PROJECT] [-a ALIAS | -u URL | [-r] ZIP] [-o OPTION ...]
   azkaban info [-p PROJECT] [-f | -o OPTION ... | [-i] JOB ...]
   azkaban log [-a ALIAS | -u URL] EXECUTION [JOB]
-  azkaban run [-bkp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
+  azkaban run [-bjkp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
               [-o OPTION ...] FLOW [JOB ...]
-  azkaban schedule [-bkp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
+  azkaban schedule [-bjkp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
                    [-o OPTION ...] [-s SPAN] (-d DATE) (-t TIME)
                    FLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
@@ -52,6 +52,8 @@ Options:
                                 second the path of the file in the archive.
   -h --help                     Show this message and exit.
   -i --include-properties       Include project properties with job options.
+  -j --jump                     Skip any specified jobs instead of only running
+                                those.
   -k --kill                     Kill worfklow on first job failure.
   -l --log                      Show path to current log file and exit.
   -o OPTION --option=OPTION     Azkaban properties. Can either be the path to
@@ -368,18 +370,22 @@ def view_log(_execution, _job, _url, _alias):
       raise AzkabanError('Execution %s not found.', _execution)
 
 def run_workflow(project_name, _flow, _job, _url, _alias, _bounce, _kill,
-  _email, _option):
+  _email, _option, _jump):
   """Run workflow."""
   session = _get_session(_url, _alias)
-  res = session.run_workflow(
-    name=project_name,
-    flow=_flow,
-    jobs=_job,
-    concurrent=not _bounce,
-    on_failure='cancel' if _kill else 'finish',
-    emails=_email,
-    properties=_parse_option(_option),
-  )
+  kwargs = {
+    'name': project_name,
+    'flow': _flow,
+    'concurrent': not _bounce,
+    'on_failure': 'cancel' if _kill else 'finish',
+    'emails': _email,
+    'properties': _parse_option(_option),
+  }
+  if _jump:
+    kwargs['disabled_jobs'] = _job
+  else:
+    kwargs['jobs'] = _job
+  res = session.run_workflow(**kwargs)
   exec_id = res['execid']
   job_names = ', jobs: %s' % (', '.join(_job), ) if _job else ''
   sys.stdout.write(
@@ -389,21 +395,25 @@ def run_workflow(project_name, _flow, _job, _url, _alias, _bounce, _kill,
   )
 
 def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
-  _alias, _bounce, _kill, _email, _option):
+  _alias, _bounce, _kill, _email, _option, _jump):
   """Schedule workflow."""
   session = _get_session(_url, _alias)
-  session.schedule_workflow(
-    name=project_name,
-    flow=_flow,
-    date=_date,
-    time=_time,
-    period=_span,
-    jobs=_job,
-    concurrent=not _bounce,
-    on_failure='cancel' if _kill else 'finish',
-    emails=_email,
-    properties=_parse_option(_option),
-  )
+  kwargs = {
+    'name': project_name,
+    'flow': _flow,
+    'date': _date,
+    'time': _time,
+    'period': _span,
+    'concurrent': not _bounce,
+    'on_failure': 'cancel' if _kill else 'finish',
+    'emails': _email,
+    'properties': _parse_option(_option),
+  }
+  if _jump:
+    kwargs['disabled_jobs'] = _job
+  else:
+    kwargs['jobs'] = _job
+  res = session.schedule_workflow(**kwargs)
   sys.stdout.write(
     'Flow %s scheduled successfully.\n' % (_flow, )
   )
@@ -505,7 +515,7 @@ def main(argv=None):
         args,
         [
           'FLOW', 'JOB', '--bounce', '--url', '--alias', '--kill', '--email',
-          '--option',
+          '--option', '--jump',
         ]
       )
     )
@@ -515,8 +525,8 @@ def main(argv=None):
       **_forward(
         args,
         [
-          'FLOW', 'JOB', '--bounce', '--url', '--alias', '--kill',
-          '--email', '--option', '--date', '--time', '--span'
+          'FLOW', 'JOB', '--bounce', '--url', '--alias', '--kill', '--email',
+          '--option', '--date', '--time', '--span', '--jump',
         ]
       )
     )

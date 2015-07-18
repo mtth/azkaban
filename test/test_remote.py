@@ -323,6 +323,37 @@ class TestRun(_TestSession):
       self.session.upload_project(self.project, path)
     self.session.run_workflow(self.project, 'bar', jobs=['foo'])
 
+  def test_run_with_disabled_job(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    self.project.add_job('bar', Job(options, {'dependencies': 'foo'}))
+    self.project.add_job('baz', Job(options, {'dependencies': 'bar'}))
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+    res = self.session.run_workflow(self.project, 'baz', disabled_jobs=['bar'])
+    sleep(2)
+    statuses = dict(
+      (job_data['id'], job_data['status'])
+      for job_data in self.session.get_execution_status(res['execid'])['nodes']
+    )
+    eq_(statuses, {'foo': 'SUCCEEDED', 'bar': 'SKIPPED', 'baz': 'SUCCEEDED'})
+
+  @raises(ValueError)
+  def test_run_with_jobs_and_disabled_jobs(self):
+    options = {'type': 'command', 'command': 'ls'}
+    self.project.add_job('foo', Job(options))
+    self.project.add_job('bar', Job(options, {'dependencies': 'foo'}))
+    with temppath() as path:
+      self.project.build(path)
+      self.session.upload_project(self.project, path)
+    self.session.run_workflow(
+      self.project,
+      'bar',
+      jobs=['foo'],
+      disabled_jobs=['bar']
+    )
+
 
 class TestExecution(_TestSession):
 

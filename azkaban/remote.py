@@ -147,12 +147,13 @@ class Session(object):
     self.user, self.password, self.url = _parse_url(url)
     if not self.user:
       self.user = getuser()
+    self.id = None
     if self.config:
       try:
         key = str(self).replace(':', '.')
         self.id = self.config.parser.get('session_id', key)
       except (NoOptionError, NoSectionError):
-        self.id = None # No previous ID found.
+        pass
     self._logger = Adapter(repr(self), _logger)
     self._logger.debug('Instantiated.')
 
@@ -368,13 +369,17 @@ class Session(object):
       raise AzkabanError('Delete failed. Check permissions and existence.')
     return res
 
-  def run_workflow(self, name, flow, jobs=None, concurrent=True,
-    properties=None, on_failure='finish', notify_early=False, emails=None):
+  def run_workflow(self, name, flow, jobs=None, disabled_jobs=None,
+    concurrent=True, properties=None, on_failure='finish', notify_early=False,
+    emails=None):
     """Launch a workflow.
 
     :param name: Name of the project.
     :param flow: Name of the workflow.
     :param jobs: List of names of jobs to run (run entire workflow by default).
+      Mutually exclusive with `disabled_jobs` parameter.
+    :param disabled_jobs: List of names of jobs not to run. Mutually exclusive
+      with `jobs` parameter.
     :param concurrent: Run workflow concurrently with any previous executions.
     :param properties: Dictionary that will override global properties in this
       execution of the workflow. This dictionary will be flattened similarly to
@@ -405,6 +410,7 @@ class Session(object):
       name,
       flow,
       jobs=jobs,
+      disabled_jobs=disabled_jobs,
       concurrent=concurrent,
       properties=properties,
       on_failure=on_failure,
@@ -654,15 +660,21 @@ class Session(object):
       self.config.save()
     self._logger.info('Refreshed.')
 
-  def _run_options(self, name, flow, jobs=None, concurrent=True,
-    properties=None, on_failure='finish', notify_early=False, emails=None):
+  def _run_options(self, name, flow, jobs=None, disabled_jobs=None,
+    concurrent=True, properties=None, on_failure='finish', notify_early=False,
+    emails=None):
     """Construct data dict for run related actions.
 
     See :meth:`run_workflow` for parameter documentation.
 
     """
+    if jobs and disabled_jobs:
+      raise ValueError('`jobs` and `disabled_jobs` are mutually exclusive.')
     if not jobs:
-      disabled = '[]'
+      if not disabled_jobs:
+        disabled = '[]'
+      else:
+        disabled = '[%s]' % (','.join('"%s"' % (n, ) for n in disabled_jobs), )
     else:
       all_names = set(
         n['id']
