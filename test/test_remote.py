@@ -59,7 +59,7 @@ class _TestSession(object):
     if not self.session:
       raise SkipTest
     if self.project_name:
-      sleep(2)
+      sleep(1)
       self.project = Project(self.project_name)
 
 
@@ -218,9 +218,9 @@ class TestRun(_TestSession):
     with temppath() as path:
       self.project.build(path)
       self.session.upload_project(self.project, path)
-    res = self.session.run_workflow(self.project, 'foo')
+    res = self.session.run_workflow(self.project, 'foo', )
     eq_(['execid', 'flow', 'message', 'project'], sorted(res.keys()))
-    eq_(res['message'][:32], 'Execution submitted successfully')
+    ok_('Execution submitted successfully' in res['message'])
 
   def test_run_workflow_with_dependencies(self):
     options = {'type': 'command', 'command': 'ls'}
@@ -383,7 +383,8 @@ class TestExecution(_TestSession):
 
   def test_execution_logs(self):
     exe = Execution.start(self.session, self.project, 'foo')
-    logs = '\n'.join(exe.logs(2))
+    sleep(1)
+    logs = '\n'.join(exe.logs())
     ok_('Submitting job \'foo\' to run.' in logs)
 
 
