@@ -5,7 +5,7 @@
 
 Usage:
   azkabanpig PATH ...
-             [-j JAR] ... [-o OPTION] ...
+             [-f FILE] ... [-j JAR] ... [-o OPTION] ...
              [-bp PROJECT] [-t TYPE] [-a ALIAS | -u URL]
   azkabanpig -h | --help | -l | --log
 
@@ -20,6 +20,7 @@ Options:
   -a ALIAS --alias=ALIAS        Cf. `azkaban --help`.
   -b --background               Run job asynchronously. AzkabanPig will launch
                                 the workflow and return.
+  -f FILE --file=FILE           Path of file to include when uploading.
   -h --help                     Show this message and exit.
   -j JAR --jar=JAR              Path to jar file. It will be available on the
                                 class path when the pig script is run, no need
@@ -46,8 +47,8 @@ AzkabanPig returns with exit code 1 if an error occurred and 0 otherwise.
 __all__ = ['PigJob']
 
 from docopt import docopt
-from os import sep
-from os.path import abspath, basename, exists
+from os import getcwd, pardir, sep
+from os.path import abspath, basename, exists, isabs, relpath
 from time import sleep
 from ..job import Job
 from ..project import Project
@@ -111,7 +112,7 @@ class _PigProject(Project):
   """
 
   def __init__(self, name, paths, pig_type=None):
-    super(_PigProject, self).__init__(name, register=False)
+    super(_PigProject, self).__init__(name, register=False, root=getcwd())
     self.ordered_jobs = [basename(path) for path in paths]
     for path, dep in zip(paths, [None] + self.ordered_jobs):
       options = {'pig.script': abspath(path)}
@@ -193,6 +194,19 @@ def main():
         % (job_path, )
       )
     project.add_file(abspath(job_path), '%s.properties' % (i, ))
+  for fpath in args['--file']:
+    if exists(fpath) and not isabs(fpath) and pardir in relpath(fpath):
+      # We give a more useful error message than what `add_file` would raise.
+      # For simplicity, AzkabanPig doesn't allow directly configuring the
+      # archive path of included files (in the vast majority of cases, a
+      # relative include is much more convenient than absolute, so we can't
+      # just use the absolute path).
+      raise AzkabanError(
+        'Included files must either be below the CWD or be included using an '
+        'absolute path.\nUse an absolute path to include %s'
+        % (fpath, )
+      )
+    project.add_file(fpath)
   for jar in jars:
     project.add_file(abspath(jar))
   with temppath() as tpath:
