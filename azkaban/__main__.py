@@ -7,10 +7,10 @@ Usage:
   azkaban build [-cp PROJECT] [-a ALIAS | -u URL | [-r] ZIP] [-o OPTION ...]
   azkaban info [-p PROJECT] [-f | -o OPTION ... | [-i] JOB ...]
   azkaban log [-a ALIAS | -u URL] EXECUTION [JOB]
-  azkaban run [-bjkp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
+  azkaban run [-jkp PROJECT] [-a ALIAS | -u URL] [-b | -m MODE] [-e EMAIL ...]
               [-o OPTION ...] FLOW [JOB ...]
-  azkaban schedule [-bjkp PROJECT] [-a ALIAS | -u URL] [-e EMAIL ...]
-                   [-o OPTION ...] [-s SPAN] (-d DATE) (-t TIME)
+  azkaban schedule [-jkp PROJECT] [-a ALIAS | -u URL] [-b | -m MODE]
+                   [-e EMAIL ...] [-o OPTION ...] [-s SPAN] (-d DATE) (-t TIME)
                    FLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
   azkaban -h | --help | -l | --log | -v | --version
@@ -42,6 +42,7 @@ Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
                                 to reuse session IDs for later connections.
   -b --bounce                   Skip execution if workflow is already running.
+                                Shortcut for `--mode=skip`.
   -c --create                   Create the project if it does not exist.
   -d DATE --date=DATE           Date used for first run of a schedule. It must
                                 be in the format `MM/DD/YYYY`.
@@ -56,6 +57,8 @@ Options:
                                 those.
   -k --kill                     Kill worfklow on first job failure.
   -l --log                      Show path to current log file and exit.
+  -m MODE --mode=MODE           Concurrency mode. The default is to allow
+                                concurrent executions. See also `--bounce`.
   -o OPTION --option=OPTION     Azkaban properties. Can either be the path to
                                 a properties file or a single parameter
                                 formatted as `key=value`, e.g. `-o
@@ -370,13 +373,13 @@ def view_log(_execution, _job, _url, _alias):
       raise AzkabanError('Execution %s not found.', _execution)
 
 def run_workflow(project_name, _flow, _job, _url, _alias, _bounce, _kill,
-  _email, _option, _jump):
+  _email, _option, _jump, _mode):
   """Run workflow."""
   session = _get_session(_url, _alias)
   kwargs = {
     'name': project_name,
     'flow': _flow,
-    'concurrent': not _bounce,
+    'concurrent': _mode if _mode else not _bounce,
     'on_failure': 'cancel' if _kill else 'finish',
     'emails': _email,
     'properties': _parse_option(_option),
@@ -395,7 +398,7 @@ def run_workflow(project_name, _flow, _job, _url, _alias, _bounce, _kill,
   )
 
 def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
-  _alias, _bounce, _kill, _email, _option, _jump):
+  _alias, _bounce, _kill, _email, _option, _jump, _mode):
   """Schedule workflow."""
   session = _get_session(_url, _alias)
   kwargs = {
@@ -404,7 +407,7 @@ def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
     'date': _date,
     'time': _time,
     'period': _span,
-    'concurrent': not _bounce,
+    'concurrent': _mode if _mode else not _bounce,
     'on_failure': 'cancel' if _kill else 'finish',
     'emails': _email,
     'properties': _parse_option(_option),
@@ -515,7 +518,7 @@ def main(argv=None):
         args,
         [
           'FLOW', 'JOB', '--bounce', '--url', '--alias', '--kill', '--email',
-          '--option', '--jump',
+          '--option', '--jump', '--mode',
         ]
       )
     )
@@ -526,7 +529,7 @@ def main(argv=None):
         args,
         [
           'FLOW', 'JOB', '--bounce', '--url', '--alias', '--kill', '--email',
-          '--option', '--date', '--time', '--span', '--jump',
+          '--option', '--date', '--time', '--span', '--jump', '--mode',
         ]
       )
     )

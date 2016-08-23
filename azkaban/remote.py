@@ -381,6 +381,7 @@ class Session(object):
     :param disabled_jobs: List of names of jobs not to run. Mutually exclusive
       with `jobs` parameter.
     :param concurrent: Run workflow concurrently with any previous executions.
+      Can either be a boolean or a valid concurrency option string.
     :param properties: Dictionary that will override global properties in this
       execution of the workflow. This dictionary will be flattened similarly to
       how :class:`~azkaban.job.Job` options are handled.
@@ -700,9 +701,11 @@ class Session(object):
       }[on_failure]
     except KeyError:
       raise ValueError('Invalid `on_failure` value: %r.' % (on_failure, ))
+    if isinstance(concurrent, bool):
+      concurrent = 'concurrent' if concurrent else 'skip'
     request_data = {
       'disabled': disabled,
-      'concurrentOption': 'concurrent' if concurrent else 'skip',
+      'concurrentOption': concurrent,
       'failureAction': failure_action,
       'notifyFailureFirst': 'true' if notify_early else 'false',
     }
