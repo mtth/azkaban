@@ -381,7 +381,13 @@ class Session(object):
     :param disabled_jobs: List of names of jobs not to run. Mutually exclusive
       with `jobs` parameter.
     :param concurrent: Run workflow concurrently with any previous executions.
-      Can either be a boolean or a valid concurrency option string.
+      Can either be a boolean or a valid concurrency option string. Available
+      string options: `'skip'`: (Do not run flow if it is already running),
+      `'pipeline:1'`: (Pipeline the flow, so the current execution will not be
+      overrun. Block job A until the previous flow job A has completed),
+      `'pipeline:2'`: (Pipeline the flow, so the current execution will not be
+      overrun. Block job A until the previous flow job A's children have
+      completed)
     :param properties: Dictionary that will override global properties in this
       execution of the workflow. This dictionary will be flattened similarly to
       how :class:`~azkaban.job.Job` options are handled.
