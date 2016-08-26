@@ -701,11 +701,19 @@ class Session(object):
       }[on_failure]
     except KeyError:
       raise ValueError('Invalid `on_failure` value: %r.' % (on_failure, ))
+    pipeline_level = 1
+    queue_level = 1
     if isinstance(concurrent, bool):
       concurrent = 'concurrent' if concurrent else 'skip'
+    elif 'pipeline-' in concurrent:
+      concurrent, pipeline_level = concurrent.split('-')
+    elif 'queue-' in concurrent:
+      concurrent, queue_level = concurrent.split('-')
     request_data = {
       'disabled': disabled,
       'concurrentOption': concurrent,
+      'pipelineLevel': pipeline_level,
+      'queueLevel': queue_level,
       'failureAction': failure_action,
       'notifyFailureFirst': 'true' if notify_early else 'false',
     }
