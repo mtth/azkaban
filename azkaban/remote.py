@@ -701,22 +701,19 @@ class Session(object):
       }[on_failure]
     except KeyError:
       raise ValueError('Invalid `on_failure` value: %r.' % (on_failure, ))
-    pipeline_level = 1
-    queue_level = 1
+    concurrency_level = None
     if isinstance(concurrent, bool):
       concurrent = 'concurrent' if concurrent else 'skip'
-    elif 'pipeline-' in concurrent:
-      concurrent, pipeline_level = concurrent.split('-')
-    elif 'queue-' in concurrent:
-      concurrent, queue_level = concurrent.split('-')
+    elif ':' in concurrent:
+      concurrent, concurrency_level = concurrent.split(':', 1)
     request_data = {
       'disabled': disabled,
       'concurrentOption': concurrent,
-      'pipelineLevel': pipeline_level,
-      'queueLevel': queue_level,
       'failureAction': failure_action,
       'notifyFailureFirst': 'true' if notify_early else 'false',
     }
+    if concurrency_level is not None:
+      request_data['%sLevel' % (concurrent, )] = concurrency_level
     if properties:
       request_data.update(dict(
         ('flowOverride[%s]' % (key, ), value)
