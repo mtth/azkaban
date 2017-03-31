@@ -590,6 +590,32 @@ class Session(object):
     )
     return res
 
+  def get_workflows(self, name):
+    """Get list of workflows corresponding to a project
+
+    :param name: Project name
+
+    """
+    self._logger.debug(
+      'Fetching workflows in project %s', name
+    )
+    try:
+      res = self._request(
+        method='GET',
+        endpoint='manager',
+        params={
+          'ajax': 'fetchprojectflows',
+          'project': name,
+        },
+      )
+    except HTTPError:
+      raise AzkabanError('No workflows found in project %s', name)
+    else:
+      try:
+        return _extract_json(res)
+      except ValueError:
+        raise AzkabanError('Project %s not found', name)
+
   def get_workflow_info(self, name, flow):
     """Get list of jobs corresponding to a workflow.
 
