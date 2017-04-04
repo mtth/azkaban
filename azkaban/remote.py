@@ -332,16 +332,12 @@ class Session(object):
     return res
 
   def get_projects(self):
-    """Get a list of all projects
-
-    """
+    """Get a list of all projects."""
     self._logger.debug('Getting all projects')
     return _extract_json(self._request(
       method='GET',
       endpoint='index',
-      params={
-        'ajax': 'fetchallprojects',
-      },
+      params={'ajax': 'fetchallprojects'},
     ))
 
   def create_project(self, name, description):
@@ -509,7 +505,8 @@ class Session(object):
     :param name: Project name.
     :param flow: Name of flow in project.
     :param cron_expression: A CRON expression comprising 6 or 7 fields
-      separated by white space that represents a set of times in Quartz Cron Format.
+      separated by white space that represents a set of times in Quartz Cron
+      Format.
     :param \*\*kwargs: See :meth:`run_workflow` for documentation.
 
     """
@@ -563,9 +560,7 @@ class Session(object):
     :param schedule_id: Schedule Id - obtainable from get_schedule
 
     """
-    self._logger.debug(
-      'Retrieving SLA for schedule ID %s.', schedule_id
-    )
+    self._logger.debug('Retrieving SLA for schedule ID %s.', schedule_id)
     res = _extract_json(self._request(
       method='GET',
       endpoint='schedule',
@@ -574,27 +569,24 @@ class Session(object):
         'scheduleId': schedule_id
       },
     ))
-    self._logger.info(
-      'Retrieved SLA for schedule ID %s.', schedule_id
-    )
+    self._logger.info('Retrieved SLA for schedule ID %s.', schedule_id)
     if 'settings' not in res:
-      raise AzkabanError(
-        'Failed to get SLA. Check that an SLA exists.'
-      )
+      raise AzkabanError('Failed to get SLA; check that an SLA exists.')
     return res
 
   def set_sla(self, schedule_id, email, settings):
-    """Set SLA for a workflow schedule
+    """Set SLA for a schedule.
 
-    :param schedule_id: Schedule id
-    :param email: Array of emails for receiving notifications
-    :param settings: Array of Comma delimited string of SLA settings
-      consisting of
-        job name - blank for full workflow
-        rule - SUCCESS or FINISH
-        duration - specified in hh:mm
-        email action - bool
-        kill action - bool
+    :param schedule_id: Schedule ID.
+    :param email: Array of emails to receive notifications.
+    :param settings: Array of comma delimited strings of SLA settings
+      consisting of:
+
+      + job name - blank for full workflow
+      + rule - SUCCESS or FINISH
+      + duration - specified in hh:mm
+      + email action - bool
+      + kill action - bool
 
     """
     self._logger.debug('Setting SLA for schedule Id %s.', schedule_id)
@@ -603,8 +595,8 @@ class Session(object):
       'scheduleId': schedule_id,
       'slaEmails': ','.join(email),
     }
-    for k, setting in enumerate(settings):
-      request_data['settings['+str(k)+']'] = setting
+    for i, setting in enumerate(settings):
+      request_data['settings[%s]' % (i,)] = setting
     res = _extract_json(self._request(
       method='POST',
       endpoint='schedule',
