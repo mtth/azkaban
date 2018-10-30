@@ -80,9 +80,10 @@ class Config(object):
         raise AzkabanError('Invalid configuration file %r.', self.path)
       else:
         # TODO: remove this in 1.0.
-        self._convert_aliases()
-        self.save()
-        self.parser.read(self.path)
+        if self._convert_aliases():
+          self.save()
+          self.parser.read(self.path)
+
 
   def save(self):
     """Save configuration parser back to file."""
@@ -139,15 +140,17 @@ class Config(object):
   def _convert_aliases(self):
     """Convert old-style aliases to new-style."""
     parser = self.parser
-    if parser.has_section('alias'):
-      for alias, url in parser.items('alias'):
-        section = 'alias.%s' % (alias, )
-        if not parser.has_section(section):
-          # Only update if the alias doesn't yet.
-          parser.add_section(section)
-          parser.set(section, 'url', url)
-          parser.set(section, 'verify', 'false') # Backwards compatibility.
-      parser.remove_section('alias')
+    if not parser.has_section('alias'):
+      return False # Nothing to do.
+    for alias, url in parser.items('alias'):
+      section = 'alias.%s' % (alias, )
+      if not parser.has_section(section):
+        # Only update if the alias doesn't yet.
+        parser.add_section(section)
+        parser.set(section, 'url', url)
+        parser.set(section, 'verify', 'false') # Backwards compatibility.
+    parser.remove_section('alias')
+    return True
 
 
 class MultipartForm(object):
