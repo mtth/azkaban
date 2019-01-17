@@ -649,6 +649,8 @@ class Session(object):
     if not self.is_valid():
       self._refresh() # ensure that the ID is valid
     archive_name = archive_name or basename(path)
+    if not archive_name.endswith('.zip'):
+        archive_name += '.zip'
     form = MultipartForm(
       files=[{
         'path': path,

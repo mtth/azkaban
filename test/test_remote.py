@@ -9,6 +9,7 @@ from azkaban.job import Job
 from azkaban.remote import Execution, Session, _parse_url
 from azkaban.util import (AzkabanError, Config, suppress_urllib_warnings,
   temppath)
+from requests.exceptions import HTTPError
 from six.moves.configparser import NoOptionError, NoSectionError
 from nose.tools import eq_, ok_, raises, nottest
 from nose.plugins.skip import SkipTest
@@ -88,7 +89,7 @@ class TestCreateDelete(_TestSession):
       with temppath() as path:
         project.build(path)
         self.session.upload_project(project, path)
-    except AzkabanError:
+    except (AzkabanError, HTTPError):
       return False
     else:
       return True
@@ -105,7 +106,6 @@ class TestCreateDelete(_TestSession):
     self.session.create_project(self.project, 'Some description.')
     self.session.create_project(self.project, 'Some other description.')
 
-  @raises(AzkabanError)
   def test_delete_nonexistent_project(self):
     if self.project_exists(self.project):
       self.session.delete_project(self.project)
