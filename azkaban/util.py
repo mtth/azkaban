@@ -32,7 +32,9 @@ class AzkabanError(Exception):
   """Base error class."""
 
   def __init__(self, message, *args):
-    super(AzkabanError, self).__init__(message % args if args else message)
+    message = message % args if args else message
+    super(AzkabanError, self).__init__(message)
+    self.message = message
 
 
 class Adapter(lg.LoggerAdapter):
