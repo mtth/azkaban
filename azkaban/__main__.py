@@ -324,6 +324,8 @@ def _upload_zip(session, name, path, create=False, archive_name=None):
         session.create_project(name, name)
       else:
         raise err
+    except HTTPError as e:
+      session.create_project(name, name)
     else:
       return res
 
