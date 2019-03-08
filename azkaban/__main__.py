@@ -325,7 +325,10 @@ def _upload_zip(session, name, path, create=False, archive_name=None):
       else:
         raise err
     except HTTPError as e:
-      session.create_project(name, name)
+      if e.response.status_code == 410:
+          session.create_project(name, name)
+      else:
+          raise e
     else:
       return res
 
