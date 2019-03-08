@@ -327,6 +327,8 @@ def _upload_zip(session, name, path, create=False, archive_name=None):
     except HTTPError as e:
       if e.response.status_code == 410:
           session.create_project(name, name)
+      elif e.response.status_code == 400:
+          raise AzkabanError("Failed to upload project. Verify that Project is not locked, exists and your users has write permission. HTTPError: {0}".format(e.response.status_code))
       else:
           raise e
     else:
