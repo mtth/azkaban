@@ -324,15 +324,25 @@ def _upload_zip(session, name, path, create=False, archive_name=None):
         session.create_project(name, name)
       else:
         raise err
-    except HTTPError as e:
-      if e.response.status_code == 410:
-          session.create_project(name, name)
-      elif e.response.status_code == 400:
-          raise AzkabanError("Failed to upload project. Verify that Project is not locked, exists and your user has write permission. HTTPError: {0}".format(e.response.status_code))
-      elif e.response.status_code == 401:
-          raise AzkabanError("Failed to upload project due to not being authorized. Verify that your user has write permission. HTTPError: {0}".format(e.response.status_code))
+    except HTTPError as err:
+      # See https://github.com/mtth/azkaban/pull/34 for more context on why the
+      # logic below is necessary.
+      code = err.response.status_code
+      if code == 400:
+        raise AzkabanError(
+          "Failed to upload project (%s HTTP error). Check that the project "
+          "is not locked, exists, and that your user has write permissions."
+          % (code, )
+        )
+      elif code == 401:
+        raise AzkabanError(
+          "Not authorized to upload project (%s HTTP error). Check that your "
+          "user has write permissions." % (code, )
+        )
+      elif code == 410:
+        session.create_project(name, name)
       else:
-          raise e
+        raise err
     else:
       return res
 
