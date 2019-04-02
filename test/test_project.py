@@ -17,7 +17,7 @@ from zipfile import ZipFile
 
 
 # filepaths for testing
-FILEPATHS = [__file__, abspath(join(dirname(__file__), pardir, 'README.rst'))]
+FILEPATHS = [__file__, abspath(join(dirname(__file__), pardir, 'README.md'))]
 
 
 class _TestProject(object):

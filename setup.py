@@ -10,7 +10,7 @@ setup(
     name='azkaban',
     version=__version__,
     description=__doc__,
-    long_description=open('README.rst').read(),
+    long_description=open('README.md').read(),
     author='Matthieu Monsch',
     author_email='monsch@alum.mit.edu',
     url='http://azkabancli.readthedocs.org/',

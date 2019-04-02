@@ -172,7 +172,7 @@ class MultipartForm(object):
 
     from requests import post
 
-    form = MultipartForm(files=['README.rst'])
+    form = MultipartForm(files=['README.md'])
     post('http://your.url', headers=form.headers, data=form)
 
   """
