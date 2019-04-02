@@ -5,7 +5,6 @@ A lightweight [Azkaban][] client providing:
 * A command line interface to run workflows, upload projects, etc.
 * A convenient and extensible way for building projects.
 
-
 ## Sample
 
 Below is a simple configuration file for a project containing a workflow with 
@@ -37,11 +36,9 @@ The [examples][] directory contains another sample project that uses Azkaban
 properties to build a project with two configurations: production and test, 
 without any job duplication.
 
-
 ## Documentation
 
 The full documentation can be found [here][doc].
-
 
 ## Installation
 
@@ -50,12 +47,6 @@ Using [pip][]:
 ```sh
 $ pip install azkaban
 ```
-
-
-[Azkaban]: http://data.linkedin.com/opensource/azkaban
-[pip]: http://www.pip-installer.org/en/latest/
-[doc]: http://azkabancli.readthedocs.org/
-[examples]: https://github.com/mtth/azkaban/tree/master/examples
 
 ## Development
 
@@ -75,3 +66,8 @@ test.alias = local
 [alias.local]
 url = azkaban:azkaban@http://localhost:8081
 ```
+
+[Azkaban]: http://data.linkedin.com/opensource/azkaban
+[doc]: http://azkabancli.readthedocs.org/
+[examples]: https://github.com/mtth/azkaban/tree/master/examples
+[pip]: http://www.pip-installer.org/en/latest/
