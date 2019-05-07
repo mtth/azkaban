@@ -17,9 +17,10 @@ from six.moves.configparser import NoOptionError, NoSectionError
 from six.moves.urllib.parse import urlparse
 from time import sleep
 from warnings import warn
+import json
 import logging as lg
-import requests as rq
 import re
+import requests as rq
 
 
 _logger = lg.getLogger(__name__)
@@ -797,7 +798,7 @@ class Session(object):
       if not disabled_jobs:
         disabled = '[]'
       else:
-        disabled = '[%s]' % (','.join('"%s"' % (n, ) for n in disabled_jobs), )
+        disabled = json.dumps(list(disabled_jobs))
     else:
       all_names = set(
         n['id']
@@ -811,10 +812,7 @@ class Session(object):
           (flow, ', '.join(missing_names))
         )
       else:
-        disabled = (
-          '[%s]'
-          % (','.join('"%s"' % (n, ) for n in all_names - run_names), )
-        )
+        disabled = json.dumps(list(all_names - run_names))
     try:
       failure_action = {
         'finish': 'finishCurrent',
