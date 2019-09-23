@@ -337,7 +337,7 @@ class Session(object):
 
     :param exec_id: Execution ID.
 
-    Note that if an execution has already been paused, it will not return any error.
+    If an execution has already been paused, this method is a no-op.
 
     """
     self._logger.debug('Pausing execution %s.', exec_id)
@@ -360,7 +360,7 @@ class Session(object):
 
     :param exec_id: Execution ID.
 
-    Note that if an execution has already been resumed, it will not return any errors.
+    If an execution is already running, this method is a no-op.
 
     """
     self._logger.debug('Resuming execution %s.', exec_id)
