@@ -14,8 +14,7 @@ jobs:
         provider: pypi
         user: mtth
         password:
-          secure: Oslw+ounXMBnCgUTF5wfXXvt/Tdxpm+pawVCP9EXdQyTO9zqmZ+aydXYhXl8Tlon/Cf4nHUWw43J67/SUx/gozSrkSRfsZ1kA9I9J6SvaxQpdHGwKTEFGuWVHNIwfRgeJ8GGPr8lBCG2LSnhRu1YPDO6R/jPdbcFbi7wMIAPjQA=
+          secure: f/dKAT6ggBZnL7lE+w3besrt2klq+DmKpqWXsjj6pWe4mfYzBscQ876yjpl+obX385m3FvHfRQp2UgFpwKY5P9mI9bz01kSdXgaGtx2W1eXCmpFo4HZRIHYfgGy3SL4o/0HeJS+KEbBACtLahBHya38ym/qZTxAe+T5TviEqvCY=
         on:
           repo: mtth/azkaban
           tags: true
-
