@@ -9,7 +9,7 @@ Usage:
   azkaban log [-a ALIAS | -u URL] EXECUTION [JOB]
   azkaban run [-jkp PROJECT] [-a ALIAS | -u URL] [-b | -m MODE] [-e EMAIL ...]
               [-o OPTION ...] FLOW [JOB ...]
-  azkaban schedule [-jkp PROJECT] [-a ALIAS | -u URL] [-b | -m MODE]
+  azkaban schedule [-jknp PROJECT] [-a ALIAS | -u URL] [-b | -m MODE]
                    [-e EMAIL ...] [-o OPTION ...] [-s SPAN] (-d DATE) (-t TIME)
                    FLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
@@ -59,6 +59,9 @@ Options:
   -l --log                      Show path to current log file and exit.
   -m MODE --mode=MODE           Concurrency mode. The default is to allow
                                 concurrent executions. See also `--bounce`.
+  -n --notify_early             Send any notification emails when the first job
+                                fails rather than when the entire workflow
+                                finishes.
   -o OPTION --option=OPTION     Azkaban properties. Can either be the path to
                                 a properties file or a single parameter
                                 formatted as `key=value`, e.g. `-o
@@ -417,7 +420,7 @@ def run_workflow(project_name, _flow, _job, _url, _alias, _bounce, _kill,
   )
 
 def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
-  _alias, _bounce, _kill, _email, _option, _jump, _mode):
+  _alias, _bounce, _kill, _email, _option, _jump, _notify_early, _mode):
   """Schedule workflow."""
   session = _get_session(_url, _alias)
   kwargs = {
@@ -431,6 +434,8 @@ def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
     'emails': _email,
     'properties': _parse_option(_option),
   }
+  if _notify_early:
+    kwargs['notify_early'] = True
   if _jump:
     kwargs['disabled_jobs'] = _job
   else:
@@ -548,7 +553,7 @@ def main(argv=None):
         args,
         [
           'FLOW', 'JOB', '--bounce', '--url', '--alias', '--kill', '--email',
-          '--option', '--date', '--time', '--span', '--jump', '--mode',
+          '--option', '--date', '--time', '--span', '--jump', '--notify_early', '--mode',
         ]
       )
     )
