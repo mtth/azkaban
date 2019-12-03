@@ -12,6 +12,9 @@ Usage:
   azkaban schedule [-jknp PROJECT] [-a ALIAS | -u URL] [-b | -m MODE]
                    [-e EMAIL ...] [-o OPTION ...] [-s SPAN] (-d DATE) (-t TIME)
                    FLOW [JOB ...]
+  azkaban cron [-jknp PROJECT] [-a ALIAS | -u URL] [-b | -m MODE]
+                   [-e EMAIL ...] [-o OPTION ...] [-s SPAN] (-x CRON) (-z TIMEZONE)
+                   FLOW [JOB ...]
   azkaban upload [-cp PROJECT] [-a ALIAS | -u URL] ZIP
   azkaban -h | --help | -l | --log | -v | --version
 
@@ -24,6 +27,8 @@ Commmands:
                                 the entire workflow will be executed.
   schedule                      Schedule a workflow to be run at a specified
                                 date and time.
+  cron                          Schedule a workflow to be run using a
+                                specified cron expression and timezone.
   upload                        Upload archive to Azkaban server.
 
 Arguments:
@@ -85,6 +90,7 @@ Options:
                                 will be run only once.
   -t TIME --time=TIME           Time when a schedule should be run. Must be of
                                 the format `hh,mm,(AM|PM),(PDT|UTC|..)`.
+  -x CRON --cron_exp=CRON       Cron expression to use
   -u URL --url=URL              Azkaban endpoint (with protocol, and optionally
                                 a username): '[user@]protocol:endpoint'. E.g.
                                 'http://azkaban.server'. The username defaults
@@ -92,6 +98,7 @@ Options:
                                 If you often use the same url, consider using
                                 the `--alias` option instead.
   -v --version                  Show version and exit.
+  -z ZONE --timezone=ZONE       Timezone to use
 
 Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 
@@ -445,6 +452,31 @@ def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
     'Flow %s scheduled successfully.\n' % (_flow, )
   )
 
+def schedule_cron_workflow(project_name, _cron_exp, _timezone, _flow, _job, _url,
+                           _alias, _bounce, _kill, _email, _option, _jump, _notify_early, _mode):
+  """Schedule workflow."""
+  session = _get_session(_url, _alias)
+  kwargs = {
+    'name': project_name,
+    'flow': _flow,
+    'cron_expression': _cron_exp,
+    'timezone': _timezone,
+    'concurrent': _mode if _mode else not _bounce,
+    'on_failure': 'cancel' if _kill else 'finish',
+    'emails': _email,
+    'properties': _parse_option(_option),
+  }
+  if _notify_early:
+    kwargs['notify_early'] = True
+  if _jump:
+    kwargs['disabled_jobs'] = _job
+  else:
+    kwargs['jobs'] = _job
+  res = session.schedule_cron_workflow(**kwargs)
+  sys.stdout.write(
+    'Flow %s scheduled successfully.\n' % (_flow, )
+  )
+
 def upload_project(project_name, _zip, _url, _alias, _create):
   """Upload project."""
   session = _get_session(_url, _alias)
@@ -554,6 +586,17 @@ def main(argv=None):
         [
           'FLOW', 'JOB', '--bounce', '--url', '--alias', '--kill', '--email',
           '--option', '--date', '--time', '--span', '--jump', '--notify_early', '--mode',
+        ]
+      )
+    )
+  elif args['cron']:
+    schedule_cron_workflow(
+      _get_project_name(args['--project']),
+      **_forward(
+        args,
+        [
+          'FLOW', 'JOB', '--bounce', '--url', '--alias', '--kill', '--email',
+          '--option', '--cron_expression', '--timezone', '--span', '--jump', '--notify_early', '--mode',
         ]
       )
     )
