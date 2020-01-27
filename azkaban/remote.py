@@ -546,7 +546,7 @@ class Session(object):
     self._logger.info('Unscheduled project %s workflow %s.', name, flow)
     return res
 
-  def schedule_cron_workflow(self, name, flow, cron_expression, timezone, **kwargs):
+  def schedule_cron_workflow(self, name, flow, cron_expression, timezone = None, **kwargs):
     """Schedule a cron workflow.
 
     :param name: Project name.
@@ -563,9 +563,11 @@ class Session(object):
       'ajax': 'scheduleCronFlow',
       'projectName': name,
       'flow': flow,
-      'timezone': timezone,
       'cronExpression': cron_expression,
     }
+    if timezone:
+      request_data['timezone'] = timezone
+
     request_data.update(self._run_options(name, flow, **kwargs))
     res = _extract_json(self._request(
       method='POST',

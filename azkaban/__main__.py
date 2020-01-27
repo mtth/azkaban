@@ -96,7 +96,7 @@ Options:
                                 If you often use the same url, consider using
                                 the `--alias` option instead.
   -v --version                  Show version and exit.
-  -z ZONE --timezone=ZONE       Timezone to use (PDT|UTC|..)
+  -z ZONE --timezone=ZONE       Timezone to use (PST|UTC|..)
                                 Uses server default if omitted.
 
 Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
@@ -427,53 +427,38 @@ def run_workflow(project_name, _flow, _job, _url, _alias, _bounce, _kill,
 
 def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
   _alias, _bounce, _kill, _email, _option, _jump, _notify_early, _mode, _cron_exp, _timezone):
-  if _cron_exp:
-    """Schedule cron workflow."""
-    session = _get_session(_url, _alias)
-    kwargs = {
-      'name': project_name,
-      'flow': _flow,
-      'cron_expression': _cron_exp,
-      'timezone': _timezone,
-      'concurrent': _mode if _mode else not _bounce,
-      'on_failure': 'cancel' if _kill else 'finish',
-      'emails': _email,
-      'properties': _parse_option(_option),
-    }
-    if _notify_early:
-      kwargs['notify_early'] = True
-    if _jump:
-      kwargs['disabled_jobs'] = _job
-    else:
-      kwargs['jobs'] = _job
-    res = session.schedule_cron_workflow(**kwargs)
-    sys.stdout.write(
-      'Flow %s scheduled successfully.\n' % (_flow, )
-    )
+  """Schedule workflow."""
+  kwargs = {
+    'name': project_name,
+    'flow': _flow,
+    'concurrent': _mode if _mode else not _bounce,
+    'on_failure': 'cancel' if _kill else 'finish',
+    'emails': _email,
+    'properties': _parse_option(_option),
+  }
+  if _notify_early:
+    kwargs['notify_early'] = True
+  if _jump:
+    kwargs['disabled_jobs'] = _job
   else:
-    """Schedule workflow."""
-    session = _get_session(_url, _alias)
-    kwargs = {
-      'name': project_name,
-      'flow': _flow,
+    kwargs['jobs'] = _job
+  session = _get_session(_url, _alias)
+  if _cron_exp:
+    kwargs.update({
+      'cron_expression': _cron_exp,
+      'timezone': _timezone
+    })
+    res = session.schedule_cron_workflow(**kwargs)
+  else:
+    kwargs.update({
       'date': _date,
       'time': _time,
-      'period': _span,
-      'concurrent': _mode if _mode else not _bounce,
-      'on_failure': 'cancel' if _kill else 'finish',
-      'emails': _email,
-      'properties': _parse_option(_option),
-    }
-    if _notify_early:
-      kwargs['notify_early'] = True
-    if _jump:
-      kwargs['disabled_jobs'] = _job
-    else:
-      kwargs['jobs'] = _job
+      'period': _span
+    })
     res = session.schedule_workflow(**kwargs)
-    sys.stdout.write(
-      'Flow %s scheduled successfully.\n' % (_flow, )
-    )
+  sys.stdout.write(
+    'Flow %s scheduled successfully.\n' % (_flow, )
+  )
 
 def upload_project(project_name, _zip, _url, _alias, _create):
   """Upload project."""
