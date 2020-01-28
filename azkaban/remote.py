@@ -546,15 +546,15 @@ class Session(object):
     self._logger.info('Unscheduled project %s workflow %s.', name, flow)
     return res
 
-  def schedule_cron_workflow(self, name, flow, cron_expression, timezone = None, **kwargs):
+  def schedule_cron_workflow(self, name, flow, cron, timezone=None, **kwargs):
     """Schedule a cron workflow.
 
     :param name: Project name.
     :param flow: Name of flow in project.
-    :param cron_expression: A CRON expression comprising 6 or 7 fields
-      separated by white space that represents a set of times in Quartz Cron
-      Format.
-    :param timezone: Timezone ID (See also https://docs.oracle.com/javase/8/docs/api/java/time/ZoneId.html).
+    :param cron: A CRON expression comprising 6 or 7 fields separated by white
+      space that represents a set of times in Quartz Cron Format.
+    :param timezone: Timezone ID. See https://bit.ly/2RzHxfI for the list of
+      valid IDs. If set to an invalid value, the server's default will be used.
     :param \*\*kwargs: See :meth:`run_workflow` for documentation.
 
     """
@@ -563,11 +563,10 @@ class Session(object):
       'ajax': 'scheduleCronFlow',
       'projectName': name,
       'flow': flow,
-      'cronExpression': cron_expression,
+      'cronExpression': cron,
     }
     if timezone:
       request_data['timezone'] = timezone
-
     request_data.update(self._run_options(name, flow, **kwargs))
     res = _extract_json(self._request(
       method='POST',

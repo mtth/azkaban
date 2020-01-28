@@ -88,7 +88,6 @@ Options:
                                 will be run only once.
   -t TIME --time=TIME           Time when a schedule should be run. Must be of
                                 the format `hh,mm,(AM|PM),(PDT|UTC|..)`.
-  -x CRON --cron_exp=CRON       Cron expression to use e.g. "0 30 5 ? * *"
   -u URL --url=URL              Azkaban endpoint (with protocol, and optionally
                                 a username): '[user@]protocol:endpoint'. E.g.
                                 'http://azkaban.server'. The username defaults
@@ -96,8 +95,10 @@ Options:
                                 If you often use the same url, consider using
                                 the `--alias` option instead.
   -v --version                  Show version and exit.
-  -z ZONE --timezone=ZONE       Timezone to use (PST|UTC|..)
-                                Uses server default if omitted.
+  -x CRON --cron=CRON           Cron expression to use (e.g. `0 30 5 ? * *`).
+  -z ZONE --timezone=ZONE       Timezone to use (PST|UTC|..). If unset or
+                                invalid, the server default will be used. See
+                                https://bit.ly/2RzHxfI for the full list.
 
 Azkaban CLI returns with exit code 1 if an error occurred and 0 otherwise.
 
@@ -426,8 +427,10 @@ def run_workflow(project_name, _flow, _job, _url, _alias, _bounce, _kill,
   )
 
 def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
-  _alias, _bounce, _kill, _email, _option, _jump, _notify_early, _mode, _cron_exp, _timezone):
+  _alias, _bounce, _kill, _email, _option, _jump, _notify_early, _mode,
+  _cron, _timezone):
   """Schedule workflow."""
+  session = _get_session(_url, _alias)
   kwargs = {
     'name': project_name,
     'flow': _flow,
@@ -442,23 +445,20 @@ def schedule_workflow(project_name, _date, _time, _span, _flow, _job, _url,
     kwargs['disabled_jobs'] = _job
   else:
     kwargs['jobs'] = _job
-  session = _get_session(_url, _alias)
-  if _cron_exp:
+  if _cron:
     kwargs.update({
-      'cron_expression': _cron_exp,
-      'timezone': _timezone
+      'cron': _cron,
+      'timezone': _timezone,
     })
-    res = session.schedule_cron_workflow(**kwargs)
+    session.schedule_cron_workflow(**kwargs)
   else:
     kwargs.update({
       'date': _date,
       'time': _time,
-      'period': _span
+      'period': _span,
     })
-    res = session.schedule_workflow(**kwargs)
-  sys.stdout.write(
-    'Flow %s scheduled successfully.\n' % (_flow, )
-  )
+    session.schedule_workflow(**kwargs)
+  sys.stdout.write('Flow %s scheduled successfully.\n' % (_flow, ))
 
 def upload_project(project_name, _zip, _url, _alias, _create):
   """Upload project."""
@@ -568,8 +568,8 @@ def main(argv=None):
         args,
         [
           'FLOW', 'JOB', '--bounce', '--url', '--alias', '--kill', '--email',
-          '--option', '--date', '--time', '--span', '--jump', '--notify_early', '--mode',
-          '--cron_exp', '--timezone'
+          '--option', '--date', '--time', '--span', '--jump', '--notify_early',
+          '--mode', '--cron', '--timezone',
         ]
       )
     )
